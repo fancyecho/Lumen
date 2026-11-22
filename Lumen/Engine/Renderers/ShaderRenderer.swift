@@ -67,7 +67,7 @@ final class ShaderRenderer: NSObject, WallpaperRenderer, MTKViewDelegate {
     private var isTornDown = false
     private var readyHandlers: [@MainActor () -> Void] = []
 
-    init(config: ShaderConfig, settings: ShaderRenderSettings) throws {
+    init(config: ShaderConfig, settings: ShaderRenderSettings, framing: WallpaperFraming = .centered) throws {
         let context = MetalContext.shared
         guard let device = context.device, let queue = context.commandQueue else { throw ShaderError.noDevice }
         guard let source = config.resolvedSource else { throw ShaderError.missingSource }
@@ -77,6 +77,7 @@ final class ShaderRenderer: NSObject, WallpaperRenderer, MTKViewDelegate {
         params = config.params
         detail = config.detail
         uniforms = ShaderUniforms(params: config.params)
+        uniforms.framing = framing.shaderVector
         self.settings = settings
         metalView = BudgetedMetalView(frame: .zero, device: device)
         super.init()
@@ -140,6 +141,11 @@ final class ShaderRenderer: NSObject, WallpaperRenderer, MTKViewDelegate {
         if !isActive, isReady { metalView.draw() }
     }
 
+    func setFraming(_ framing: WallpaperFraming) {
+        uniforms.framing = framing.shaderVector
+        if !isActive, isReady { metalView.draw() }
+    }
+
     func update(settings newSettings: ShaderRenderSettings) {
         guard newSettings != settings else { return }
         settings = newSettings
@@ -172,6 +178,7 @@ final class ShaderRenderer: NSObject, WallpaperRenderer, MTKViewDelegate {
         uniforms.resolution = SIMD2(Float(view.drawableSize.width), Float(view.drawableSize.height))
         encoder.setRenderPipelineState(pipeline)
         withUnsafeBytes(of: &uniforms) { bytes in
+            encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 0)
             encoder.setFragmentBytes(bytes.baseAddress!, length: bytes.count, index: 0)
         }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)

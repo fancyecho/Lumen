@@ -21,17 +21,24 @@ final class LibraryStore {
     private(set) var importJobs: [ImportJob] = []
     private(set) var optimizing: [UUID: Double] = [:]
     private(set) var revision = 0
+    /// Built-in presets are immutable, so their position/zoom lives here.
+    private(set) var builtinFramings: [UUID: WallpaperFraming] = [:]
 
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
     private static let favoritesKey = "favoriteBuiltinWallpapers"
+    private static let builtinFramingsKey = "builtinWallpaperFramings"
 
     // MARK: Lookup
 
     var builtins: [Wallpaper] {
-        BuiltinShaders.wallpapers.map { wallpaper in
-            var copy = wallpaper
-            copy.isFavorite = favoriteBuiltins.contains(wallpaper.id)
-            return copy
-        }
+        BuiltinShaders.wallpapers.map(decorated)
+    }
+
+    private func decorated(_ builtin: Wallpaper) -> Wallpaper {
+        var copy = builtin
+        copy.isFavorite = favoriteBuiltins.contains(builtin.id)
+        copy.framing = builtinFramings[builtin.id]
+        return copy
     }
 
     var all: [Wallpaper] { items + builtins }
@@ -43,9 +50,8 @@ final class LibraryStore {
 
     func wallpaper(id: UUID) -> Wallpaper? {
         if let item = items.first(where: { $0.id == id }) { return item }
-        guard var builtin = BuiltinShaders.preset(id: id)?.wallpaper else { return nil }
-        builtin.isFavorite = favoriteBuiltins.contains(id)
-        return builtin
+        guard let builtin = BuiltinShaders.preset(id: id)?.wallpaper else { return nil }
+        return decorated(builtin)
     }
 
     /// The file the engine should decode: the optimised variant when one exists.
@@ -73,6 +79,10 @@ final class LibraryStore {
 
     func load() {
         favoriteBuiltins = Set((UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []).compactMap(UUID.init(uuidString:)))
+        if let data = UserDefaults.standard.data(forKey: Self.builtinFramingsKey),
+           let stored = try? JSONDecoder().decode([UUID: WallpaperFraming].self, from: data) {
+            builtinFramings = stored
+        }
         guard let data = try? Data(contentsOf: AppPaths.libraryFile) else { return }
         do {
             let decoder = JSONDecoder()
@@ -81,6 +91,23 @@ final class LibraryStore {
         } catch {
             Log.library.error("Library file unreadable: \(error.localizedDescription, privacy: .public)")
         }
+        dropOversizedOptimizedCopies()
+    }
+
+    /// Earlier builds could produce an "optimised" copy larger than the source. Remove those
+    /// so playback falls back to the original and the improved optimiser can be run again.
+    private func dropOversizedOptimizedCopies() {
+        var changed = false
+        for index in items.indices {
+            guard let video = items[index].video, let optimized = video.optimized,
+                  Double(optimized.fileSize) > Double(video.fileSize) * VideoOptimizer.requiredSaving
+            else { continue }
+            try? FileManager.default.removeItem(at: AppPaths.folder(for: items[index].id).appending(path: optimized.fileName))
+            items[index].video?.optimized = nil
+            changed = true
+            Log.library.info("Removed an optimised copy that wasn't smaller than its source")
+        }
+        if changed { save() }
     }
 
     private func save() {
@@ -102,6 +129,27 @@ final class LibraryStore {
         guard let index = items.firstIndex(where: { $0.id == wallpaper.id }) else { return }
         items[index] = wallpaper
         save()
+    }
+
+    /// Updates position/zoom immediately; the file write is coalesced while a slider is dragged.
+    func setFraming(_ framing: WallpaperFraming, for id: UUID) {
+        let stored: WallpaperFraming? = framing.isCentered ? nil : framing.clamped
+        if let index = items.firstIndex(where: { $0.id == id }) {
+            guard items[index].framing != stored else { return }
+            items[index].framing = stored
+            pendingSave?.cancel()
+            pendingSave = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                self?.save()
+            }
+        } else if BuiltinShaders.ids.contains(id) {
+            guard builtinFramings[id] != stored else { return }
+            builtinFramings[id] = stored
+            if let data = try? JSONEncoder().encode(builtinFramings) {
+                UserDefaults.standard.set(data, forKey: Self.builtinFramingsKey)
+            }
+        }
     }
 
     func toggleFavorite(_ id: UUID) {
@@ -214,27 +262,42 @@ final class LibraryStore {
 
     // MARK: Optimisation
 
-    func optimize(_ wallpaperID: UUID, maxDisplayWidth: Int) async throws {
+    enum OptimizationOutcome {
+        case optimized(saved: Int64)
+        /// The HEVC copy wasn't clearly smaller; the original is kept and optimisation isn't offered again.
+        case keptOriginal
+        case notNeeded
+    }
+
+    func optimize(_ wallpaperID: UUID, maxDisplayWidth: Int) async throws -> OptimizationOutcome {
         guard let wallpaper = wallpaper(id: wallpaperID),
               let video = wallpaper.video,
               let source = sourceURL(for: wallpaper),
               let plan = VideoOptimizer.plan(for: video, maxDisplayWidth: maxDisplayWidth)
-        else { return }
+        else { return .notNeeded }
 
         optimizing[wallpaperID] = 0
         defer { optimizing[wallpaperID] = nil }
         let output = AppPaths.folder(for: wallpaperID).appending(path: "optimized.mp4")
-        try await VideoOptimizer.export(source, to: output, preset: plan.preset) { [weak self] value in
+        try await VideoOptimizer.export(source, to: output, plan: plan) { [weak self] value in
             Task { @MainActor in
                 guard let self, self.optimizing[wallpaperID] != nil else { return }
                 self.optimizing[wallpaperID] = value
             }
         }
         let meta = try await MediaInspector.inspect(output)
-        guard var current = self.wallpaper(id: wallpaperID), current.video != nil else { return }
+        guard var current = self.wallpaper(id: wallpaperID), current.video != nil else { return .notNeeded }
+
+        if Double(meta.fileSize) > Double(video.fileSize) * VideoOptimizer.requiredSaving {
+            try? FileManager.default.removeItem(at: output)
+            current.video?.optimizationDeclined = true
+            update(current)
+            return .keptOriginal
+        }
         current.video?.optimized = OptimizedVideo(
             fileName: output.lastPathComponent, width: meta.width, height: meta.height, fileSize: meta.fileSize
         )
         update(current)
+        return .optimized(saved: video.fileSize - meta.fileSize)
     }
 }

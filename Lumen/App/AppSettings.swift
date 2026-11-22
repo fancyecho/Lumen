@@ -55,13 +55,20 @@ enum DockIconMode: String, CaseIterable, Identifiable {
 @Observable
 final class AppSettings {
     enum Change {
-        case policy, playback, scaling, shader, stillFrame
+        case policy, playback, scaling, shader, stillFrame, lockScreen
     }
 
-    @ObservationIgnored var onChange: ((Change) -> Void)?
+    @ObservationIgnored private var observers: [(Change) -> Void] = []
     @ObservationIgnored private let defaults = UserDefaults.standard
 
+    /// Registers a listener for setting changes (the engine, the lock-screen manager).
+    func observe(_ handler: @escaping (Change) -> Void) {
+        observers.append(handler)
+    }
+
     var pauseWhenCovered: Bool { didSet { store(pauseWhenCovered, "pauseWhenCovered", .policy) } }
+    /// Share of the desktop (0.5...1) that must be covered before "pause when covered" kicks in.
+    var coverageThreshold: Double { didSet { store(coverageThreshold, "coverageThreshold", .policy) } }
     var pauseOnBattery: Bool { didSet { store(pauseOnBattery, "pauseOnBattery", .policy) } }
     var pauseOnLowPower: Bool { didSet { store(pauseOnLowPower, "pauseOnLowPower", .policy) } }
     var pauseOnThermalPressure: Bool { didSet { store(pauseOnThermalPressure, "pauseOnThermalPressure", .policy) } }
@@ -78,6 +85,12 @@ final class AppSettings {
     var syncStillFrame: Bool { didSet { store(syncStillFrame, "syncStillFrame", .stillFrame) } }
     var dockIconMode: DockIconMode { didSet { store(dockIconMode.rawValue, "dockIconMode", nil) } }
 
+    var lockScreenEnabled: Bool { didSet { store(lockScreenEnabled, "lockScreenEnabled", .lockScreen) } }
+    /// `nil` follows the main display's wallpaper; otherwise a specific wallpaper.
+    var lockScreenWallpaperID: UUID? {
+        didSet { store(lockScreenWallpaperID?.uuidString ?? "", "lockScreenWallpaperID", .lockScreen) }
+    }
+
     var shaderRenderSettings: ShaderRenderSettings {
         ShaderRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.pixelBudget)
     }
@@ -85,6 +98,9 @@ final class AppSettings {
     init() {
         defaults.register(defaults: [
             "pauseWhenCovered": true,
+            "coverageThreshold": 0.95,
+            "lockScreenEnabled": false,
+            "lockScreenWallpaperID": "",
             "pauseOnBattery": false,
             "pauseOnLowPower": true,
             "pauseOnThermalPressure": true,
@@ -99,6 +115,9 @@ final class AppSettings {
             "dockIconMode": DockIconMode.whileWindowOpen.rawValue,
         ])
         pauseWhenCovered = defaults.bool(forKey: "pauseWhenCovered")
+        coverageThreshold = min(max(defaults.double(forKey: "coverageThreshold"), 0.5), 1)
+        lockScreenEnabled = defaults.bool(forKey: "lockScreenEnabled")
+        lockScreenWallpaperID = UUID(uuidString: defaults.string(forKey: "lockScreenWallpaperID") ?? "")
         pauseOnBattery = defaults.bool(forKey: "pauseOnBattery")
         pauseOnLowPower = defaults.bool(forKey: "pauseOnLowPower")
         pauseOnThermalPressure = defaults.bool(forKey: "pauseOnThermalPressure")
@@ -115,6 +134,6 @@ final class AppSettings {
 
     private func store(_ value: Any, _ key: String, _ change: Change?) {
         defaults.set(value, forKey: key)
-        if let change { onChange?(change) }
+        if let change { observers.forEach { $0(change) } }
     }
 }

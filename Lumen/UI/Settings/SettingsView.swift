@@ -5,6 +5,7 @@ struct SettingsView: View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Playback", systemImage: "play.rectangle") { PlaybackSettings() }
+            Tab("Lock Screen", systemImage: "lock.fill") { LockScreenSettings() }
             Tab("Performance", systemImage: "gauge.with.dots.needle.50percent") { PerformanceSettings() }
         }
         .frame(width: 540)
@@ -127,6 +128,9 @@ private struct PerformanceSettings: View {
         Form {
             Section {
                 Toggle("When the desktop is covered by windows", isOn: $settings.pauseWhenCovered)
+                if settings.pauseWhenCovered {
+                    CoverageThresholdRow(threshold: $settings.coverageThreshold)
+                }
                 Toggle("When running on battery", isOn: $settings.pauseOnBattery)
                 Toggle("In Low Power Mode", isOn: $settings.pauseOnLowPower)
                 Toggle("When the Mac is under thermal pressure", isOn: $settings.pauseOnThermalPressure)

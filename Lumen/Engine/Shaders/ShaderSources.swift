@@ -21,19 +21,22 @@ enum ShaderSources {
         float4 color1;
         float4 color2;
         float4 color3;
+        float4 framing; // x/y offset, zoom
     };
 
     struct VertexOut {
         float4 position [[position]];
-        float2 uv;
+        float2 uv;     // scene coordinates, moved and zoomed by the wallpaper's framing
+        float2 screen; // fixed screen coordinates, for vignettes and dithering
     };
 
-    // One oversized triangle covers the whole target; uv is 0...1 with y up.
-    vertex VertexOut lumen_vertex(uint vid [[vertex_id]]) {
+    // One oversized triangle covers the whole target; coordinates are 0...1 with y up.
+    vertex VertexOut lumen_vertex(uint vid [[vertex_id]], constant Uniforms& u [[buffer(0)]]) {
         float2 p = float2(float((vid << 1) & 2), float(vid & 2));
         VertexOut out;
         out.position = float4(p * 2.0 - 1.0, 0.0, 1.0);
-        out.uv = p;
+        out.screen = p;
+        out.uv = (p - 0.5) / max(u.framing.z, 1.0) + 0.5 + u.framing.xy;
         return out;
     }
 
@@ -140,8 +143,8 @@ enum ShaderSources {
 
         float luma = dot(color, float3(0.299, 0.587, 0.114));
         color = mix(float3(luma), color, 0.75 + 0.3 * u.intensity);
-        color *= vignette(in.uv, 0.35);
-        return float4(dither(color, in.uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.35);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 
@@ -181,8 +184,8 @@ enum ShaderSources {
         float mountain = smoothstep(ridge + aa, ridge - aa, uv.y);
         color = mix(color, u.color0.rgb * 0.2, mountain);
 
-        color *= vignette(uv, 0.3);
-        return float4(dither(color, uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.3);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 
@@ -207,8 +210,8 @@ enum ShaderSources {
         color += starField(p * 14.0, u.time, 0.93, 0.05) * 0.9;
         color += starField(p * 40.0 + 3.0, u.time, 0.95, 0.07) * 0.55;
 
-        color *= vignette(in.uv, 0.45);
-        return float4(dither(color, in.uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.45);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 
@@ -236,7 +239,7 @@ enum ShaderSources {
         float sweep = 0.5 + 0.5 * sin((p.x + p.y) * 2.0 - t * 1.5);
         color += 0.05 * u.intensity * sweep;
 
-        float grain = hash21(uv * u.resolution + fract(u.time) * 100.0) - 0.5;
+        float grain = hash21(in.screen * u.resolution + fract(u.time) * 100.0) - 0.5;
         color += grain * 0.03 * u.intensity;
         return float4(color, 1.0);
     }
@@ -260,8 +263,8 @@ enum ShaderSources {
         color = mix(color, ink, saturate(line * 0.4 * u.intensity));
         color = mix(color, ink, saturate(major * 0.85 * u.intensity));
 
-        color *= vignette(in.uv, 0.4);
-        return float4(dither(color, in.uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.4);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 
@@ -295,8 +298,8 @@ enum ShaderSources {
         float rim = body * (1.0 - smoothstep(1.0, 1.7, field));
         color += rim * 0.22 * u.color3.rgb * u.intensity;
 
-        color *= vignette(uv, 0.35);
-        return float4(dither(color, uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.35);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 
@@ -305,12 +308,13 @@ enum ShaderSources {
     // Available: u.time (seconds, already scaled by speed), u.resolution,
     // u.intensity, u.scale, u.color0...u.color3, plus helpers from the header:
     // fbm(), gradientNoise(), palette(), centered(), dither(), vignette().
+    // in.uv follows the wallpaper's position/zoom; in.screen stays fixed.
     fragment float4 lumen_fragment(VertexOut in [[stage_in]], constant Uniforms& u [[buffer(0)]]) {
         float2 p = centered(in.uv, u.resolution) * (2.0 / max(u.scale, 0.05));
         float wave = fbm(p + float2(u.time * 0.1, 0.0), 5);
         float3 color = palette(wave * 1.3 - 0.15, u);
-        color *= vignette(in.uv, 0.4);
-        return float4(dither(color, in.uv * u.resolution, u.time), 1.0);
+        color *= vignette(in.screen, 0.4);
+        return float4(dither(color, in.screen * u.resolution, u.time), 1.0);
     }
     """#
 }

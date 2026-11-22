@@ -8,5 +8,7 @@ protocol WallpaperRenderer: AnyObject {
     func setActive(_ active: Bool)
     /// Called once the first frame is on screen, so swaps never flash black.
     func whenReady(_ handler: @escaping @MainActor () -> Void)
+    /// Moves/zooms the content live, without rebuilding the renderer.
+    func setFraming(_ framing: WallpaperFraming)
     func tearDown()
 }

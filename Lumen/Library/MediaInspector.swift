@@ -115,41 +115,38 @@ enum MediaInspector {
     }
 }
 
-/// Re-encodes a video to HEVC at the largest connected display's size.
-/// HEVC decodes on the media engine at a fraction of the power of high-bitrate
-/// H.264 or oversized sources, and the files are usually much smaller.
+/// Plans and runs "Optimize for this Mac": an HEVC copy at the largest display's size.
+/// Smaller frames and a sensible bitrate mean less work for the media engine and a smaller
+/// file. A copy that doesn't come out clearly smaller is thrown away.
 enum VideoOptimizer {
     struct Plan {
-        let preset: String
+        let renderSize: CGSize
+        let bitRate: Int
         let label: String
     }
 
+    /// The optimised copy must be at least this much smaller than the source to be kept.
+    static let requiredSaving = 0.9
+
     static func plan(for video: VideoAsset, maxDisplayWidth: Int) -> Plan? {
+        guard video.optimized == nil, video.optimizationDeclined != true, !video.isHDR,
+              video.width > 0, video.height > 0
+        else { return nil }
         let alreadyEfficient = video.codec == "HEVC" && video.width <= max(maxDisplayWidth, 1920)
-        guard !alreadyEfficient, video.optimized == nil else { return nil }
-        let target = min(video.width, maxDisplayWidth)
-        if target <= 1920 { return Plan(preset: AVAssetExportPresetHEVC1920x1080, label: "HEVC 1080p") }
-        if target <= 3840 { return Plan(preset: AVAssetExportPresetHEVC3840x2160, label: "HEVC 4K") }
-        return Plan(preset: AVAssetExportPresetHEVCHighestQuality, label: "HEVC")
+        guard !alreadyEfficient else { return nil }
+
+        let source = CGSize(width: video.width, height: video.height)
+        let size = HEVCTranscoder.evenSize(source, fitting: CGSize(width: CGFloat(max(maxDisplayWidth, 1280)), height: .greatestFiniteMagnitude))
+        let sourceBitRate = video.duration > 0 ? Double(video.fileSize) * 8 / video.duration : nil
+        let bitRate = HEVCTranscoder.bitRate(for: size, frameRate: video.frameRate, sourceBitRate: sourceBitRate)
+        return Plan(renderSize: size, bitRate: bitRate, label: "HEVC \(Int(size.width))×\(Int(size.height))")
     }
 
-    static func export(_ source: URL, to destination: URL, preset: String, progress: @escaping @Sendable (Double) -> Void) async throws {
-        try? FileManager.default.removeItem(at: destination)
-        let asset = AVURLAsset(url: source)
-        guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
-            throw MediaError.exportFailed("preset unavailable")
-        }
-        session.shouldOptimizeForNetworkUse = false
-        let monitor = Task {
-            for await state in session.states(updateInterval: 0.25) {
-                if case .exporting(let value) = state { progress(value.fractionCompleted) }
-            }
-        }
-        defer { monitor.cancel() }
-        do {
-            try await session.export(to: destination, as: .mp4)
-        } catch {
-            throw MediaError.exportFailed(error.localizedDescription)
-        }
+    static func export(_ source: URL, to destination: URL, plan: Plan, progress: @escaping @Sendable (Double) -> Void) async throws {
+        try await HEVCTranscoder.transcode(
+            source, to: destination,
+            options: HEVCTranscoder.Options(renderSize: plan.renderSize, bitRate: plan.bitRate, scaling: .fit),
+            progress: progress
+        )
     }
 }

@@ -83,7 +83,7 @@ final class MetalContext {
     }
 
     /// Renders one frame offscreen — used for thumbnails and the system still frame.
-    func snapshot(of config: ShaderConfig, size: CGSize, time: Double = 12) throws -> CGImage {
+    func snapshot(of config: ShaderConfig, size: CGSize, time: Double = 12, framing: WallpaperFraming = .centered) throws -> CGImage {
         guard let device, let commandQueue else { throw ShaderError.noDevice }
         guard let source = config.resolvedSource else { throw ShaderError.missingSource }
         let pipeline = try pipeline(for: source)
@@ -108,10 +108,12 @@ final class MetalContext {
         var uniforms = ShaderUniforms(params: config.params)
         uniforms.time = Float(time * config.params.speed)
         uniforms.resolution = SIMD2(Float(width), Float(height))
+        uniforms.framing = framing.shaderVector
 
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { throw ShaderError.renderFailed }
         encoder.setRenderPipelineState(pipeline)
         withUnsafeBytes(of: &uniforms) { bytes in
+            encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 0)
             encoder.setFragmentBytes(bytes.baseAddress!, length: bytes.count, index: 0)
         }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)

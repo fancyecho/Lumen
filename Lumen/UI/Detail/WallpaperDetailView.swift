@@ -13,6 +13,7 @@ struct WallpaperDetailView: View {
                 VStack(alignment: .leading, spacing: 30) {
                     hero(wallpaper)
                     info(wallpaper)
+                    FramingControls(wallpaper: wallpaper)
                     if let video = wallpaper.video {
                         OptimizationCard(wallpaper: wallpaper, video: video)
                     }

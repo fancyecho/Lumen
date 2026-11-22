@@ -73,15 +73,22 @@ final class SharedVideoPlayer {
     }
 }
 
-/// Hosts an `AVPlayerLayer` that always fills the view, without implicit animations.
+/// Hosts an `AVPlayerLayer` without implicit animations.
+///
+/// With a known `contentSize` the layer is placed by `framing` (position and zoom) and clipped;
+/// otherwise it simply fills the view and relies on the layer's video gravity.
 final class PlayerLayerView: NSView {
     let playerLayer: AVPlayerLayer
+    var contentSize: CGSize = .zero { didSet { needsLayout = true } }
+    var scaling: VideoScaling = .fill { didSet { needsLayout = true } }
+    var framing: WallpaperFraming = .centered { didSet { if framing != oldValue { applyLayout() } } }
 
     init(playerLayer: AVPlayerLayer) {
         self.playerLayer = playerLayer
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
+        layer?.masksToBounds = true
         layer?.addSublayer(playerLayer)
     }
 
@@ -92,9 +99,18 @@ final class PlayerLayerView: NSView {
 
     override func layout() {
         super.layout()
+        applyLayout()
+    }
+
+    private func applyLayout() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        playerLayer.frame = bounds
+        if contentSize.width > 0, contentSize.height > 0 {
+            playerLayer.videoGravity = .resize
+            playerLayer.frame = framing.rect(for: contentSize, in: bounds, scaling: scaling)
+        } else {
+            playerLayer.frame = bounds
+        }
         CATransaction.commit()
     }
 }
@@ -110,7 +126,7 @@ final class VideoRenderer: WallpaperRenderer {
     private var isReady = false
     private var isTornDown = false
 
-    init(player: SharedVideoPlayer, scaling: VideoScaling, isHDR: Bool) {
+    init(player: SharedVideoPlayer, scaling: VideoScaling, isHDR: Bool, contentSize: CGSize = .zero, framing: WallpaperFraming = .centered) {
         shared = player
         let layer = AVPlayerLayer(player: player.player)
         layer.videoGravity = scaling.gravity
@@ -120,6 +136,9 @@ final class VideoRenderer: WallpaperRenderer {
             layer.preferredDynamicRange = .high
         }
         layerView = PlayerLayerView(playerLayer: layer)
+        layerView.contentSize = contentSize
+        layerView.scaling = scaling
+        layerView.framing = framing
         shared.attach(self)
 
         readyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
@@ -147,6 +166,11 @@ final class VideoRenderer: WallpaperRenderer {
         CATransaction.setDisableActions(true)
         layerView.playerLayer.videoGravity = scaling.gravity
         CATransaction.commit()
+        layerView.scaling = scaling
+    }
+
+    func setFraming(_ framing: WallpaperFraming) {
+        layerView.framing = framing
     }
 
     func tearDown() {

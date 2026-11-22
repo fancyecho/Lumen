@@ -20,6 +20,7 @@ final class AppModel {
     let router = Router()
     let engine: WallpaperEngine
     let playlists: PlaylistStore
+    let lockScreen: LockScreenManager
 
     var isImporterPresented = false
     var pendingDeletion: Wallpaper?
@@ -31,8 +32,10 @@ final class AppModel {
     private init() {
         engine = WallpaperEngine(settings: settings, library: library, system: system)
         playlists = PlaylistStore(library: library)
+        lockScreen = LockScreenManager(settings: settings, library: library, engine: engine)
         playlists.applyHandler = { [weak self] wallpaper in
             self?.engine.apply(wallpaper, to: .allDisplays, animated: true)
+            self?.lockScreen.wallpaperDidChange()
         }
     }
 
@@ -44,6 +47,7 @@ final class AppModel {
         system.start()
         engine.start()
         playlists.start()
+        lockScreen.start()
         #if DEBUG
         openDebugRoute()
         #endif
@@ -77,12 +81,21 @@ final class AppModel {
     func setWallpaper(_ wallpaper: Wallpaper, on target: DisplayTarget) {
         playlists.stop()
         engine.apply(wallpaper, to: target)
+        lockScreen.wallpaperDidChange()
         showToast(String(localized: "“\(wallpaper.title)” is on \(label(for: target))"), symbol: "checkmark.circle.fill")
     }
 
     func clearWallpaper(on target: DisplayTarget) {
         playlists.stop()
         engine.clear(target)
+        lockScreen.wallpaperDidChange()
+    }
+
+    /// Moves/zooms a wallpaper everywhere it's shown, live.
+    func setFraming(_ framing: WallpaperFraming, for wallpaperID: UUID) {
+        library.setFraming(framing, for: wallpaperID)
+        engine.updateFraming(wallpaperID: wallpaperID)
+        lockScreen.wallpaperDidChange()
     }
 
     func importFiles(_ urls: [URL]) {
@@ -118,10 +131,17 @@ final class AppModel {
         let maxWidth = NSScreen.screens.map { Int($0.pixelSize.width) }.max() ?? 3840
         Task {
             do {
-                try await library.optimize(wallpaper.id, maxDisplayWidth: maxWidth)
-                ThumbnailCache.shared.invalidate(wallpaper)
-                engine.reload(wallpaperID: wallpaper.id)
-                showToast(String(localized: "Optimized “\(wallpaper.title)” for this Mac"), symbol: "bolt.fill")
+                switch try await library.optimize(wallpaper.id, maxDisplayWidth: maxWidth) {
+                case .optimized(let saved):
+                    ThumbnailCache.shared.invalidate(wallpaper)
+                    engine.reload(wallpaperID: wallpaper.id)
+                    lockScreen.wallpaperDidChange()
+                    showToast(String(localized: "Optimized “\(wallpaper.title)” · saved \(Format.bytes(saved))"), symbol: "bolt.fill")
+                case .keptOriginal:
+                    showToast(String(localized: "“\(wallpaper.title)” is already compact, so Lumen kept the original"), symbol: "checkmark.seal.fill")
+                case .notNeeded:
+                    break
+                }
             } catch {
                 showToast(error.localizedDescription, symbol: "exclamationmark.triangle.fill")
             }

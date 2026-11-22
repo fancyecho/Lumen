@@ -17,8 +17,11 @@ struct Wallpaper: Identifiable, Codable, Hashable {
     var isFavorite: Bool = false
     var video: VideoAsset?
     var shader: ShaderConfig?
+    /// Position and zoom on the display; nil means centred.
+    var framing: WallpaperFraming?
 
     var isBuiltin: Bool { BuiltinShaders.ids.contains(id) }
+    var resolvedFraming: WallpaperFraming { framing ?? .centered }
 }
 
 struct VideoAsset: Codable, Hashable {
@@ -33,6 +36,8 @@ struct VideoAsset: Codable, Hashable {
     var isHDR: Bool
     var hasAudio: Bool
     var optimized: OptimizedVideo?
+    /// Set when an optimised copy came out no smaller than the source, so it isn't offered again.
+    var optimizationDeclined: Bool?
 }
 
 struct OptimizedVideo: Codable, Hashable {

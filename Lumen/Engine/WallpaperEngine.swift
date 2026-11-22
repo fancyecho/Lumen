@@ -14,6 +14,8 @@ final class WallpaperEngine {
         var isPrimary: Bool
         var wallpaperID: UUID?
         var pauseReason: PauseReason?
+        /// Share of the usable desktop hidden by windows, while coverage is being watched.
+        var coverage: Double?
 
         var isPlaying: Bool { wallpaperID != nil && pauseReason == nil }
     }
@@ -44,7 +46,7 @@ final class WallpaperEngine {
     func start() {
         guard !started else { return }
         started = true
-        settings.onChange = { [weak self] change in self?.settingsChanged(change) }
+        settings.observe { [weak self] change in self?.settingsChanged(change) }
         system.onChange = { [weak self] in self?.reconcile() }
         system.onWake = { [weak self] in self?.recoverAfterWake() }
         occlusion.onChange = { [weak self] in self?.reconcile() }
@@ -87,6 +89,17 @@ final class WallpaperEngine {
     /// Call after a wallpaper's content changed (optimised file, shader edits).
     func reload(wallpaperID: UUID) {
         rebuild(animated: true, forceReload: [wallpaperID])
+    }
+
+    /// Moves/zooms every desktop showing this wallpaper, live, and refreshes its still frame.
+    func updateFraming(wallpaperID: UUID) {
+        guard let wallpaper = library.wallpaper(id: wallpaperID) else { return }
+        for (displayID, host) in hosts where host.wallpaperID == wallpaperID {
+            host.renderer?.setFraming(wallpaper.resolvedFraming)
+            if settings.syncStillFrame, let screen = NSScreen.screen(withUUID: displayID) {
+                stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling, debounce: true)
+            }
+        }
     }
 
     func forget(wallpaperID: UUID) {
@@ -143,7 +156,7 @@ final class WallpaperEngine {
             if let renderer = makeRenderer(for: wallpaper) {
                 host.present(renderer, wallpaperID: wallpaper.id, animated: animated && settings.crossfade)
                 if settings.syncStillFrame {
-                    stills.sync(wallpaper, on: screen, library: library)
+                    stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
                 }
             }
         }
@@ -160,11 +173,18 @@ final class WallpaperEngine {
         case .video:
             guard let url = library.playbackURL(for: wallpaper) else { return nil }
             let player = players[url] ?? makePlayer(for: url)
-            return VideoRenderer(player: player, scaling: settings.videoScaling, isHDR: wallpaper.video?.isHDR ?? false)
+            let size = wallpaper.video.map { CGSize(width: $0.width, height: $0.height) } ?? .zero
+            return VideoRenderer(
+                player: player,
+                scaling: settings.videoScaling,
+                isHDR: wallpaper.video?.isHDR ?? false,
+                contentSize: size,
+                framing: wallpaper.resolvedFraming
+            )
         case .shader:
             guard let config = wallpaper.shader else { return nil }
             do {
-                return try ShaderRenderer(config: config, settings: settings.shaderRenderSettings)
+                return try ShaderRenderer(config: config, settings: settings.shaderRenderSettings, framing: wallpaper.resolvedFraming)
             } catch {
                 Log.engine.error("Shader failed to build: \(error.localizedDescription, privacy: .public)")
                 return nil
@@ -202,6 +222,7 @@ final class WallpaperEngine {
     /// Single place that decides, per display, whether anything should be animating.
     func reconcile() {
         let global = globalPauseReason()
+        occlusion.threshold = settings.coverageThreshold
         occlusion.isEnabled = settings.pauseWhenCovered && !hosts.isEmpty && global == nil
 
         let primaryID = NSScreen.screens.first?.displayUUID
@@ -224,7 +245,8 @@ final class WallpaperEngine {
                 isBuiltin: screen.isBuiltin,
                 isPrimary: displayID == primaryID,
                 wallpaperID: host?.wallpaperID,
-                pauseReason: reason
+                pauseReason: reason,
+                coverage: occlusion.isEnabled ? occlusion.coverage[displayID] : nil
             ))
         }
         if updated != displays { displays = updated }
@@ -265,11 +287,13 @@ final class WallpaperEngine {
             if settings.syncStillFrame {
                 for screen in NSScreen.screens {
                     guard let id = hosts[screen.displayUUID]?.wallpaperID, let wallpaper = library.wallpaper(id: id) else { continue }
-                    stills.sync(wallpaper, on: screen, library: library)
+                    stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
                 }
             } else {
                 stills.restoreAll()
             }
+        case .lockScreen:
+            break
         }
     }
 }

@@ -17,13 +17,19 @@ final class StillFrameSync {
         originals = UserDefaults.standard.dictionary(forKey: Self.originalsKey) as? [String: String] ?? [:]
     }
 
-    func sync(_ wallpaper: Wallpaper, on screen: NSScreen, library: LibraryStore) {
+    /// `debounce` waits for a slider drag to settle before rendering a new still.
+    func sync(_ wallpaper: Wallpaper, on screen: NSScreen, library: LibraryStore, scaling: VideoScaling, debounce: Bool = false) {
         let displayID = screen.displayUUID
+        let pixelSize = screen.pixelSize
         tasks[displayID]?.cancel()
         tasks[displayID] = Task { @MainActor [weak self] in
+            if debounce {
+                try? await Task.sleep(for: .milliseconds(700))
+                guard !Task.isCancelled else { return }
+            }
             guard let self else { return }
             do {
-                let url = try await self.stillImage(for: wallpaper, pixelSize: screen.pixelSize, library: library)
+                let url = try await self.stillImage(for: wallpaper, pixelSize: pixelSize, library: library, scaling: scaling)
                 guard !Task.isCancelled, let screen = NSScreen.screen(withUUID: displayID) else { return }
                 self.rememberOriginal(for: screen)
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [
@@ -64,14 +70,16 @@ final class StillFrameSync {
         UserDefaults.standard.set(originals, forKey: Self.originalsKey)
     }
 
-    private func stillImage(for wallpaper: Wallpaper, pixelSize: CGSize, library: LibraryStore) async throws -> URL {
+    private func stillImage(for wallpaper: Wallpaper, pixelSize: CGSize, library: LibraryStore, scaling: VideoScaling) async throws -> URL {
         let width = Int(pixelSize.width), height = Int(pixelSize.height)
+        let framing = wallpaper.resolvedFraming
+        let placement = framing.isCentered && scaling == .fill ? "" : "-\(StableHash.hex(of: [framing.horizontal, framing.vertical, framing.zoom]))\(scaling.rawValue)"
         let tag: String
         switch wallpaper.kind {
         case .video:
-            tag = "v-\(wallpaper.id.uuidString)-\(wallpaper.video?.optimized?.fileName ?? "source")"
+            tag = "v-\(wallpaper.id.uuidString)-\(wallpaper.video?.optimized?.fileName ?? "source")\(placement)"
         case .shader:
-            tag = "s-\(StableHash.hex(of: wallpaper.shader))"
+            tag = "s-\(StableHash.hex(of: wallpaper.shader))\(placement)"
         }
         let url = AppPaths.stills.appending(path: "\(tag)-\(width)x\(height).jpg")
         if FileManager.default.fileExists(atPath: url.path) { return url }
@@ -80,13 +88,16 @@ final class StillFrameSync {
         switch wallpaper.kind {
         case .video:
             guard let source = library.playbackURL(for: wallpaper) else { throw ShaderError.missingSource }
-            image = try await MediaInspector.frame(of: source, maxPixelSize: pixelSize, at: 0, exact: true)
+            let frame = try await MediaInspector.frame(of: source, maxPixelSize: nil, at: 0, exact: true)
+            // Place the frame exactly as the desktop window does (position, zoom, scaling).
+            guard let placed = framing.render(frame, into: pixelSize, scaling: scaling) else { throw ShaderError.renderFailed }
+            image = placed
         case .shader:
             guard let config = wallpaper.shader else { throw ShaderError.missingSource }
             // The desktop renderer starts its clock at 12 shader-seconds; match that frame.
             let scale = min(1, 3840 / max(pixelSize.width, 1))
             let size = CGSize(width: pixelSize.width * scale, height: pixelSize.height * scale)
-            image = try MetalContext.shared.snapshot(of: config, size: size, time: 12 / max(config.params.speed, 0.01))
+            image = try MetalContext.shared.snapshot(of: config, size: size, time: 12 / max(config.params.speed, 0.01), framing: framing)
         }
         try MediaInspector.writeJPEG(image, to: url, quality: 0.9)
         pruneStills(keeping: url)
