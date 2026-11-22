@@ -116,6 +116,32 @@
     "%lld%%": {
       "shouldTranslate": false
     },
+    "%lld%% covered": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        }
+      }
+    },
+    "%lld%% covered · pauses at %lld%%": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已遮挡 %1$lld%% · 达到 %2$lld%% 时暂停"
+          }
+        }
+      }
+    },
+    "100%": {
+      "shouldTranslate": false
+    },
+    "50%": {
+      "shouldTranslate": false
+    },
     "A living topographic map": {
       "localizations": {
         "zh-Hans": {
@@ -224,7 +250,7 @@
         }
       }
     },
-    "All Displays": {
+    "all displays": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -234,7 +260,7 @@
         }
       }
     },
-    "all displays": {
+    "All Displays": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -334,12 +360,42 @@
         }
       }
     },
+    "Bottom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偏下"
+          }
+        }
+      }
+    },
     "Browse your library": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "浏览资源库"
+          }
+        }
+      }
+    },
+    "Center": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "居中"
+          }
+        }
+      }
+    },
+    "Centered": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "居中"
           }
         }
       }
@@ -414,6 +470,16 @@
         }
       }
     },
+    "Converting for the Lock Screen failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转换锁屏视频失败：%@"
+          }
+        }
+      }
+    },
     "Cooling down": {
       "localizations": {
         "zh-Hans": {
@@ -424,12 +490,32 @@
         }
       }
     },
+    "Couldn't read %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 %@。"
+          }
+        }
+      }
+    },
     "Couldn't write the image.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "无法写入图片。"
+          }
+        }
+      }
+    },
+    "Coverage threshold": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遮挡阈值"
           }
         }
       }
@@ -550,6 +636,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示器"
+          }
+        }
+      }
+    },
+    "Drag the preview or pinch to zoom. Changes show on your desktop right away.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动预览画面调整位置，在触控板上捏合缩放，桌面会立即同步。"
+          }
+        }
+      }
+    },
+    "Drag to move the wallpaper, pinch to zoom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动以移动壁纸，捏合以缩放"
           }
         }
       }
@@ -774,6 +880,16 @@
         }
       }
     },
+    "Good to know": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用须知"
+          }
+        }
+      }
+    },
     "Hide Code": {
       "localizations": {
         "zh-Hans": {
@@ -790,6 +906,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "首页"
+          }
+        }
+      }
+    },
+    "Horizontal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "水平"
           }
         }
       }
@@ -844,6 +970,16 @@
         }
       }
     },
+    "Installing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在安装…"
+          }
+        }
+      }
+    },
     "Intensity": {
       "localizations": {
         "zh-Hans": {
@@ -860,6 +996,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "语言"
+          }
+        }
+      }
+    },
+    "Left": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偏左"
           }
         }
       }
@@ -884,6 +1030,36 @@
         }
       }
     },
+    "Lock Screen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "锁屏"
+          }
+        }
+      }
+    },
+    "Lock Screen shows the system wallpaper": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "锁屏当前显示系统壁纸"
+          }
+        }
+      }
+    },
+    "Lock your Mac with ⌃⌘Q, or start the screen saver, to see it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 ⌃⌘Q 锁定 Mac，或启动屏幕保护程序即可看到效果。"
+          }
+        }
+      }
+    },
     "Low Power Mode": {
       "localizations": {
         "zh-Hans": {
@@ -896,6 +1072,16 @@
     },
     "Lumen": {
       "shouldTranslate": false
+    },
+    "Lumen adds the wallpaper to macOS's Aerial collection, under “Lumen”, and selects it for the Lock Screen and screen saver. It keeps playing even when Lumen isn't running. Turning this off restores your previous choice.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 会把壁纸加入 macOS 的航拍壁纸（归在“Lumen”分组下），并选为锁屏和屏幕保护程序。即使 Lumen 没有运行也会继续播放。关闭后会恢复你之前的选择。"
+          }
+        }
+      }
     },
     "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.": {
       "localizations": {
@@ -1240,6 +1426,26 @@
         }
       }
     },
+    "Only the horizontal position has room to move at 1× zoom.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 1× 缩放下只有水平方向可以移动。"
+          }
+        }
+      }
+    },
+    "Only the vertical position has room to move at 1× zoom.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 1× 缩放下只有垂直方向可以移动。"
+          }
+        }
+      }
+    },
     "Only while the window is open": {
       "localizations": {
         "zh-Hans": {
@@ -1330,12 +1536,12 @@
         }
       }
     },
-    "Optimized “%@” for this Mac": {
+    "Optimized “%@” · saved %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为这台 Mac 优化「%@」"
+            "value": "已优化「%1$@」· 节省 %2$@"
           }
         }
       }
@@ -1346,6 +1552,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "其他"
+          }
+        }
+      }
+    },
+    "Other wallpaper apps that manage the Lock Screen may replace Lumen's choice while they're running.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他管理锁屏的壁纸 App 运行时，可能会替换掉 Lumen 的设置。"
           }
         }
       }
@@ -1396,6 +1612,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用电池时暂停"
+          }
+        }
+      }
+    },
+    "Pause when at least": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "遮挡比例达到"
           }
         }
       }
@@ -1498,6 +1724,16 @@
         }
       }
     },
+    "Play on the Lock Screen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在锁屏上播放"
+          }
+        }
+      }
+    },
     "Play wallpaper audio": {
       "localizations": {
         "zh-Hans": {
@@ -1588,6 +1824,26 @@
         }
       }
     },
+    "Position": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置"
+          }
+        }
+      }
+    },
+    "Position & Zoom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置与缩放"
+          }
+        }
+      }
+    },
     "Power adapter": {
       "localizations": {
         "zh-Hans": {
@@ -1604,6 +1860,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "电源"
+          }
+        }
+      }
+    },
+    "Preparing %lld%%": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备 %lld%%"
           }
         }
       }
@@ -1634,6 +1900,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "把这个 %1$@ %2$@ 视频重新编码为适配你显示器尺寸的 HEVC。媒体引擎解码 HEVC 更省电，文件通常也会小很多。原文件会保留。"
+          }
+        }
+      }
+    },
+    "Rebuild Lock Screen Video": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成锁屏视频"
           }
         }
       }
@@ -1718,6 +1994,16 @@
         }
       }
     },
+    "Rendering for the Lock Screen failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "渲染锁屏视频失败：%@"
+          }
+        }
+      }
+    },
     "Renders about 1 MP and upscales. Lowest GPU use.": {
       "localizations": {
         "zh-Hans": {
@@ -1754,6 +2040,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "重置"
+          }
+        }
+      }
+    },
+    "Reset position and zoom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置位置和缩放"
           }
         }
       }
@@ -1808,6 +2104,16 @@
         }
       }
     },
+    "Right": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偏右"
+          }
+        }
+      }
+    },
     "Right now": {
       "localizations": {
         "zh-Hans": {
@@ -1858,6 +2164,16 @@
         }
       }
     },
+    "Same as the desktop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与桌面相同"
+          }
+        }
+      }
+    },
     "Save": {
       "localizations": {
         "zh-Hans": {
@@ -1903,7 +2219,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "缩放"
+            "value": "图案大小"
           }
         }
       }
@@ -1978,6 +2294,16 @@
         }
       }
     },
+    "Set a desktop wallpaper first": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先设置桌面壁纸"
+          }
+        }
+      }
+    },
     "Set as Wallpaper": {
       "localizations": {
         "zh-Hans": {
@@ -2028,6 +2354,16 @@
         }
       }
     },
+    "Short loops are repeated to an hour without taking more disk space. Non-HEVC videos and repositioned wallpapers are converted once.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较短的循环视频会重复到一小时，不额外占用磁盘空间。非 HEVC 视频和调整过位置的壁纸会转换一次。"
+          }
+        }
+      }
+    },
     "Show Dock icon": {
       "localizations": {
         "zh-Hans": {
@@ -2064,6 +2400,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在显示系统壁纸"
+          }
+        }
+      }
+    },
+    "Showing “%@”": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在显示「%@」"
           }
         }
       }
@@ -2144,6 +2490,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "开始轮换"
+          }
+        }
+      }
+    },
+    "Status": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
           }
         }
       }
@@ -2258,12 +2614,42 @@
         }
       }
     },
+    "The video already matches your display's shape. Zoom in to make room to move it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频比例已经和显示器一致，放大后才有移动的空间。"
+          }
+        }
+      }
+    },
+    "The wallpaper has no video track.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "壁纸中没有视频轨道。"
+          }
+        }
+      }
+    },
     "Thermal state": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "温度状态"
+          }
+        }
+      }
+    },
+    "This Mac has no Aerial catalog yet. Open System Settings › Wallpaper once, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 还没有航拍壁纸目录。请先打开一次 系统设置 › 墙纸，然后再试。"
           }
         }
       }
@@ -2294,6 +2680,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "标题"
+          }
+        }
+      }
+    },
+    "Top": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偏上"
           }
         }
       }
@@ -2348,6 +2744,16 @@
         }
       }
     },
+    "Vertical": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "垂直"
+          }
+        }
+      }
+    },
     "Video": {
       "localizations": {
         "zh-Hans": {
@@ -2394,6 +2800,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量"
+          }
+        }
+      }
+    },
+    "Wallpaper": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "壁纸"
           }
         }
       }
@@ -2564,6 +2980,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "我的着色器 · %@"
+          }
+        }
+      }
+    },
+    "Zoom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缩放"
+          }
+        }
+      }
+    },
+    "“%@” is already compact, so Lumen kept the original": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」已经足够精简，Lumen 保留了原文件"
           }
         }
       }

@@ -9,7 +9,7 @@ struct SettingsView: View {
             Tab("Performance", systemImage: "gauge.with.dots.needle.50percent") { PerformanceSettings() }
         }
         .frame(width: 540)
-        .frame(minHeight: 520)
+        .frame(minHeight: 580)
     }
 }
 

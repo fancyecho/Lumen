@@ -17,7 +17,7 @@ struct StudioEditorView: View {
                 ScrollView {
                     HStack(alignment: .top, spacing: 26) {
                         VStack(alignment: .leading, spacing: 18) {
-                            preview(config: config)
+                            preview(config: config, framing: base.resolvedFraming)
                             if showsCode { codeEditor }
                         }
                         .frame(maxWidth: .infinity)
@@ -40,8 +40,8 @@ struct StudioEditorView: View {
 
     // MARK: Preview
 
-    private func preview(config: ShaderConfig) -> some View {
-        ShaderPreview(config: config, settings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000))
+    private func preview(config: ShaderConfig, framing: WallpaperFraming) -> some View {
+        ShaderPreview(config: config, settings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000), framing: framing)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
@@ -118,6 +118,15 @@ struct StudioEditorView: View {
                 slider("Speed", value: paramBinding(\.speed), range: 0.1...3, format: { Theme.rateLabel(($0 * 20).rounded() / 20) })
                 slider("Scale", value: paramBinding(\.scale), range: 0.4...2.5, format: { String(format: "%.2f", $0) })
                 slider("Intensity", value: paramBinding(\.intensity), range: 0...2, format: { String(format: "%.0f%%", $0 * 100) })
+            }
+
+            panel("Position") {
+                FramingSliders(wallpaper: base)
+                HStack {
+                    Spacer()
+                    FramingResetButton(wallpaper: base)
+                        .controlSize(.small)
+                }
             }
 
             VStack(alignment: .leading, spacing: 10) {

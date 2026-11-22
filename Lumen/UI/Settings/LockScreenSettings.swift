@@ -9,12 +9,21 @@ struct LockScreenSettings: View {
         let lockScreen = model.lockScreen
         Form {
             Section {
+                LockScreenPreview(wallpaper: previewWallpaper, isEnabled: settings.lockScreenEnabled)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+            }
+
+            Section {
                 Toggle("Play on the Lock Screen", isOn: $settings.lockScreenEnabled)
                     .disabled(!lockScreen.isSupported && !settings.lockScreenEnabled)
                 Picker("Wallpaper", selection: $settings.lockScreenWallpaperID) {
                     Text("Same as the desktop").tag(UUID?.none)
                     Divider()
-                    ForEach(model.library.all) { wallpaper in
+                    ForEach(model.library.videos) { wallpaper in
+                        Text(verbatim: wallpaper.title).tag(UUID?.some(wallpaper.id))
+                    }
+                    if !model.library.videos.isEmpty { Divider() }
+                    ForEach(model.library.customShaders + model.library.builtins) { wallpaper in
                         Text(verbatim: wallpaper.title).tag(UUID?.some(wallpaper.id))
                     }
                 }
@@ -38,6 +47,68 @@ struct LockScreenSettings: View {
             .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
+    }
+}
+
+extension LockScreenSettings {
+    /// What the Lock Screen will show: the chosen wallpaper, or the main display's.
+    fileprivate var previewWallpaper: Wallpaper? {
+        if let id = model.settings.lockScreenWallpaperID, let chosen = model.library.wallpaper(id: id) {
+            return chosen
+        }
+        return model.engine.primaryDisplay?.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
+    }
+}
+
+/// A miniature Lock Screen: the wallpaper with the clock laid over it, as macOS shows it.
+private struct LockScreenPreview: View {
+    let wallpaper: Wallpaper?
+    let isEnabled: Bool
+
+    var body: some View {
+        ZStack {
+            if let wallpaper {
+                ThumbnailView(wallpaper: wallpaper)
+            } else {
+                LinearGradient(colors: [Color(white: 0.18), Color(white: 0.08)], startPoint: .top, endPoint: .bottom)
+            }
+            LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.25)], startPoint: .top, endPoint: .bottom)
+            VStack(spacing: 2) {
+                TimelineView(.everyMinute) { context in
+                    VStack(spacing: 2) {
+                        Text(context.date, format: .dateTime.weekday(.wide).month(.wide).day())
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(context.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
+                            .font(.system(size: 46, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                }
+                Spacer()
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(8)
+                    .background(Circle().fill(.white.opacity(0.18)))
+            }
+            .foregroundStyle(.white.opacity(0.92))
+            .shadow(color: .black.opacity(0.35), radius: 6)
+            .padding(.vertical, 16)
+
+            if !isEnabled {
+                Color.black.opacity(0.5)
+                Text("Lock Screen shows the system wallpaper")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(.black.opacity(0.45)))
+            }
+        }
+        .aspectRatio(16.0 / 10.0, contentMode: .fit)
+        .frame(maxWidth: 360)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
+        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.25), value: isEnabled)
     }
 }
 

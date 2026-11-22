@@ -220,6 +220,8 @@ struct SmartPausePanel: View {
         @Bindable var settings = model.settings
         let system = model.system
         let coveredCount = model.engine.displays.filter { $0.pauseReason == .covered }.count
+        let liveCoverage = model.engine.displays.first(where: \.isPrimary)?.coverage
+            ?? model.engine.displays.compactMap(\.coverage).first
 
         VStack(alignment: .leading, spacing: isCompact ? 12 : 16) {
             if isCompact {
@@ -236,7 +238,7 @@ struct SmartPausePanel: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: isCompact ? 260 : 240), spacing: 12)], spacing: 12) {
                 PolicyTile(
                     symbol: "macwindow", title: String(localized: "When covered by windows"),
-                    status: coveredCount > 0 ? String(localized: "Paused on \(coveredCount) displays") : String(localized: "Watching"),
+                    status: coveredStatus(count: coveredCount, coverage: liveCoverage, threshold: settings.coverageThreshold),
                     isTriggered: coveredCount > 0, isOn: $settings.pauseWhenCovered
                 )
                 PolicyTile(
@@ -256,6 +258,16 @@ struct SmartPausePanel: View {
                 )
             }
         }
+    }
+}
+
+extension SmartPausePanel {
+    fileprivate func coveredStatus(count: Int, coverage: Double?, threshold: Double) -> String {
+        if count > 0 { return String(localized: "Paused on \(count) displays") }
+        guard let coverage else { return String(localized: "Watching") }
+        let covered = Int((coverage * 100).rounded())
+        let limit = Int((threshold * 100).rounded())
+        return String(localized: "\(covered)% covered · pauses at \(limit)%")
     }
 }
 

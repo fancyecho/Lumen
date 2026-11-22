@@ -36,6 +36,7 @@ struct LumenApp: App {
         }
         .windowResizability(.contentSize)
         .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
         #endif
     }
 }

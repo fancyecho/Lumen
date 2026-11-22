@@ -127,6 +127,7 @@ struct ShaderPreview: NSViewRepresentable {
     let config: ShaderConfig
     var settings: ShaderRenderSettings = .preview
     var isActive = true
+    var framing: WallpaperFraming = .centered
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -134,7 +135,7 @@ struct ShaderPreview: NSViewRepresentable {
         let container = NSView()
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
-        context.coordinator.build(config, settings: settings, in: container)
+        context.coordinator.build(config, settings: settings, framing: framing, in: container)
         context.coordinator.renderer?.setActive(isActive)
         return container
     }
@@ -142,12 +143,13 @@ struct ShaderPreview: NSViewRepresentable {
     func updateNSView(_ container: NSView, context: Context) {
         let coordinator = context.coordinator
         if coordinator.renderer == nil {
-            coordinator.build(config, settings: settings, in: container)
+            coordinator.build(config, settings: settings, framing: framing, in: container)
         } else if coordinator.config != config {
             try? coordinator.renderer?.update(config: config)
             coordinator.config = config
         }
         coordinator.renderer?.update(settings: settings)
+        coordinator.renderer?.setFraming(framing)
         coordinator.renderer?.setActive(isActive)
     }
 
@@ -161,8 +163,8 @@ struct ShaderPreview: NSViewRepresentable {
         var renderer: ShaderRenderer?
         var config: ShaderConfig?
 
-        func build(_ config: ShaderConfig, settings: ShaderRenderSettings, in container: NSView) {
-            guard let renderer = try? ShaderRenderer(config: config, settings: settings) else { return }
+        func build(_ config: ShaderConfig, settings: ShaderRenderSettings, framing: WallpaperFraming, in container: NSView) {
+            guard let renderer = try? ShaderRenderer(config: config, settings: settings, framing: framing) else { return }
             renderer.view.frame = container.bounds
             renderer.view.autoresizingMask = [.width, .height]
             container.addSubview(renderer.view)
