@@ -70,7 +70,7 @@ struct WallpaperDetailView: View {
                     MetaChip(symbol: "clock", text: Format.duration(video.duration))
                     MetaChip(symbol: "internaldrive", text: Format.bytes(video.fileSize))
                     if video.isHDR { MetaChip(symbol: "sun.max.fill", text: "HDR", tint: .yellow) }
-                    if video.hasAudio { MetaChip(symbol: "speaker.wave.2.fill", text: "Audio") }
+                    if video.hasAudio { MetaChip(symbol: "speaker.wave.2.fill", text: String(localized: "Audio")) }
                 }
             }
 
@@ -87,7 +87,7 @@ struct WallpaperDetailView: View {
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
                 .controlSize(.large)
-                .help(wallpaper.isFavorite ? "Remove from favorites" : "Add to favorites")
+                .help(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
 
                 Menu {
                     WallpaperMenuItems(wallpaper: wallpaper)
@@ -126,11 +126,12 @@ struct WallpaperDetailView: View {
                     updated.category = name
                     model.library.update(updated)
                 } label: {
-                    if name == wallpaper.category { Label(name, systemImage: "checkmark") } else { Text(name) }
+                    let title = WallpaperCategories.displayName(name)
+                    if name == wallpaper.category { Label(title, systemImage: "checkmark") } else { Text(title) }
                 }
             }
         } label: {
-            Label(wallpaper.category, systemImage: "tag")
+            Label(WallpaperCategories.displayName(wallpaper.category), systemImage: "tag")
                 .font(.system(size: 13, weight: .medium))
         }
         .menuStyle(.button)
@@ -204,17 +205,17 @@ struct OptimizationCard: View {
     }
 
     private func title(plan: VideoOptimizer.Plan?) -> String {
-        if video.optimized != nil { return "Optimized for this Mac" }
-        return plan == nil ? "Already efficient" : "Make it lighter to play"
+        if video.optimized != nil { return String(localized: "Optimized for this Mac") }
+        return plan == nil ? String(localized: "Already efficient") : String(localized: "Make it lighter to play")
     }
 
     private func message(plan: VideoOptimizer.Plan?) -> String {
         if let optimized = video.optimized {
-            return "Playing an HEVC copy at \(Format.resolution(optimized.width, optimized.height)) · \(Format.bytes(optimized.fileSize)) (original \(Format.bytes(video.fileSize)))."
+            return String(localized: "Playing an HEVC copy at \(Format.resolution(optimized.width, optimized.height)) · \(Format.bytes(optimized.fileSize)) (original \(Format.bytes(video.fileSize))).")
         }
         if plan == nil {
-            return "\(video.codec) at this size decodes on the media engine with minimal power."
+            return String(localized: "\(video.codec) at this size decodes on the media engine with minimal power.")
         }
-        return "Re-encode this \(video.codec) \(Format.resolution(video.width, video.height)) video to HEVC at your display's size. The media engine decodes HEVC with less power, and the file is usually much smaller. The original is kept."
+        return String(localized: "Re-encode this \(video.codec) \(Format.resolution(video.width, video.height)) video to HEVC at your display's size. The media engine decodes HEVC with less power, and the file is usually much smaller. The original is kept.")
     }
 }

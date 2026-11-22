@@ -54,7 +54,7 @@ struct NowPlayingBar: View {
                 .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(wallpaper?.title ?? "Nothing on your desktop yet")
+                    Text(wallpaper?.title ?? String(localized: "Nothing on your desktop yet"))
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                     statusLine(hasWallpaper: wallpaper != nil)
@@ -64,7 +64,7 @@ struct NowPlayingBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(wallpaper == nil ? "Browse your library" : "Open")
+        .help(wallpaper == nil ? Text("Browse your library") : Text("Open"))
     }
 
     @ViewBuilder
@@ -113,7 +113,7 @@ struct NowPlayingBar: View {
                 Button { model.playlists.previous() } label: {
                     Image(systemName: "backward.fill")
                 }
-                .help("Previous in playlist")
+                .help("Previous in Playlist")
             }
 
             Button { engine.toggleUserPause() } label: {
@@ -123,20 +123,20 @@ struct NowPlayingBar: View {
             }
             .buttonStyle(BarIconButtonStyle(size: 38))
             .disabled(!hasWallpaper)
-            .help(engine.userPaused ? "Resume all displays" : "Pause all displays")
+            .help(engine.userPaused ? Text("Resume all displays") : Text("Pause all displays"))
 
             if model.playlists.active != nil {
                 Button { model.playlists.next() } label: {
                     Image(systemName: "forward.fill")
                 }
-                .help("Next in playlist")
+                .help("Next in Playlist")
             }
 
             Button { settings.audioEnabled.toggle() } label: {
                 Image(systemName: settings.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .contentTransition(.symbolEffect(.replace))
             }
-            .help(settings.audioEnabled ? "Mute wallpaper audio" : "Play wallpaper audio")
+            .help(settings.audioEnabled ? Text("Mute wallpaper audio") : Text("Play wallpaper audio"))
 
             Menu {
                 Picker("Speed", selection: Binding(

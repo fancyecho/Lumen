@@ -6,9 +6,9 @@ enum VideoScaling: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .fill: "Fill screen"
-        case .fit: "Fit inside"
-        case .stretch: "Stretch"
+        case .fill: String(localized: "Fill screen")
+        case .fit: String(localized: "Fit inside")
+        case .stretch: String(localized: "Stretch")
         }
     }
 }
@@ -18,16 +18,16 @@ enum ShaderQuality: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .efficient: "Efficient"
-        case .balanced: "Balanced"
-        case .full: "Native"
+        case .efficient: String(localized: "Efficient")
+        case .balanced: String(localized: "Balanced")
+        case .full: String(localized: "Native")
         }
     }
     var detail: String {
         switch self {
-        case .efficient: "Renders about 1 MP and upscales. Lowest GPU use."
-        case .balanced: "Renders about 2 MP. Indistinguishable for smooth scenes."
-        case .full: "Renders every pixel of the display. Highest GPU use."
+        case .efficient: String(localized: "Renders about 1 MP and upscales. Lowest GPU use.")
+        case .balanced: String(localized: "Renders about 2 MP. Indistinguishable for smooth scenes.")
+        case .full: String(localized: "Renders every pixel of the display. Highest GPU use.")
         }
     }
     var pixelBudget: Double {
@@ -44,8 +44,8 @@ enum DockIconMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .whileWindowOpen: "Only while the window is open"
-        case .always: "Always"
+        case .whileWindowOpen: String(localized: "Only while the window is open")
+        case .always: String(localized: "Always")
         }
     }
 }

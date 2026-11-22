@@ -108,6 +108,22 @@ enum DisplayTarget: Hashable {
 
 enum WallpaperCategories {
     static let all = ["Abstract", "Anime", "City", "Games", "Minimal", "Nature", "Space", "Sci-Fi", "Other"]
+
+    /// Categories are stored as English keys; this is what the UI shows.
+    static func displayName(_ key: String) -> String {
+        switch key {
+        case "Abstract": String(localized: "Abstract")
+        case "Anime": String(localized: "Anime")
+        case "City": String(localized: "City")
+        case "Games": String(localized: "Games")
+        case "Minimal": String(localized: "Minimal")
+        case "Nature": String(localized: "Nature")
+        case "Space": String(localized: "Space")
+        case "Sci-Fi": String(localized: "Sci-Fi")
+        case "Other": String(localized: "Other")
+        default: key
+        }
+    }
 }
 
 extension ShaderUniforms {

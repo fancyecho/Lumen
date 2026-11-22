@@ -28,37 +28,37 @@ enum BuiltinShaders {
     static let all: [ShaderPreset] = [
         ShaderPreset(
             key: "silk", id: presetID(1), title: "Silk",
-            tagline: "Folds of light drifting like satin", category: "Abstract",
+            tagline: String(localized: "Folds of light drifting like satin"), category: "Abstract",
             source: ShaderSources.silk,
             params: ShaderParams(colors: palette(0x0B1026, 0x4B36C9, 0xE0679F, 0xFFD2A6)), detail: 1.0
         ),
         ShaderPreset(
             key: "aurora", id: presetID(2), title: "Aurora",
-            tagline: "Northern lights over a quiet ridge", category: "Nature",
+            tagline: String(localized: "Northern lights over a quiet ridge"), category: "Nature",
             source: ShaderSources.aurora,
             params: ShaderParams(colors: palette(0x060B1A, 0x2BF5A0, 0x1FB5FF, 0xB04BFF)), detail: 1.0
         ),
         ShaderPreset(
             key: "nebula", id: presetID(3), title: "Nebula",
-            tagline: "Slow gas clouds and distant stars", category: "Space",
+            tagline: String(localized: "Slow gas clouds and distant stars"), category: "Space",
             source: ShaderSources.nebula,
             params: ShaderParams(colors: palette(0x05030D, 0x6A2CB8, 0xE2458F, 0xFFE3B0)), detail: 1.0
         ),
         ShaderPreset(
             key: "bloom", id: presetID(4), title: "Bloom",
-            tagline: "Soft pastel light, gently breathing", category: "Minimal",
+            tagline: String(localized: "Soft pastel light, gently breathing"), category: "Minimal",
             source: ShaderSources.bloom,
             params: ShaderParams(colors: palette(0xFF9A8B, 0xFF6A88, 0x8EC5FC, 0xE0C3FC)), detail: 0.6
         ),
         ShaderPreset(
             key: "contour", id: presetID(5), title: "Contour",
-            tagline: "A living topographic map", category: "Minimal",
+            tagline: String(localized: "A living topographic map"), category: "Minimal",
             source: ShaderSources.contour,
             params: ShaderParams(colors: palette(0x07090F, 0x14213D, 0x4CC9F0, 0xF72585)), detail: 1.8
         ),
         ShaderPreset(
             key: "lava", id: presetID(6), title: "Lava",
-            tagline: "Warm wax rising and falling", category: "Abstract",
+            tagline: String(localized: "Warm wax rising and falling"), category: "Abstract",
             source: ShaderSources.lava,
             params: ShaderParams(colors: palette(0x12001F, 0xFF4E50, 0xF9D423, 0xFC913A)), detail: 1.0
         ),

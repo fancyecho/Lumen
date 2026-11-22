@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -149,6 +150,11 @@ struct RootView: View {
 
     private func windowAppeared() {
         NSApp.setActivationPolicy(.regular)
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "LumenDebugMenuPreview") {
+            openWindow(id: SceneID.menuPreview)
+        }
+        #endif
         if model.launchedAsLoginItem {
             // Started by launch-at-login: run quietly from the menu bar.
             model.launchedAsLoginItem = false
@@ -173,7 +179,8 @@ struct DisplaysMenu: View {
             ForEach(engine.displays) { display in
                 Section(display.name) {
                     if let id = display.wallpaperID, let wallpaper = model.library.wallpaper(id: id) {
-                        Button("\(wallpaper.title) — \(display.pauseReason?.title ?? "Playing")") {
+                        let state = display.pauseReason?.title ?? String(localized: "Playing")
+                        Button(wallpaper.title + " — " + state) {
                             model.router.open(wallpaper.kind == .video ? .wallpaper(id) : .studio(id))
                         }
                         Button("Use System Wallpaper") { model.clearWallpaper(on: .display(display.id)) }

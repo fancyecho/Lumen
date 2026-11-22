@@ -15,16 +15,16 @@ enum PauseReason: Equatable {
 
     var title: String {
         switch self {
-        case .user: "Paused"
-        case .systemSleep: "Mac is asleep"
-        case .displayAsleep: "Display is asleep"
-        case .locked: "Screen locked"
-        case .screenSaver: "Screen saver running"
-        case .sessionInactive: "Another user is active"
-        case .lowPower: "Low Power Mode"
-        case .battery: "On battery"
-        case .thermal: "Cooling down"
-        case .covered: "Covered by windows"
+        case .user: String(localized: "Paused")
+        case .systemSleep: String(localized: "Mac is asleep")
+        case .displayAsleep: String(localized: "Display is asleep")
+        case .locked: String(localized: "Screen locked")
+        case .screenSaver: String(localized: "Screen saver running")
+        case .sessionInactive: String(localized: "Another user is active")
+        case .lowPower: String(localized: "Low Power Mode")
+        case .battery: String(localized: "On battery")
+        case .thermal: String(localized: "Cooling down")
+        case .covered: String(localized: "Covered by windows")
         }
     }
 

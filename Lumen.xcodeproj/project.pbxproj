@@ -13,6 +13,7 @@
 		137D3832EB26376356DCC1B2 /* NowPlayingBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C63CF187C4E862FB3FCB35 /* NowPlayingBar.swift */; };
 		18630A81CED2081AB08BEE65 /* DesktopHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A0E10328A0020DA6E66474 /* DesktopHost.swift */; };
 		1AB6D9D828188A4141BC258A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A6A1FE4907B4DE10F11315 /* RootView.swift */; };
+		1B78E317145F48829FBA41B5 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 4244B249389139ABF718F32A /* Localizable.xcstrings */; };
 		1E018830F8476F8BEA9CE457 /* MetalContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48A8A9A1AA1B84BBC59477BA /* MetalContext.swift */; };
 		257FC9A803A2F08EC2596739 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 260EDEBFB0FCA65EBDFB3C30 /* Models.swift */; };
 		294CF658258C57E265A4AE83 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE0D3CD8B0B03D2CCF87210 /* LibraryView.swift */; };
@@ -47,6 +48,7 @@
 		E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E435D49B649CBC8FED581694 /* StudioEditorView.swift */; };
 		EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DB38C40FFF27490AAC894D /* WallpaperCard.swift */; };
 		F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1925E15F5611478F76DDCD5 /* Artwork.swift */; };
+		FF71DEC2F5C0B3ABD4A08732 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88EB151D6599A946A5916EAD /* AppLanguage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +63,7 @@
 		337A3269E47126DC851115EE /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35A6A1FE4907B4DE10F11315 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		39DB38C40FFF27490AAC894D /* WallpaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCard.swift; sourceTree = "<group>"; };
+		4244B249389139ABF718F32A /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		434FBF47296311D0EB8ADDE0 /* PauseReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseReason.swift; sourceTree = "<group>"; };
 		4808C95144734787B81A2AA2 /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
 		48A8A9A1AA1B84BBC59477BA /* MetalContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalContext.swift; sourceTree = "<group>"; };
@@ -72,6 +75,7 @@
 		77634FB81764312077A0248D /* OcclusionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OcclusionMonitor.swift; sourceTree = "<group>"; };
 		796508CF82781CECA422D840 /* AmbientBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackdrop.swift; sourceTree = "<group>"; };
 		82F8F2F06698872283B45F55 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		88EB151D6599A946A5916EAD /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		9BF2D45011297ED2AEBCFD8D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		A1925E15F5611478F76DDCD5 /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
 		A344EC8028FF1FF31AA92DBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -185,6 +189,7 @@
 			isa = PBXGroup;
 			children = (
 				A344EC8028FF1FF31AA92DBD /* Assets.xcassets */,
+				4244B249389139ABF718F32A /* Localizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -238,6 +243,7 @@
 		7DDD516D25BC6634C4E15EA0 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				88EB151D6599A946A5916EAD /* AppLanguage.swift */,
 				AE67EA26E9EB9536AA066034 /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -344,6 +350,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 3D6C9A073723A54628361039;
 			minimizedProjectReferenceProxies = 1;
@@ -363,6 +370,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				994F782287920E4097852C07 /* Assets.xcassets in Resources */,
+				1B78E317145F48829FBA41B5 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,6 +383,7 @@
 			files = (
 				0666F51921E870528722F391 /* AmbientBackdrop.swift in Sources */,
 				9A3ECB2DCC54AE9BCBD1C213 /* AppDelegate.swift in Sources */,
+				FF71DEC2F5C0B3ABD4A08732 /* AppLanguage.swift in Sources */,
 				B78A9867644D1154DD8E962E /* AppModel.swift in Sources */,
 				46CB4D8DE2C531E4ED062246 /* AppSettings.swift in Sources */,
 				F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */,
@@ -499,7 +508,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;
 				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 			};
 			name = Debug;
@@ -592,7 +601,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;
 				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 			};
 			name = Release;

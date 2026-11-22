@@ -8,6 +8,7 @@ struct SettingsView: View {
             Tab("Performance", systemImage: "gauge.with.dots.needle.50percent") { PerformanceSettings() }
         }
         .frame(width: 540)
+        .frame(minHeight: 520)
     }
 }
 
@@ -46,6 +47,8 @@ private struct GeneralSettings: View {
                 Text("macOS shows the system wallpaper during Mission Control, Space switches and on the lock screen. Lumen sets it to a frame of your live wallpaper so those moments match, and restores your original picture when you stop using a wallpaper.")
             }
 
+            LanguageSection()
+
             Section("Storage") {
                 LabeledContent("Library") {
                     Text(Format.bytes(model.library.totalDiskUsage)).monospacedDigit()
@@ -56,6 +59,31 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct LanguageSection: View {
+    @State private var selection = AppLanguage.current
+
+    var body: some View {
+        Section {
+            Picker("Language", selection: $selection) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(verbatim: language.label).tag(language)
+                }
+            }
+            .onChange(of: selection) { _, language in language.save() }
+            if selection != AppLanguage.atLaunch {
+                HStack {
+                    Text("Restart Lumen to use the new language.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Restart Now") { AppLanguage.relaunch() }
+                }
+            }
+        } footer: {
+            Text("Wallpapers resume automatically after the restart.")
+        }
     }
 }
 
@@ -118,12 +146,12 @@ private struct PerformanceSettings: View {
             } header: {
                 Text("Generative wallpapers")
             } footer: {
-                Text(settings.shaderQuality.detail + " Video wallpapers decode on the media engine and aren't affected.")
+                Text(settings.shaderQuality.detail + " " + String(localized: "Video wallpapers decode on the media engine and aren't affected."))
             }
 
             Section("Right now") {
-                LabeledContent("Power source", value: system.onBattery ? "Battery" : "Power adapter")
-                LabeledContent("Low Power Mode", value: system.lowPowerMode ? "On" : "Off")
+                LabeledContent("Power source", value: system.onBattery ? String(localized: "Battery") : String(localized: "Power adapter"))
+                LabeledContent("Low Power Mode", value: system.lowPowerMode ? String(localized: "On") : String(localized: "Off"))
                 LabeledContent("Thermal state", value: system.thermalDescription)
             }
         }

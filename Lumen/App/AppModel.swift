@@ -77,7 +77,7 @@ final class AppModel {
     func setWallpaper(_ wallpaper: Wallpaper, on target: DisplayTarget) {
         playlists.stop()
         engine.apply(wallpaper, to: target)
-        showToast("“\(wallpaper.title)” is on \(label(for: target))", symbol: "checkmark.circle.fill")
+        showToast(String(localized: "“\(wallpaper.title)” is on \(label(for: target))"), symbol: "checkmark.circle.fill")
     }
 
     func clearWallpaper(on target: DisplayTarget) {
@@ -93,9 +93,13 @@ final class AppModel {
                 showToast("\(failure.name): \(failure.reason)", symbol: "exclamationmark.triangle.fill")
             } else if !result.added.isEmpty {
                 let count = result.added.count
-                let suffix = result.failures.isEmpty ? "" : " · \(result.failures.count) skipped"
-                showToast(count == 1 ? "Added “\(result.added[0].title)”\(suffix)" : "Added \(count) wallpapers\(suffix)",
-                          symbol: "square.and.arrow.down.fill")
+                var message = count == 1
+                    ? String(localized: "Added “\(result.added[0].title)”")
+                    : String(localized: "Added \(count) wallpapers")
+                if !result.failures.isEmpty {
+                    message += String(localized: " · \(result.failures.count) skipped")
+                }
+                showToast(message, symbol: "square.and.arrow.down.fill")
             }
         }
     }
@@ -107,7 +111,7 @@ final class AppModel {
         ThumbnailCache.shared.invalidate(wallpaper)
         library.delete(wallpaper.id)
         if router.route == .wallpaper(wallpaper.id) || router.route == .studio(wallpaper.id) { router.back() }
-        showToast("Deleted “\(wallpaper.title)”", symbol: "trash.fill")
+        showToast(String(localized: "Deleted “\(wallpaper.title)”"), symbol: "trash.fill")
     }
 
     func optimize(_ wallpaper: Wallpaper) {
@@ -117,7 +121,7 @@ final class AppModel {
                 try await library.optimize(wallpaper.id, maxDisplayWidth: maxWidth)
                 ThumbnailCache.shared.invalidate(wallpaper)
                 engine.reload(wallpaperID: wallpaper.id)
-                showToast("Optimized “\(wallpaper.title)” for this Mac", symbol: "bolt.fill")
+                showToast(String(localized: "Optimized “\(wallpaper.title)” for this Mac"), symbol: "bolt.fill")
             } catch {
                 showToast(error.localizedDescription, symbol: "exclamationmark.triangle.fill")
             }
@@ -132,9 +136,9 @@ final class AppModel {
     func label(for target: DisplayTarget) -> String {
         switch target {
         case .allDisplays:
-            return engine.displays.count > 1 ? "all displays" : "your desktop"
+            return engine.displays.count > 1 ? String(localized: "all displays") : String(localized: "your desktop")
         case .display(let id):
-            return engine.displays.first { $0.id == id }?.name ?? "that display"
+            return engine.displays.first { $0.id == id }?.name ?? String(localized: "that display")
         }
     }
 

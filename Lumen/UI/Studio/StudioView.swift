@@ -11,7 +11,7 @@ struct StudioView: View {
                 PageHeader(
                     eyebrow: "Studio",
                     title: "Generative wallpapers",
-                    subtitle: "Rendered live on the GPU within a fixed pixel budget. Tune colours and motion, or write your own Metal shader."
+                    subtitle: String(localized: "Rendered live on the GPU within a fixed pixel budget. Tune colours and motion, or write your own Metal shader.")
                 ) {
                     Button(action: createShader) {
                         Label("New Shader", systemImage: "chevron.left.forwardslash.chevron.right")
@@ -47,7 +47,7 @@ struct StudioView: View {
     private func createShader() {
         let base = BuiltinShaders.all[0].params
         let wallpaper = model.library.saveShader(
-            title: "Untitled Shader",
+            title: String(localized: "Untitled Shader"),
             config: ShaderConfig(presetKey: nil, customSource: ShaderSources.customTemplate, params: base),
             category: "Abstract"
         )

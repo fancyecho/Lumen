@@ -5,6 +5,7 @@ import CoreServices
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppModel.shared.launchedAsLoginItem = Self.isLoginItemLaunch()
+        _ = AppLanguage.atLaunch
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

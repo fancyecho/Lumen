@@ -27,11 +27,22 @@ struct LumenApp: App {
             Image(systemName: model.engine.isAnyPlaying ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack")
         }
         .menuBarExtraStyle(.window)
+
+        #if DEBUG
+        // `-LumenDebugMenuPreview YES` shows the menu bar panel in a normal window for UI checks.
+        Window("Menu Bar Preview", id: SceneID.menuPreview) {
+            MenuBarPanel()
+                .environment(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
+        #endif
     }
 }
 
 enum SceneID {
     static let main = "main"
+    static let menuPreview = "menu-preview"
 }
 
 struct LumenCommands: Commands {
@@ -43,8 +54,10 @@ struct LumenCommands: Commands {
                 .keyboardShortcut("o")
         }
         CommandMenu("Playback") {
-            Button(model.engine.userPaused ? "Resume All" : "Pause All") {
+            Button {
                 model.engine.toggleUserPause()
+            } label: {
+                if model.engine.userPaused { Text("Resume All") } else { Text("Pause All") }
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
 

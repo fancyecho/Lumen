@@ -9,7 +9,7 @@ struct PlaylistsView: View {
                 PageHeader(
                     eyebrow: "Playlists",
                     title: "Rotations",
-                    subtitle: "Cycle through wallpapers on a schedule, across every display."
+                    subtitle: String(localized: "Cycle through wallpapers on a schedule, across every display.")
                 )
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260, maximum: 400), spacing: 24, alignment: .top)], alignment: .leading, spacing: 30) {
                     NewPlaylistCard {
@@ -79,15 +79,21 @@ struct PlaylistCard: View {
                         .strokeBorder(isActive ? Theme.accent : Color.white.opacity(hovering ? 0.28 : 0.08), lineWidth: isActive ? 2 : 1)
                 )
                 .overlay(alignment: .topLeading) {
-                    if isActive { ArtBadge(text: "Rotating now", symbol: "arrow.triangle.2.circlepath").padding(10) }
+                    if isActive { ArtBadge(text: String(localized: "Rotating now"), symbol: "arrow.triangle.2.circlepath").padding(10) }
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if hovering || isActive {
                         Button {
                             if isActive { model.playlists.stop() } else { model.playlists.play(playlist.id) }
                         } label: {
-                            Label(isActive ? "Stop" : "Play", systemImage: isActive ? "stop.fill" : "play.fill")
-                                .font(.system(size: 12, weight: .semibold))
+                            Group {
+                                if isActive {
+                                    Label("Stop", systemImage: "stop.fill")
+                                } else {
+                                    Label("Play", systemImage: "play.fill")
+                                }
+                            }
+                            .font(.system(size: 12, weight: .semibold))
                         }
                         .buttonStyle(.glassProminent)
                         .disabled(wallpapers.isEmpty)
@@ -98,7 +104,7 @@ struct PlaylistCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(playlist.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                Text("\(wallpapers.count) wallpaper\(wallpapers.count == 1 ? "" : "s") · \(Format.interval(minutes: playlist.intervalMinutes))\(playlist.shuffle ? " · shuffled" : "")")
+                Text(summary(count: wallpapers.count))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -107,6 +113,12 @@ struct PlaylistCard: View {
         .onTapGesture { model.router.open(.playlist(playlist.id)) }
         .onHover { hovering = $0 }
         .animation(.snappy(duration: 0.2), value: hovering)
+    }
+
+    private func summary(count: Int) -> String {
+        var parts = [String(localized: "\(count) wallpapers"), Format.interval(minutes: playlist.intervalMinutes)]
+        if playlist.shuffle { parts.append(String(localized: "shuffled")) }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -160,7 +172,7 @@ struct PlaylistEditorView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("PLAYLIST").font(Theme.eyebrow).tracking(1.8).foregroundStyle(Theme.accent)
+                    Text(verbatim: "PLAYLIST").font(Theme.eyebrow).tracking(1.8).foregroundStyle(Theme.accent)
                     TextField("Name", text: binding(\.name))
                         .textFieldStyle(.plain)
                         .font(Theme.display(40))
@@ -210,7 +222,7 @@ struct PlaylistEditorView: View {
 
                 SectionTitle(
                     "Wallpapers",
-                    subtitle: "\(playlist.wallpaperIDs.count) selected · click to add or remove. Order follows selection."
+                    subtitle: String(localized: "\(playlist.wallpaperIDs.count) selected · click to add or remove. Order follows selection.")
                 )
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: 18, alignment: .top)], alignment: .leading, spacing: 22) {
                     ForEach(model.library.all) { wallpaper in

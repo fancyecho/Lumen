@@ -11,6 +11,10 @@ struct WallpaperCard: View {
     @State private var hoverTask: Task<Void, Never>?
 
     private var isOnDesktop: Bool { !model.engine.displays(showing: wallpaper.id).isEmpty }
+    private var isOnEveryDisplay: Bool {
+        let engine = model.engine
+        return !engine.displays.isEmpty && engine.displays(showing: wallpaper.id).count == engine.displays.count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
@@ -41,7 +45,7 @@ struct WallpaperCard: View {
         .overlay(alignment: .topLeading) { badges.padding(10) }
         .overlay(alignment: .topTrailing) {
             if isOnDesktop {
-                ArtBadge(text: "On desktop", symbol: "display").padding(10)
+                ArtBadge(text: String(localized: "On desktop"), symbol: "display").padding(10)
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -70,7 +74,7 @@ struct WallpaperCard: View {
                 if let video = wallpaper.video {
                     if let label = Format.resolutionClass(video.width, video.height) { ArtBadge(text: label) }
                     if video.isHDR { ArtBadge(text: "HDR") }
-                    if video.optimized != nil { ArtBadge(text: "Optimized", symbol: "bolt.fill") }
+                    if video.optimized != nil { ArtBadge(text: String(localized: "Optimized"), symbol: "bolt.fill") }
                 }
             case .shader:
                 ArtBadge(text: "Live", symbol: "sparkles")
@@ -90,16 +94,23 @@ struct WallpaperCard: View {
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
-                .accessibilityLabel(wallpaper.isFavorite ? "Remove from favorites" : "Add to favorites")
+                .accessibilityLabel(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
 
-                Button {
-                    model.setWallpaper(wallpaper, on: .allDisplays)
-                } label: {
-                    Label("Set", systemImage: "play.fill")
+                if isOnEveryDisplay {
+                    Label("In Use", systemImage: "checkmark")
                         .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .glassEffect(.regular, in: .capsule)
+                } else {
+                    Button {
+                        model.setWallpaper(wallpaper, on: .allDisplays)
+                    } label: {
+                        Label("Set as Wallpaper", systemImage: "play.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .buttonStyle(.glassProminent)
                 }
-                .buttonStyle(.glassProminent)
-                .accessibilityLabel("Set as wallpaper")
             }
         }
     }
@@ -127,10 +138,14 @@ struct WallpaperCard: View {
     private var subtitle: String {
         switch wallpaper.kind {
         case .video:
-            guard let video = wallpaper.video else { return wallpaper.category }
-            return "\(wallpaper.category) · \(Format.duration(video.duration)) · \(video.codec)"
+            let category = WallpaperCategories.displayName(wallpaper.category)
+            guard let video = wallpaper.video else { return category }
+            return "\(category) · \(Format.duration(video.duration)) · \(video.codec)"
         case .shader:
-            return wallpaper.isBuiltin ? "Generative · \(wallpaper.category)" : "Your shader · \(wallpaper.category)"
+            let category = WallpaperCategories.displayName(wallpaper.category)
+            return wallpaper.isBuiltin
+                ? String(localized: "Rendered live · \(category)")
+                : String(localized: "Your shader · \(category)")
         }
     }
 
@@ -173,8 +188,10 @@ struct WallpaperMenuItems: View {
             Button("Set as Wallpaper") { model.setWallpaper(wallpaper, on: .allDisplays) }
         }
         Divider()
-        Button(wallpaper.isFavorite ? "Remove from Favorites" : "Add to Favorites") {
+        Button {
             model.library.toggleFavorite(wallpaper.id)
+        } label: {
+            if wallpaper.isFavorite { Text("Remove from Favorites") } else { Text("Add to Favorites") }
         }
         if wallpaper.kind == .video {
             Button("Show in Finder") { model.revealInFinder(wallpaper) }
@@ -189,7 +206,7 @@ struct WallpaperMenuItems: View {
 /// Primary "Set as Wallpaper" control; offers per-display targets when several are connected.
 struct SetWallpaperButton: View {
     @Environment(AppModel.self) private var model
-    var title = "Set as Wallpaper"
+    var title: LocalizedStringKey = "Set as Wallpaper"
     let action: (DisplayTarget) -> Void
 
     var body: some View {

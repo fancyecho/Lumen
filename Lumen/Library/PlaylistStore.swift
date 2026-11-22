@@ -41,7 +41,7 @@ final class PlaylistStore {
     // MARK: Editing
 
     func create() -> Playlist {
-        let playlist = Playlist(name: "Playlist \(playlists.count + 1)")
+        let playlist = Playlist(name: String(localized: "Playlist \(playlists.count + 1)"))
         playlists.insert(playlist, at: 0)
         save()
         return playlist

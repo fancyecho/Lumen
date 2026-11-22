@@ -138,7 +138,7 @@ final class LibraryStore {
         var result = ImportResult()
         for url in urls {
             guard MediaInspector.isVideoFile(url) else {
-                result.failures.append((url.lastPathComponent, "Not a video file."))
+                result.failures.append((url.lastPathComponent, String(localized: "Not a video file.")))
                 continue
             }
             let job = ImportJob(id: UUID(), name: url.lastPathComponent)
@@ -197,7 +197,13 @@ final class LibraryStore {
     }
 
     static func prettyTitle(for url: URL) -> String {
-        let base = url.deletingPathExtension().lastPathComponent
+        let raw = url.deletingPathExtension().lastPathComponent
+        // UUIDs and hashes from download sites make poor titles.
+        let compact = raw.filter { $0 != "-" && $0 != "_" && $0 != " " }
+        if compact.count >= 16, compact.allSatisfy(\.isHexDigit) {
+            return String(localized: "Untitled Video")
+        }
+        let base = raw
             .replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
         let words = base.split(separator: " ").map(String.init)

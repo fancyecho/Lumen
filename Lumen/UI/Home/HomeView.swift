@@ -10,7 +10,7 @@ struct HomeView: View {
                 displaysSection
                 if !recent.isEmpty { recentShelf }
                 generativeShelf
-                SmartPausePanel()
+                if model.engine.displays.count != 1 { SmartPausePanel() }
             }
             .padding(.horizontal, Theme.pagePadding)
             .padding(.top, 26)
@@ -28,33 +28,53 @@ struct HomeView: View {
         let playing = engine.displays.filter(\.isPlaying).count
         let libraryCount = model.library.items.count
         return VStack(alignment: .leading, spacing: 12) {
-            Text("\(Format.greeting()) · \(Date.now.formatted(.dateTime.weekday(.wide)))".uppercased())
+            Text(verbatim: "\(Format.greeting()) · \(Date.now.formatted(Date.FormatStyle(locale: Locale(identifier: "en_US")).weekday(.wide)))".uppercased())
                 .font(Theme.eyebrow)
                 .tracking(1.8)
                 .foregroundStyle(Theme.accent)
-            Text("Your desktop,\nin motion.")
+            Text(verbatim: "Your desktop,\nin motion.")
                 .font(Theme.display(52))
                 .lineSpacing(-4)
-            Text(heroSubtitle(playing: playing, displays: engine.displays.count, libraryCount: libraryCount))
+            Text(heroSubtitle(playing: playing, libraryCount: libraryCount))
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func heroSubtitle(playing: Int, displays: Int, libraryCount: Int) -> String {
+    private func heroSubtitle(playing: Int, libraryCount: Int) -> String {
+        let displays = model.engine.displays.count
         let library = libraryCount == 0
-            ? "Drop a video anywhere in this window to start"
-            : "\(libraryCount) video\(libraryCount == 1 ? "" : "s") in your library"
-        let status = displays > 1 ? "\(playing) of \(displays) displays playing" : (playing == 1 ? "playing now" : "idle")
+            ? String(localized: "Drop a video anywhere in this window to start")
+            : String(localized: "\(libraryCount) videos in your library")
+        let status: String
+        if displays > 1 {
+            status = String(localized: "\(playing) of \(displays) displays playing")
+        } else if playing == 1 {
+            status = String(localized: "Playing now")
+        } else if let only = model.engine.displays.first, only.wallpaperID != nil, let reason = only.pauseReason {
+            status = reason.title
+        } else {
+            status = String(localized: "No live wallpaper yet")
+        }
         return "\(library) · \(status)"
     }
 
     private var displaysSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionTitle("On your displays", subtitle: "Each display can play its own wallpaper.")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 360, maximum: 620), spacing: 22, alignment: .top)], alignment: .leading, spacing: 22) {
-                ForEach(model.engine.displays) { display in
-                    DisplayCard(display: display)
+            SectionTitle("On your displays", subtitle: String(localized: "Each display can play its own wallpaper."))
+            if let only = model.engine.displays.first, model.engine.displays.count == 1 {
+                // One display: give the card room and use the space beside it for Smart pause.
+                HStack(alignment: .top, spacing: 34) {
+                    DisplayCard(display: only)
+                        .frame(minWidth: 420, maxWidth: 600)
+                    SmartPausePanel(isCompact: true)
+                        .frame(minWidth: 300, maxWidth: .infinity)
+                }
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 360, maximum: 620), spacing: 22, alignment: .top)], alignment: .leading, spacing: 22) {
+                    ForEach(model.engine.displays) { display in
+                        DisplayCard(display: display)
+                    }
                 }
             }
         }
@@ -72,7 +92,7 @@ struct HomeView: View {
 
     private var generativeShelf: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionTitle(title: "Generative", subtitle: "Rendered live on the GPU. Tune colours and motion in Studio.") {
+            SectionTitle(title: "Generative", subtitle: String(localized: "Rendered live on the GPU. Tune colours and motion in Studio.")) {
                 Button("Open Studio") { model.router.show(.studio) }
                     .buttonStyle(.link)
             }
@@ -193,32 +213,44 @@ struct DisplayCard: View {
 /// Live view of the automatic pause rules and what they're doing right now.
 struct SmartPausePanel: View {
     @Environment(AppModel.self) private var model
+    /// Sits beside a display card: smaller title, tiles stack in one or two columns.
+    var isCompact = false
 
     var body: some View {
         @Bindable var settings = model.settings
         let system = model.system
         let coveredCount = model.engine.displays.filter { $0.pauseReason == .covered }.count
 
-        VStack(alignment: .leading, spacing: 16) {
-            SectionTitle("Smart pause", subtitle: "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
+        VStack(alignment: .leading, spacing: isCompact ? 12 : 16) {
+            if isCompact {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: "Smart pause").font(Theme.display(17, weight: .semibold))
+                    Text("Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                SectionTitle("Smart pause", subtitle: String(localized: "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more."))
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: isCompact ? 260 : 240), spacing: 12)], spacing: 12) {
                 PolicyTile(
-                    symbol: "macwindow", title: "Covered by windows",
-                    status: coveredCount > 0 ? "Paused on \(coveredCount) display\(coveredCount == 1 ? "" : "s")" : "Watching",
+                    symbol: "macwindow", title: String(localized: "When covered by windows"),
+                    status: coveredCount > 0 ? String(localized: "Paused on \(coveredCount) displays") : String(localized: "Watching"),
                     isTriggered: coveredCount > 0, isOn: $settings.pauseWhenCovered
                 )
                 PolicyTile(
-                    symbol: "battery.50percent", title: "On battery",
-                    status: system.onBattery ? "Running on battery" : "On power adapter",
+                    symbol: "battery.50percent", title: String(localized: "When on battery"),
+                    status: system.onBattery ? String(localized: "Running on battery") : String(localized: "On power adapter"),
                     isTriggered: system.onBattery && settings.pauseOnBattery, isOn: $settings.pauseOnBattery
                 )
                 PolicyTile(
-                    symbol: "leaf.fill", title: "Low Power Mode",
-                    status: system.lowPowerMode ? "On" : "Off",
+                    symbol: "leaf.fill", title: String(localized: "In Low Power Mode"),
+                    status: system.lowPowerMode ? String(localized: "On") : String(localized: "Off"),
                     isTriggered: system.lowPowerMode && settings.pauseOnLowPower, isOn: $settings.pauseOnLowPower
                 )
                 PolicyTile(
-                    symbol: "thermometer.medium", title: "Thermal pressure",
+                    symbol: "thermometer.medium", title: String(localized: "When the Mac runs hot"),
                     status: system.thermalDescription,
                     isTriggered: system.thermalPressureHigh && settings.pauseOnThermalPressure, isOn: $settings.pauseOnThermalPressure
                 )

@@ -26,11 +26,11 @@ final class SystemMonitor {
 
     var thermalDescription: String {
         switch thermalState {
-        case .nominal: "Normal"
-        case .fair: "Warm"
-        case .serious: "Hot"
-        case .critical: "Critical"
-        @unknown default: "Unknown"
+        case .nominal: String(localized: "Normal")
+        case .fair: String(localized: "Warm")
+        case .serious: String(localized: "Hot")
+        case .critical: String(localized: "Critical")
+        @unknown default: String(localized: "Unknown")
         }
     }
 

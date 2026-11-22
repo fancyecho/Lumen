@@ -99,9 +99,9 @@ enum Format {
     static func interval(minutes: Int) -> String {
         if minutes >= 60, minutes % 60 == 0 {
             let hours = minutes / 60
-            return hours == 1 ? "every hour" : "every \(hours) hours"
+            return hours == 1 ? String(localized: "every hour") : String(localized: "every \(hours) hours")
         }
-        return "every \(minutes) min"
+        return String(localized: "every \(minutes) min")
     }
 }
 

@@ -5,10 +5,10 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .all: "All"
-        case .videos: "Videos"
-        case .generative: "Generative"
-        case .favorites: "Favorites"
+        case .all: String(localized: "All")
+        case .videos: String(localized: "Videos")
+        case .generative: String(localized: "Rendered Live")
+        case .favorites: String(localized: "Favorites")
         }
     }
     var symbol: String {
@@ -26,10 +26,10 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .recent: "Recently Added"
-        case .name: "Name"
-        case .duration: "Duration"
-        case .size: "File Size"
+        case .recent: String(localized: "Recently Added")
+        case .name: String(localized: "Name")
+        case .duration: String(localized: "Duration")
+        case .size: String(localized: "File Size")
         }
     }
 }
@@ -74,17 +74,9 @@ struct LibraryView: View {
         let search = model.router.searchText
         return PageHeader(
             eyebrow: "Library",
-            title: search.isEmpty ? "Your wallpapers" : "Results for “\(search)”",
-            subtitle: "\(library.items.count) imported · \(library.builtins.count) generative · \(Format.bytes(library.totalDiskUsage)) on disk"
-        ) {
-            Button {
-                model.isImporterPresented = true
-            } label: {
-                Label("Add Videos", systemImage: "plus")
-            }
-            .buttonStyle(.glass)
-            .controlSize(.large)
-        }
+            title: search.isEmpty ? "Your wallpapers" : String(localized: "Results for “\(search)”"),
+            subtitle: String(localized: "\(library.items.count) imported · \(library.builtins.count) rendered live · \(Format.bytes(library.totalDiskUsage)) on disk")
+        )
     }
 
     private var controls: some View {
@@ -112,9 +104,9 @@ struct LibraryView: View {
             let categories = availableCategories
             if categories.count > 1 {
                 HStack(spacing: 8) {
-                    FilterChip(title: "Any category", isSelected: category == nil) { category = nil }
+                    FilterChip(title: String(localized: "Any category"), isSelected: category == nil) { category = nil }
                     ForEach(categories, id: \.self) { name in
-                        FilterChip(title: name, isSelected: category == name) {
+                        FilterChip(title: WallpaperCategories.displayName(name), isSelected: category == name) {
                             category = category == name ? nil : name
                         }
                     }
@@ -211,13 +203,13 @@ struct EmptyLibraryView: View {
     }
 
     private var title: String {
-        if isSearching { return "No matches" }
-        return filter == .favorites ? "No favorites yet" : "Drop videos here"
+        if isSearching { return String(localized: "No matches") }
+        return filter == .favorites ? String(localized: "No favorites yet") : String(localized: "Drop videos here")
     }
 
     private var message: String {
-        if isSearching { return "Try a different name or category." }
-        if filter == .favorites { return "Hover a wallpaper and tap the heart to keep it here." }
-        return "MP4 and MOV files play on the media engine, so HEVC loops cost almost no power. Lumen keeps its own copy, so you can delete the original."
+        if isSearching { return String(localized: "Try a different name or category.") }
+        if filter == .favorites { return String(localized: "Hover a wallpaper and tap the heart to keep it here.") }
+        return String(localized: "MP4 and MOV files play on the media engine, so HEVC loops cost almost no power. Lumen keeps its own copy, so you can delete the original.")
     }
 }

@@ -12,12 +12,16 @@ enum MediaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notPlayable(let ext):
-            ext == "WEBM"
-                ? "WebM isn't supported by macOS's video engine. Convert it to MP4 (HEVC or H.264)."
-                : "This \(ext.isEmpty ? "file" : ext + " file") can't be played by macOS."
-        case .noVideoTrack: "The file has no video track."
-        case .writeFailed: "Couldn't write the image."
-        case .exportFailed(let reason): "Optimization failed: \(reason)"
+            if ext == "WEBM" {
+                String(localized: "WebM isn't supported by macOS's video engine. Convert it to MP4 (HEVC or H.264).")
+            } else if ext.isEmpty {
+                String(localized: "macOS can't play this file.")
+            } else {
+                String(localized: "macOS can't play this \(ext) file.")
+            }
+        case .noVideoTrack: String(localized: "The file has no video track.")
+        case .writeFailed: String(localized: "Couldn't write the image.")
+        case .exportFailed(let reason): String(localized: "Optimization failed: \(reason)")
         }
     }
 }

@@ -52,7 +52,7 @@ struct StudioEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Fragment shader").font(.system(size: 13, weight: .semibold))
-                Text("Metal Shading Language").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(verbatim: "Metal Shading Language").font(.system(size: 12)).foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset") { source = self.config?.resolvedSource ?? "" }
                     .buttonStyle(.glass)
@@ -88,7 +88,7 @@ struct StudioEditorView: View {
     private func controls(base: Wallpaper, config: ShaderConfig) -> some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(base.isBuiltin ? "PRESET" : "YOUR SHADER")
+                Text(verbatim: base.isBuiltin ? "PRESET" : "YOUR SHADER")
                     .font(Theme.eyebrow).tracking(1.8).foregroundStyle(Theme.accent)
                 TextField("Name", text: $title)
                     .textFieldStyle(.plain)
@@ -125,12 +125,20 @@ struct StudioEditorView: View {
                     .controlSize(.large)
                 HStack(spacing: 8) {
                     Button { save(base: base) } label: {
-                        Label(base.isBuiltin ? "Save Copy" : "Save", systemImage: "square.and.arrow.down")
+                        if base.isBuiltin {
+                            Label("Save Copy", systemImage: "square.and.arrow.down")
+                        } else {
+                            Label("Save", systemImage: "square.and.arrow.down")
+                        }
                     }
                     Button {
                         withAnimation(.smooth) { showsCode.toggle() }
                     } label: {
-                        Label(showsCode ? "Hide Code" : "Edit Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                        if showsCode {
+                            Label("Hide Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                        } else {
+                            Label("Edit Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                        }
                     }
                     if !base.isBuiltin {
                         Button(role: .destructive) { model.pendingDeletion = base } label: {
@@ -149,7 +157,7 @@ struct StudioEditorView: View {
         }
     }
 
-    private func panel<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func panel<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
             content()
@@ -159,7 +167,7 @@ struct StudioEditorView: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.surfaceStroke))
     }
 
-    private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, format: @escaping (Double) -> String) -> some View {
+    private func slider(_ label: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>, format: @escaping (Double) -> String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label).font(.system(size: 13))
@@ -248,7 +256,7 @@ struct StudioEditorView: View {
                 title: name == base.title ? "\(base.title) Remix" : name,
                 config: config, category: base.category
             )
-            model.showToast("Saved “\(copy.title)” to your library", symbol: "square.and.arrow.down.fill")
+            model.showToast(String(localized: "Saved “\(copy.title)” to your library"), symbol: "square.and.arrow.down.fill")
             return copy
         }
         var updated = base
@@ -256,7 +264,7 @@ struct StudioEditorView: View {
         updated.shader = config
         model.library.update(updated)
         model.engine.reload(wallpaperID: updated.id)
-        model.showToast("Saved “\(updated.title)”", symbol: "checkmark.circle.fill")
+        model.showToast(String(localized: "Saved “\(updated.title)”"), symbol: "checkmark.circle.fill")
         return updated
     }
 

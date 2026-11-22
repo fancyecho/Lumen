@@ -8,10 +8,10 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .home: "Home"
-        case .library: "Library"
-        case .studio: "Studio"
-        case .playlists: "Playlists"
+        case .home: String(localized: "Home")
+        case .library: String(localized: "Library")
+        case .studio: String(localized: "Studio")
+        case .playlists: String(localized: "Playlists")
         }
     }
 }

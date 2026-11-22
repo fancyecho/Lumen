@@ -10,10 +10,10 @@ enum ShaderError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noDevice: "This Mac has no Metal device."
-        case .missingEntryPoint: "The shader must define `fragment float4 lumen_fragment(...)`."
-        case .missingSource: "This wallpaper has no shader source."
-        case .renderFailed: "The shader could not be rendered."
+        case .noDevice: String(localized: "This Mac has no Metal device.")
+        case .missingEntryPoint: String(localized: "The shader must define `fragment float4 lumen_fragment(...)`.")
+        case .missingSource: String(localized: "This wallpaper has no shader source.")
+        case .renderFailed: String(localized: "The shader could not be rendered.")
         }
     }
 }
@@ -77,7 +77,7 @@ final class MetalContext {
             guard let match = line.firstMatch(of: /program_source:(\d+):(\d+):\s*(.*)/),
                   let number = Int(match.1)
             else { return line }
-            return "Line \(max(1, number - offset)): \(match.3)"
+            return String(localized: "Line \(max(1, number - offset)): \(String(match.3))")
         }
         return cleaned.isEmpty ? raw : cleaned.prefix(6).joined(separator: "\n")
     }
