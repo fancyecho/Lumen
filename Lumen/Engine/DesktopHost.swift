@@ -94,12 +94,13 @@ final class DesktopHost {
                 self.isShown = true
                 self.fadeWindow(to: 1, duration: animated ? 0.7 : 0.3) { previous?.tearDown() }
             } else if crossfade {
+                let tearDownPrevious: @MainActor () -> Void = { previous?.tearDown() }
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = 0.9
                     context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                     view.animator().alphaValue = 1
                 } completionHandler: {
-                    MainActor.assumeIsolated { previous?.tearDown() }
+                    MainActor.assumeIsolated(tearDownPrevious)
                 }
             } else {
                 view.alphaValue = 1
