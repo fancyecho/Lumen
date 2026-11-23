@@ -75,6 +75,32 @@ final class WallpaperEngine {
     var isAnyWallpaperSet: Bool { displays.contains { $0.wallpaperID != nil } }
     var isAnyPlaying: Bool { displays.contains(where: \.isPlaying) }
 
+    /// Displays whose system Desktop entry is owned by Lock Screen's Aerial rather than `StillFrameSync`.
+    func lockScreenManagedDisplayIDs() -> Set<String> {
+        guard settings.lockScreenEnabled else { return [] }
+        guard let primary = primaryDisplay?.id ?? NSScreen.screens.first?.displayUUID else { return [] }
+        return [primary]
+    }
+
+    /// Secondary displays that currently mirror a still frame into the system Desktop entry.
+    func stillFrameManagedDisplayIDs() -> Set<String> {
+        guard settings.syncStillFrame else { return [] }
+        return Set(hosts.keys).subtracting(lockScreenManagedDisplayIDs())
+    }
+
+    /// Reapplies still frames (or restores pre-Lumen originals) once Lock Screen finishes restoring `Index.plist`.
+    func syncStillFramesAfterLockScreenDisabled() {
+        guard !settings.lockScreenEnabled else { return }
+        for screen in NSScreen.screens {
+            let displayID = screen.displayUUID
+            if settings.syncStillFrame, let id = hosts[displayID]?.wallpaperID, let wallpaper = library.wallpaper(id: id) {
+                stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
+            } else {
+                stills.restoreOriginal(for: screen)
+            }
+        }
+    }
+
     func displays(showing wallpaperID: UUID) -> [Display] {
         displays.filter { $0.wallpaperID == wallpaperID }
     }
@@ -101,9 +127,10 @@ final class WallpaperEngine {
     /// Moves/zooms every desktop showing this wallpaper, live, and refreshes its still frame.
     func updateFraming(wallpaperID: UUID) {
         guard let wallpaper = library.wallpaper(id: wallpaperID) else { return }
+        let lockManaged = lockScreenManagedDisplayIDs()
         for (displayID, host) in hosts where host.wallpaperID == wallpaperID {
             host.renderer?.setFraming(wallpaper.resolvedFraming)
-            if settings.syncStillFrame, let screen = NSScreen.screen(withUUID: displayID) {
+            if settings.syncStillFrame, !lockManaged.contains(displayID), let screen = NSScreen.screen(withUUID: displayID) {
                 stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling, debounce: true)
             }
         }
@@ -141,6 +168,7 @@ final class WallpaperEngine {
 
     private func rebuild(animated: Bool, forceReload: Set<UUID> = []) {
         let screens = NSScreen.screens
+        let lockManaged = lockScreenManagedDisplayIDs()
         var connected = Set<String>()
 
         for screen in screens {
@@ -151,7 +179,9 @@ final class WallpaperEngine {
             guard let wallpaper else {
                 if let host = hosts.removeValue(forKey: displayID) {
                     host.dismiss(animated: animated)
-                    stills.restoreOriginal(for: screen)
+                    if !lockManaged.contains(displayID) {
+                        stills.restoreOriginal(for: screen)
+                    }
                 }
                 continue
             }
@@ -170,7 +200,7 @@ final class WallpaperEngine {
 
             if let renderer = makeRenderer(for: wallpaper) {
                 host.present(renderer, wallpaperID: wallpaper.id, animated: animated && settings.crossfade)
-                if settings.syncStillFrame {
+                if settings.syncStillFrame, !lockManaged.contains(displayID) {
                     stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
                 }
             }
@@ -368,16 +398,23 @@ final class WallpaperEngine {
             hosts.values.compactMap { $0.renderer as? WebRenderer }.forEach { $0.update(settings: web) }
             hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
         case .stillFrame:
+            let lockManaged = lockScreenManagedDisplayIDs()
             if settings.syncStillFrame {
-                for screen in NSScreen.screens {
+                for screen in NSScreen.screens where !lockManaged.contains(screen.displayUUID) {
                     guard let id = hosts[screen.displayUUID]?.wallpaperID, let wallpaper = library.wallpaper(id: id) else { continue }
                     stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
                 }
             } else {
-                stills.restoreAll()
+                for screen in NSScreen.screens where !lockManaged.contains(screen.displayUUID) {
+                    stills.restoreOriginal(for: screen)
+                }
             }
         case .lockScreen:
-            break
+            if settings.lockScreenEnabled {
+                for displayID in lockScreenManagedDisplayIDs() {
+                    stills.cancel(for: displayID)
+                }
+            }
         case .scene:
             let ids = Set(hosts.values.compactMap { host in
                 host.wallpaperID.flatMap { library.wallpaper(id: $0) }.flatMap { $0.kind == .scene ? $0.id : nil }

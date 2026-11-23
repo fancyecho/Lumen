@@ -42,6 +42,13 @@ final class StillFrameSync {
         }
     }
 
+    /// Stops any in-flight sync for `displayID` without touching the system desktop choice
+    /// (used when Lock Screen takes ownership of that display's Desktop Aerial).
+    func cancel(for displayID: String) {
+        tasks[displayID]?.cancel()
+        tasks[displayID] = nil
+    }
+
     func restoreOriginal(for screen: NSScreen) {
         let displayID = screen.displayUUID
         tasks[displayID]?.cancel()

@@ -50,6 +50,7 @@ targets:
     sources:
       - path: LumenTests
       # Compile the production parsers without starting the app or its desktop engine.
+      - path: Lumen/Engine/LockScreen/AerialSystem.swift
       - path: Lumen/Engine/Scene/SceneAnimation.swift
       - path: Lumen/Engine/Scene/SceneDocument.swift
       - path: Lumen/Engine/Scene/SceneFileSystem.swift
