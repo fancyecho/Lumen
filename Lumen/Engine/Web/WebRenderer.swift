@@ -6,6 +6,8 @@ struct WebRenderSettings: Equatable {
     var frameRate: Int
     var muted: Bool
     var volume: Double
+    /// Feed `wallpaperRegisterAudioListener` with the system audio spectrum.
+    var audioReactive = false
 }
 
 /// Renderers that react to the pointer while it rests on the desktop.
@@ -48,6 +50,9 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     private var readyTimeout: Task<Void, Never>?
     private var snapshotGeneration = 0
     private var lastPointerSend: CFTimeInterval = 0
+    /// The page registered an audio listener.
+    private var wantsAudio = false
+    private var audioTimer: Timer?
 
     init(source: Source, properties: [WEProperty], values: [String: PropertyValue], settings: WebRenderSettings) {
         self.properties = properties
@@ -121,6 +126,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     func setActive(_ active: Bool) {
         guard !isTornDown, active != wantsActive else { return }
         wantsActive = active
+        updateAudioCapture()
         guard isReady else { return }
         active ? resume() : pause()
     }
@@ -135,6 +141,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     func tearDown() {
         guard !isTornDown else { return }
         isTornDown = true
+        updateAudioCapture()
         readyTimeout?.cancel()
         readyHandlers.removeAll()
         webView.stopLoading()
@@ -152,6 +159,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
         guard newSettings != settings else { return }
         settings = newSettings
         applyMute()
+        updateAudioCapture()
         evaluate("window.__lumen && (__lumen.setFPS(\(newSettings.frameRate)), __lumen.setVolume(\(newSettings.muted ? 0 : newSettings.volume)))")
     }
 
@@ -179,6 +187,34 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
         evaluate("window.__lumen && __lumen.pointer('\(isDown ? "mousedown" : "mouseup")', \(point.x), \(point.y), \(isDown ? 1 : 0))")
     }
 
+    // MARK: Audio
+
+    /// Captures system audio only while the page listens, plays and the setting allows it;
+    /// Wallpaper Engine sends 64 left then 64 right bands about 30 times a second.
+    private func updateAudioCapture() {
+        let capture = wantsAudio && wantsActive && !isTornDown && settings.audioReactive
+        guard capture != (audioTimer != nil) else { return }
+        if capture {
+            AudioSpectrumService.shared.retain(self)
+            let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.sendAudio() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            audioTimer = timer
+        } else {
+            audioTimer?.invalidate()
+            audioTimer = nil
+            AudioSpectrumService.shared.release(self)
+            evaluate("window.__lumen && __lumen.setAudio(null)")
+        }
+    }
+
+    private func sendAudio() {
+        let bands = AudioSpectrumService.shared.bands
+        let values = (bands.left + bands.right).map { String(format: "%.3f", $0) }.joined(separator: ",")
+        evaluate("window.__lumen && __lumen.setAudio([\(values)])")
+    }
+
     // MARK: Page lifecycle
 
     fileprivate func pageLoaded() {
@@ -198,6 +234,9 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
         switch message["type"] as? String {
         case "ready":
             markReady()
+        case "audio":
+            wantsAudio = true
+            updateAudioCapture()
         case "log":
             #if DEBUG
             Log.engine.debug("web: \(String(describing: message["text"] ?? ""), privacy: .public)")
@@ -356,15 +395,15 @@ enum WebBridgeScript {
       window.requestAnimationFrame = function (cb) { var id = nextID++; callbacks.set(id, cb); schedule(); return id; };
       window.cancelAnimationFrame = function (id) { callbacks.delete(id); };
 
-      var audioListeners = [], audioTimer = null, silence = new Array(128).fill(0);
+      var audioListeners = [], audioTimer = null, silence = new Array(128).fill(0), audioFrame = silence;
       function feedAudio() {
         if (state.paused) return;
-        for (var i = 0; i < audioListeners.length; i++) { try { audioListeners[i](silence); } catch (e) {} }
+        for (var i = 0; i < audioListeners.length; i++) { try { audioListeners[i](audioFrame); } catch (e) {} }
       }
       window.wallpaperRegisterAudioListener = function (cb) {
         if (typeof cb !== 'function') return;
         audioListeners.push(cb);
-        if (!audioTimer) audioTimer = setInterval(feedAudio, 33);
+        if (!audioTimer) { audioTimer = setInterval(feedAudio, 33); post({ type: 'audio' }); }
       };
       ['wallpaperRegisterMediaStatusListener', 'wallpaperRegisterMediaPropertiesListener',
        'wallpaperRegisterMediaThumbnailListener', 'wallpaperRegisterMediaPlaybackListener',
@@ -390,6 +429,7 @@ enum WebBridgeScript {
 
       window.__lumen = {
         setFPS: function (n) { state.fps = n | 0; },
+        setAudio: function (bands) { audioFrame = bands || silence; },
         setVolume: function (v) {
           state.volume = v;
           document.querySelectorAll('audio,video').forEach(function (m) { try { m.volume = v; } catch (e) {} });

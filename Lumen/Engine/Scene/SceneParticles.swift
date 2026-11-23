@@ -17,6 +17,11 @@ final class ParticleSystem {
         var instantaneous: Int
         var speed: ClosedRange<Float>
         var duration: Float
+        /// Audio response scaling the rate: 0 off, 1 left, 2 right, 3 both channels.
+        var audioMode = 0
+        var audioBands = 0...1
+        var audioBounds = SIMD2<Float>(0, 1)
+        var audioExponent: Float = 1
     }
 
     enum Initializer {
@@ -147,7 +152,12 @@ final class ParticleSystem {
                 rate: values.float(raw["rate"], default: 5),
                 instantaneous: values.int(raw["instantaneous"], default: 0),
                 speed: Self.range(values, raw["speedmin"], raw["speedmax"], 0, 0),
-                duration: values.float(raw["duration"], default: 0)
+                duration: values.float(raw["duration"], default: 0),
+                audioMode: values.int(raw["audioprocessingmode"], default: 0),
+                audioBands: Self.bandRange(values.int(raw["audioprocessingfrequencystart"], default: 0),
+                                           values.int(raw["audioprocessingfrequencyend"], default: 1)),
+                audioBounds: values.vec2(raw["audioprocessingbounds"], default: SIMD2(0, 1)),
+                audioExponent: values.float(raw["audioprocessingexponent"], default: 1)
             ))
         }
         self.emitters = emitters
@@ -245,6 +255,14 @@ final class ParticleSystem {
         particles.reserveCapacity(maxCount)
     }
 
+    /// Whether any emitter's rate follows the music.
+    var usesAudio: Bool { emitters.contains { $0.audioMode > 0 } }
+
+    private static func bandRange(_ start: Int, _ end: Int) -> ClosedRange<Int> {
+        let low = min(max(min(start, end), 0), 15), high = min(max(max(start, end), 0), 15)
+        return low...high
+    }
+
     private static func range(_ values: SceneValues, _ min: Any?, _ max: Any?, _ defaultMin: Float, _ defaultMax: Float) -> ClosedRange<Float> {
         let low = values.float(min, default: defaultMin)
         let high = values.float(max, default: Swift.max(defaultMax, low))
@@ -254,7 +272,7 @@ final class ParticleSystem {
     // MARK: Simulation
 
     /// `pointer` is the cursor in this system's local space, if it's over the scene.
-    func update(delta: Float, pointer: SIMD3<Float>?) {
+    func update(delta: Float, pointer: SIMD3<Float>?, audio: AudioBands = .silent) {
         clock += delta
         // Age and remove.
         var index = 0
@@ -269,20 +287,20 @@ final class ParticleSystem {
             }
             index += 1
         }
-        emit(delta: delta)
+        emit(delta: delta, audio: audio)
         simulate(delta: delta, pointer: pointer)
         for child in children {
             if child.childKind == .follow {
                 child.followOrigins = particles.map { $0.position + $0.offset }
             }
-            child.update(delta: delta, pointer: pointer)
+            child.update(delta: delta, pointer: pointer, audio: audio)
         }
     }
 
     /// Positions of the parent's particles that a following child emits from.
     private var followOrigins: [SIMD3<Float>] = []
 
-    private func emit(delta: Float) {
+    private func emit(delta: Float, audio: AudioBands) {
         for (index, emitter) in emitters.enumerated() {
             if !emitted, emitter.instantaneous > 0 {
                 for _ in 0..<emitter.instantaneous { spawn(emitter) }
@@ -290,6 +308,10 @@ final class ParticleSystem {
             if emitter.duration > 0, clock > emitter.duration { continue }
             if childKind == .death || childKind == .spawn { continue }
             var rate = emitter.rate * overrides.rate
+            if emitter.audioMode > 0 {
+                rate *= audio.response(mode: emitter.audioMode, start: emitter.audioBands.lowerBound, end: emitter.audioBands.upperBound,
+                                       bounds: emitter.audioBounds, exponent: emitter.audioExponent)
+            }
             if childKind == .follow { rate *= Float(followOrigins.count) }
             accumulators[index] += rate * delta
             while accumulators[index] >= 1 {
@@ -528,12 +550,12 @@ final class ParticleLayer {
         return result
     }
 
-    func update(delta: Float, pointerCanvas: SIMD2<Float>?) {
+    func update(delta: Float, pointerCanvas: SIMD2<Float>?, audio: AudioBands = .silent) {
         let local = pointerCanvas.map { point -> SIMD3<Float> in
             let p = model.inverse * SIMD4(point.x, point.y, 0, 1)
             return SIMD3(p.x, p.y, p.z)
         }
-        root.update(delta: delta, pointer: local)
+        root.update(delta: delta, pointer: local, audio: audio)
     }
 
     static func sharedIndices(device: MTLDevice) -> MTLBuffer? {

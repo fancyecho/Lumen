@@ -16,6 +16,7 @@ scene_sources() {
   ls "$SRC"/Engine/Scene/*.swift | grep -v SceneRenderer.swift
   ls "$SRC"/Engine/Scene/Shaders/*.swift
   echo "$SRC/Library/WallpaperEngineProject.swift"
+  ls "$SRC"/Engine/Audio/*.swift
   echo "$SRC/Support/Support.swift"
 }
 

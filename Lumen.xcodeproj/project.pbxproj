@@ -83,6 +83,8 @@
 		E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E435D49B649CBC8FED581694 /* StudioEditorView.swift */; };
 		EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DB38C40FFF27490AAC894D /* WallpaperCard.swift */; };
 		ECCD6E52A68C7107D3F61D3E /* LockScreenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */; };
+		F3FCA7DF25E7F07AE654BC94 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */; };
+		F4E638D9692A540554AA42E4 /* AudioSpectrum.swift in Sources */ = {isa = PBXBuildFile; fileRef = E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */; };
 		F6F0AFCB2EE11E8512DE6AC0 /* SceneDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C31C8B90CE5826A36437805 /* SceneDocument.swift */; };
 		F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1925E15F5611478F76DDCD5 /* Artwork.swift */; };
 		FF71DEC2F5C0B3ABD4A08732 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88EB151D6599A946A5916EAD /* AppLanguage.swift */; };
@@ -165,8 +167,10 @@
 		E2E8D6A48A8B48410EE70E1B /* PackageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImporter.swift; sourceTree = "<group>"; };
 		E435D49B649CBC8FED581694 /* StudioEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioEditorView.swift; sourceTree = "<group>"; };
 		E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HEVCTranscoder.swift; sourceTree = "<group>"; };
+		E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSpectrum.swift; sourceTree = "<group>"; };
 		EB190E6A2FEBDAF2CCB08258 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
+		F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		F9A0E10328A0020DA6E66474 /* DesktopHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHost.swift; sourceTree = "<group>"; };
 		FB69623C5BC7D5FECD47DBA0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF74219320866283D5E10984 /* AerialSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialSystem.swift; sourceTree = "<group>"; };
@@ -253,6 +257,7 @@
 				742E87EC609779C7783C9EC5 /* Framing.swift */,
 				D7768E168AD4BC9925BF5361 /* StillFrameSync.swift */,
 				69A8A05087F50BE21AF67935 /* WallpaperEngine.swift */,
+				561EDF15086EE2A1B00A491D /* Audio */,
 				F38F9599D315A16A9ECB8015 /* LockScreen */,
 				72F28CBC4DA6C35B78E63360 /* Policy */,
 				039A3F9511ECBAA9B0EA7653 /* Renderers */,
@@ -299,6 +304,15 @@
 				4808C95144734787B81A2AA2 /* Router.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		561EDF15086EE2A1B00A491D /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */,
+				F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */,
+			);
+			path = Audio;
 			sourceTree = "<group>";
 		};
 		5F67D51BF0718DEB6162BEEE /* Playlists */ = {
@@ -549,6 +563,7 @@
 				46CB4D8DE2C531E4ED062246 /* AppSettings.swift in Sources */,
 				F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */,
 				920F1E1EBC68259000312A97 /* AssignmentStore.swift in Sources */,
+				F4E638D9692A540554AA42E4 /* AudioSpectrum.swift in Sources */,
 				06CE6FFEFDE3B9E8EC1560F3 /* BuiltinShaders.swift in Sources */,
 				18630A81CED2081AB08BEE65 /* DesktopHost.swift in Sources */,
 				0ED7940764A2A5CD2C83C349 /* DesktopPointerMonitor.swift in Sources */,
@@ -601,6 +616,7 @@
 				E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */,
 				6E71C3E48E0DB59B7EA8FDEB /* StudioView.swift in Sources */,
 				B323056511CC2322443C169B /* Support.swift in Sources */,
+				F3FCA7DF25E7F07AE654BC94 /* SystemAudioCapture.swift in Sources */,
 				A64FB2B23F443ED99EB5D067 /* SystemMonitor.swift in Sources */,
 				0668915019BC6C699AFCCAB4 /* TexDecoder.swift in Sources */,
 				D1947C2634CCE180A7B98F58 /* Theme.swift in Sources */,

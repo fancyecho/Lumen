@@ -50,7 +50,7 @@
 | T01 | 提交阶段 3/4 的改动 | 全局 | 高 | 完成 | claude | `23d33aa` |
 | T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 待认领 | | 语料中 139 处使用（含 6 个场景的 `*_puppet.mdl` 眼部/部件裁剪蒙版）；目前角色静止不动 |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
-| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待认领 | | 需要系统音频采集（Core Audio tap 或 ScreenCaptureKit），注意权限和能耗 |
+| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 分支 `claude/T04-audio-reactive`。Core Audio process tap + FFT，接入着色器、粒子发射器、SceneScript、Web 监听器；需用户授权「录制系统音频」后用真实音乐验证手感 |
 | T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 待认领 | | |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | |
@@ -70,6 +70,19 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 分支 `claude/T04-audio-reactive`（未合并）
+
+- **做了什么**：
+  - 新增 `Lumen/Engine/Audio/`：`SystemAudioCapture`（Core Audio process tap + 私有聚合设备，切换输出设备时自动重建）、`AudioSpectrumAnalyzer`（2048 点 FFT，64 段对数频带 45 Hz–16 kHz，快起慢落平滑）、`AudioSpectrumService`（引用计数，只在有音频响应壁纸正在播放时采集）。
+  - 场景：`g_AudioSpectrum{16,32,64}{Left,Right}` 填入真实数据；粒子发射器支持 `audioprocessingmode/bounds/exponent/frequencystart/end`；SceneScript 的 `engine.registerAudioBuffers()` 每帧刷新 `left/right/average`。
+  - Web：`wallpaperRegisterAudioListener` 收到 128 个值（64 左 + 64 右），约 30 次/秒。
+  - 设置：`audioReactiveWallpapers`（默认开，「设置 › Wallpaper Engine」里可关）；`project.yml` 加了 `NSAudioCaptureUsageDescription`。预览渲染器不会触发采集。
+  - 场景回归工具支持 `LUMEN_FAKE_AUDIO=1` 注入假频谱。
+- **验证**：build 通过；场景 75/75 OK、0 洋红；假频谱下音频条/脉冲效果有变化；合成正弦波测试频带位置正确。**没有**在真机上采集过真实音频（会弹系统权限框，需要用户本人授权）。
+- **接口改动**：`EngineUniform.audio` 变成 `.audio(resolution:right:)`；`SceneInstance.Frame`、`DrawState` 新增 `audio`；`ParticleSystem.update`、`SceneScriptRuntime.update` 新增带默认值的 `audio` 参数；`SceneRenderSettings`、`WebRenderSettings` 新增 `audioReactive`。
+- **合并提示**：Gemini 的 T02 在 `SceneMaterials.swift` 同一位置加了 `bones/bonesAlpha`，后合并的一方会有小冲突：两个 case 都保留即可。
+- **建议下一步**：用户授权后播放音乐，看频谱条高度和粒子节奏，必要时调整 `AudioSpectrumAnalyzer` 里的电平映射（`decibels + 60) / 48`）和倾斜（3 dB/oct，以 400 Hz 为轴）。
 
 ### 2026-11-23 · gemini · `gemini/T03-clipping-masks`（已合并 `main`）
 

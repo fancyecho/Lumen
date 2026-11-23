@@ -115,8 +115,12 @@ final class SceneScriptRuntime: @unchecked Sendable {
         guard hasScripts else { return }
         lock.lock()
         context.objectForKeyedSubscript("__start")?.call(withArguments: [])
+        wantsAudio = context.evaluateScript("__audioBuffers.length > 0")?.toBool() ?? false
         lock.unlock()
     }
+
+    /// Whether a script called `engine.registerAudioBuffers` (so capture should run).
+    private(set) var wantsAudio = false
 
     func applyUserProperties(_ changed: [String: PropertyValue]) {
         guard hasScripts else { return }
@@ -134,12 +138,14 @@ final class SceneScriptRuntime: @unchecked Sendable {
     }
 
     /// Runs one frame of every script and returns the layers they changed, keyed by id.
-    func update(time: Double, delta: Double, daytime: Double, cursor: SIMD2<Float>?, cursorDown: Bool) -> [Int: Change] {
+    func update(time: Double, delta: Double, daytime: Double, cursor: SIMD2<Float>?, cursorDown: Bool,
+                audio: AudioBands = .silent) -> [Int: Change] {
         guard hasScripts, !failed else { return [:] }
         lock.lock()
         defer { lock.unlock() }
         let cursorArgument: Any = cursor.map { [$0.x, $0.y] as Any } ?? NSNull()
-        guard let result = context.objectForKeyedSubscript("__frame")?.call(withArguments: [time, delta, daytime, cursorArgument, cursorDown]),
+        let audioArgument: Any = wantsAudio ? (audio.left + audio.right) as Any : NSNull()
+        guard let result = context.objectForKeyedSubscript("__frame")?.call(withArguments: [time, delta, daytime, cursorArgument, cursorDown, audioArgument]),
               let text = result.toString(), let data = text.data(using: .utf8),
               let entries = try? JSONSerialization.jsonObject(with: data) as? [[Any]]
         else { return [:] }
@@ -288,7 +294,12 @@ final class SceneScriptRuntime: @unchecked Sendable {
       userProperties: {}, AUDIO_RESOLUTION_16: 16, AUDIO_RESOLUTION_32: 32, AUDIO_RESOLUTION_64: 64,
       isDesktopDevice: function () { return true; }, isWallpaper: function () { return true; }, isScreensaver: function () { return false; },
       isRunningInEditor: function () { return false; }, isMobileDevice: function () { return false; },
-      registerAudioBuffers: function (n) { n = n || 16; return { left: new Float32Array(n), right: new Float32Array(n), average: new Float32Array(n), resolution: n }; },
+      registerAudioBuffers: function (n) {
+        n = n === 32 || n === 64 ? n : 16;
+        var b = { left: new Float32Array(n), right: new Float32Array(n), average: new Float32Array(n), resolution: n };
+        __audioBuffers.push(b);
+        return b;
+      },
       registerAsset: function () { return {}; }, openUserShortcut: function () {}, setTimeout: function () {}, getScreenResolution: function () { return this.screenResolution; }
     };
     var input = { cursorWorldPosition: new Vec3(0, 0, 0), cursorScreenPosition: new Vec2(0, 0), cursorLeftDown: false };
@@ -352,7 +363,21 @@ final class SceneScriptRuntime: @unchecked Sendable {
       __scripts.forEach(function (s) { __call(s, 'applyUserProperties', changed); });
     }
 
-    function __frame(time, delta, daytime, cursor, down) {
+    var __audioBuffers = [];
+    // `bands` holds 64 left values then 64 right values; each buffer gets its own resolution.
+    function __audio(bands) {
+      for (var i = 0; i < __audioBuffers.length; i++) {
+        var b = __audioBuffers[i], group = 64 / b.resolution;
+        for (var j = 0; j < b.resolution; j++) {
+          var l = 0, r = 0;
+          for (var k = 0; k < group; k++) { l += bands[j * group + k]; r += bands[64 + j * group + k]; }
+          b.left[j] = l / group; b.right[j] = r / group; b.average[j] = (l + r) / (2 * group);
+        }
+      }
+    }
+
+    function __frame(time, delta, daytime, cursor, down, audio) {
+      if (audio) __audio(audio);
       engine.runtime = time; engine.frametime = delta; engine.timeOfDay = daytime;
       if (cursor) { input.cursorWorldPosition = new Vec3(cursor[0], cursor[1], 0); input.cursorScreenPosition = new Vec2(cursor[0] / __canvas.x, 1 - cursor[1] / __canvas.y); }
       input.cursorLeftDown = !!down;

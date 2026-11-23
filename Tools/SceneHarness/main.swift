@@ -11,6 +11,12 @@ let assets = URL(fileURLWithPath: args[2])
 let out = URL(fileURLWithPath: args[3])
 let ids = args.count > 4 ? args[4].split(separator: ",").map(String.init) : []
 let time = Float(args.count > 5 ? args[5] : "2") ?? 2
+// LUMEN_FAKE_AUDIO=1 feeds a synthetic spectrum (loud bass falling to quiet treble) to check audio-reactive paths.
+let fakeAudio: AudioBands = {
+    guard ProcessInfo.processInfo.environment["LUMEN_FAKE_AUDIO"] != nil else { return .silent }
+    let bands = (0..<AudioBands.bandCount).map { 0.95 - Float($0) / Float(AudioBands.bandCount) * 0.8 }
+    return AudioBands(left: bands, right: bands)
+}()
 if args.count > 6 { SceneLoader.debugLayerFilter = Set(args[6].split(separator: ",").compactMap { Int($0) }) }
 
 func savePNG(_ texture: MTLTexture, to url: URL) {
@@ -72,7 +78,7 @@ for id in items {
         for i in 0..<frames {
             t = time + Float(i) / 30
             let cb = queue.makeCommandBuffer()!
-            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero))
+            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero, audio: fakeAudio))
             cb.commit(); cb.waitUntilCompleted()
             gpu = cb.gpuEndTime - cb.gpuStartTime
         }

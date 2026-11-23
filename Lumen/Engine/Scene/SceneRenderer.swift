@@ -9,6 +9,8 @@ struct SceneRenderSettings: Equatable {
     var scaling: VideoScaling
     var muted = true
     var volume: Double = 1
+    /// Follow the music the Mac is playing (needs the System Audio Recording permission).
+    var audioReactive = false
 
     static let preview = SceneRenderSettings(frameRate: 30, pixelBudget: 900_000, scaling: .fill)
 }
@@ -127,6 +129,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
                 self.metalView.isPaused = !self.isActive
                 instance.sounds?.configure(muted: self.settings.muted, volume: Float(self.settings.volume))
                 instance.setPlaying(self.isActive)
+                self.updateAudioCapture()
                 if !self.isActive { self.metalView.draw() }
             case .failure(let error):
                 Log.engine.error("Scene failed to load: \(error.localizedDescription, privacy: .public)")
@@ -161,6 +164,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         lastFrame = nil
         metalView.isPaused = !active || instance == nil
         instance?.setPlaying(active)
+        updateAudioCapture()
     }
 
     func whenReady(_ handler: @escaping @MainActor () -> Void) {
@@ -181,6 +185,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         metalView.delegate = nil
         readyHandlers.removeAll()
         instance = nil
+        updateAudioCapture()
         container.removeFromSuperview()
     }
 
@@ -189,6 +194,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         let needsReload = newSettings.pixelBudget != settings.pixelBudget
         settings = newSettings
         instance?.sounds?.configure(muted: newSettings.muted, volume: Float(newSettings.volume))
+        updateAudioCapture()
         metalView.preferredFramesPerSecond = newSettings.frameRate
         metalView.pixelBudget = newSettings.pixelBudget * 1.5
         layoutScene()
@@ -201,6 +207,21 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         guard newValues != values else { return }
         values = newValues
         load()
+    }
+
+    // MARK: Audio
+
+    private var capturesAudio: Bool {
+        isActive && !isTornDown && settings.audioReactive && instance?.usesAudio == true
+    }
+
+    /// Holds system audio capture only while this scene is playing and listens to it.
+    private func updateAudioCapture() {
+        if capturesAudio {
+            AudioSpectrumService.shared.retain(self)
+        } else {
+            AudioSpectrumService.shared.release(self)
+        }
     }
 
     // MARK: Pointer
@@ -266,7 +287,8 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
             pointer: pointer,
             pointerLast: pointerLast,
             cameraOffset: parallax,
-            parallax: parallax / max(instance.canvas, SIMD2(1, 1))
+            parallax: parallax / max(instance.canvas, SIMD2(1, 1)),
+            audio: capturesAudio ? AudioSpectrumService.shared.bands : .silent
         )
         instance.encode(into: buffer, frame: frame)
 

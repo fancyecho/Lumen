@@ -41,6 +41,7 @@ AppModel (@MainActor, 全局状态)
 | `Lumen/Engine/Shaders` | 内置和用户 Metal 着色器，运行时编译 |
 | `Lumen/Engine/Policy` | 自动暂停（遮挡、锁屏、屏保、低电量、电池、高温）、桌面鼠标监听 |
 | `Lumen/Engine/LockScreen` | 锁屏视频生成与安装 |
+| `Lumen/Engine/Audio` | 系统音频采集（Core Audio process tap）与频谱分析，供音频响应壁纸使用 |
 | `Lumen/Engine/Web` | Web 渲染器、`lumen-web://` 本地协议、注入的桥接脚本 |
 | `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（见下节） |
 | `Lumen/Library` | 资源库、导入（视频、WE 项目、网页）、缩略图、HEVC 转码、播放列表 |

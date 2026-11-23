@@ -82,6 +82,8 @@ final class AppSettings {
     var shaderFrameRate: Int { didSet { store(shaderFrameRate, "shaderFrameRate", .shader) } }
     /// Web and scene wallpapers follow the pointer while it rests on the desktop.
     var interactiveWallpapers: Bool { didSet { store(interactiveWallpapers, "interactiveWallpapers", .policy) } }
+    /// Audio-reactive web and scene wallpapers listen to what the Mac plays.
+    var audioReactiveWallpapers: Bool { didSet { store(audioReactiveWallpapers, "audioReactiveWallpapers", .playback) } }
     /// Folder holding Wallpaper Engine's shared `assets` (shaders, materials, effects) for scenes.
     var sceneAssetsPath: String { didSet { store(sceneAssetsPath, "sceneAssetsPath", .scene) } }
     var shaderQuality: ShaderQuality { didSet { store(shaderQuality.rawValue, "shaderQuality", .shader) } }
@@ -101,14 +103,14 @@ final class AppSettings {
 
     var sceneRenderSettings: SceneRenderSettings {
         SceneRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.pixelBudget.isFinite ? shaderQuality.pixelBudget * 1.4 : 8_300_000,
-                            scaling: videoScaling, muted: !audioEnabled, volume: volume)
+                            scaling: videoScaling, muted: !audioEnabled, volume: volume, audioReactive: audioReactiveWallpapers)
     }
 
     /// Wallpaper Engine's shared assets, from Settings or found automatically.
     var sceneAssets: URL? { SceneAssetsLocator.resolve(configured: sceneAssetsPath) }
 
     var webRenderSettings: WebRenderSettings {
-        WebRenderSettings(frameRate: shaderFrameRate, muted: !audioEnabled, volume: volume)
+        WebRenderSettings(frameRate: shaderFrameRate, muted: !audioEnabled, volume: volume, audioReactive: audioReactiveWallpapers)
     }
 
     init() {
@@ -127,6 +129,7 @@ final class AppSettings {
             "crossfade": true,
             "shaderFrameRate": 30,
             "interactiveWallpapers": true,
+            "audioReactiveWallpapers": true,
             "sceneAssetsPath": "",
             "shaderQuality": ShaderQuality.balanced.rawValue,
             "syncStillFrame": true,
@@ -147,6 +150,7 @@ final class AppSettings {
         shaderFrameRate = defaults.integer(forKey: "shaderFrameRate")
         shaderQuality = ShaderQuality(rawValue: defaults.string(forKey: "shaderQuality") ?? "") ?? .balanced
         interactiveWallpapers = defaults.bool(forKey: "interactiveWallpapers")
+        audioReactiveWallpapers = defaults.bool(forKey: "audioReactiveWallpapers")
         sceneAssetsPath = defaults.string(forKey: "sceneAssetsPath") ?? ""
         syncStillFrame = defaults.bool(forKey: "syncStillFrame")
         dockIconMode = DockIconMode(rawValue: defaults.string(forKey: "dockIconMode") ?? "") ?? .whileWindowOpen
