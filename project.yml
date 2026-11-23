@@ -9,12 +9,21 @@ settings:
   base:
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     SWIFT_VERSION: "5.0"
+    SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Lumen/Library/Steam/Native/CArchive"
+packages:
+  Zstandard:
+    url: https://github.com/facebook/zstd.git
+    exactVersion: "1.5.7"
 targets:
   Lumen:
     type: application
     platform: macOS
     sources:
       - path: Lumen
+        excludes: [Library/Steam/Native/CArchive]
+    dependencies:
+      - package: Zstandard
+        product: libzstd
     info:
       path: Lumen/Info.plist
       properties:
@@ -58,7 +67,12 @@ targets:
       - path: Lumen/Engine/Scene/Shaders/WEShaderPreprocessor.swift
       - path: Lumen/Library/WallpaperEngineProject.swift
       - path: Lumen/Library/Steam/SteamCMD.swift
+      - path: Lumen/Library/Steam/Native
+        excludes: [CArchive]
       - path: Lumen/Support/Support.swift
+    dependencies:
+      - package: Zstandard
+        product: libzstd
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

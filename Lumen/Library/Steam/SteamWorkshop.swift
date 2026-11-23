@@ -9,13 +9,11 @@ struct WorkshopItemDetails: Sendable {
     var fileSize: Int64?
 }
 
-/// Steam Workshop downloads for Wallpaper Engine (app 431960) through SteamCMD, with the
-/// person's own Steam account. Lumen never stores the password.
+/// Queues Wallpaper Engine Workshop downloads under the user's native or SteamCMD sign-in.
 @MainActor
 @Observable
 final class SteamWorkshop {
     enum Prompt: Equatable {
-        case password
         case guardCode(email: Bool)
         case mobileConfirmation
     }
@@ -39,7 +37,12 @@ final class SteamWorkshop {
     static let appID = "431960"
     private static let accountKey = "steamAccountName"
 
-    private(set) var account: String? = UserDefaults.standard.string(forKey: SteamWorkshop.accountKey)
+    private var steamCMDAccount: String? = UserDefaults.standard.string(forKey: SteamWorkshop.accountKey)
+    private var nativeAccount: String?
+    var account: String? { nativeAccount ?? steamCMDAccount }
+    var usesSteamCMD: Bool { nativeAccount == nil && steamCMDAccount != nil }
+    private(set) var qrChallenge: URL?
+    private(set) var isQRSignIn = false
     private(set) var prompt: Prompt?
     private(set) var downloads: [Download] = []
     private(set) var isSigningIn = false
@@ -47,12 +50,20 @@ final class SteamWorkshop {
     private(set) var isInstalling = false
 
     @ObservationIgnored private var session: SteamCMDSession?
+    @ObservationIgnored private var qrTask: Task<Void, Never>?
+    @ObservationIgnored private var nativeCredential: SteamNativeCredential?
     @ObservationIgnored private var pendingPassword: String?
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private let library: LibraryStore
 
     init(library: LibraryStore) {
         self.library = library
+        do {
+            nativeCredential = try SteamNativeKeychain.load()
+            nativeAccount = nativeCredential?.account
+        } catch {
+            signInError = SteamNativeError.keychain.localizedDescription
+        }
     }
 
     var isSignedIn: Bool { account != nil }
@@ -60,21 +71,69 @@ final class SteamWorkshop {
 
     // MARK: Account
 
+    func beginQRSignIn() {
+        guard !isBusy, nativeCredential == nil else { return }
+        signInError = nil
+        isSigningIn = true
+        isQRSignIn = true
+        qrTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.qrChallenge = nil
+                self.qrTask = nil
+                self.isQRSignIn = false
+                self.isSigningIn = false
+                self.startNext()
+            }
+            do {
+                let auth = SteamQRSignIn()
+                var challenge = try await auth.begin()
+                let deadline = ContinuousClock.now + .seconds(180)
+                self.qrChallenge = challenge.url
+                while ContinuousClock.now < deadline {
+                    try await Task.sleep(for: .seconds(challenge.interval))
+                    switch try await auth.poll(challenge) {
+                    case .waiting(let updated):
+                        challenge = updated
+                        self.qrChallenge = updated.url
+                    case .authorised(let credential):
+                        try Task.checkCancellation()
+                        try SteamNativeKeychain.store(credential)
+                        self.nativeCredential = credential
+                        self.nativeAccount = credential.account
+                        return
+                    }
+                }
+                throw SteamNativeError.expired
+            } catch is CancellationError {
+                // Closing the panel or cancelling the challenge leaves the account unchanged.
+            } catch {
+                self.signInError = error.localizedDescription
+            }
+        }
+    }
+
+    func cancelQRSignIn() {
+        qrTask?.cancel()
+    }
+
     /// Signs in once; SteamCMD remembers the login so downloads don't ask again.
     func signIn(username: String, password: String) {
         let name = username.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !isSigningIn else { return }
+        guard !name.isEmpty, !isBusy else { return }
         isSigningIn = true
         signInError = nil
         pendingPassword = password
         Task {
             do {
                 try await ensureInstalled()
-                let status = try await runSteamCMD(["+login", name, "+quit"])
-                if status == 0 {
-                    account = name
+                let result = await runSteamCMD(["+login", name, "+quit"])
+                if result.status == 0, result.loggedIn {
+                    steamCMDAccount = name
                     UserDefaults.standard.set(name, forKey: Self.accountKey)
-                } else if signInError == nil {
+                } else if let failure = result.failure {
+                    signInError = failure == .cancelled ? nil : failure.localizedDescription
+                } else {
                     signInError = String(localized: "Steam sign-in didn't finish.")
                 }
             } catch {
@@ -83,13 +142,25 @@ final class SteamWorkshop {
             pendingPassword = nil
             prompt = nil
             isSigningIn = false
+            startNext()
         }
     }
 
     func signOut() {
-        session?.cancel()
+        guard !isBusy else { return }
+        signInError = nil
+        if nativeCredential != nil {
+            do {
+                try SteamNativeKeychain.remove()
+                nativeCredential = nil
+                nativeAccount = nil
+            } catch {
+                signInError = error.localizedDescription
+                return
+            }
+        }
         SteamCMD.signOut()
-        account = nil
+        steamCMDAccount = nil
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
     }
 
@@ -109,15 +180,24 @@ final class SteamWorkshop {
     /// Accepts a Workshop link (`…/filedetails/?id=123`) or a bare id.
     static func itemID(from text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.allSatisfy(\.isNumber), trimmed.count >= 6 { return trimmed }
+        if trimmed.count >= 6, let id = numericID(trimmed) { return String(id) }
         if let components = URLComponents(string: trimmed),
-           let id = components.queryItems?.first(where: { $0.name == "id" })?.value, id.allSatisfy(\.isNumber) {
-            return id
+           let value = components.queryItems?.first(where: { $0.name == "id" })?.value,
+           let id = numericID(value) { return String(id) }
+        if let match = trimmed.firstMatch(of: /(?:id=|\/)([0-9]{6,})/), let id = numericID(String(match.1)) {
+            return String(id)
         }
-        return trimmed.firstMatch(of: /(?:id=|\/)(\d{6,})/).map { String($0.1) }
+        return nil
     }
 
-    func download(_ id: String) {
+    private static func numericID(_ value: String) -> UInt64? {
+        guard value.utf8.allSatisfy({ (48...57).contains($0) }), let id = UInt64(value), id > 0 else { return nil }
+        return id
+    }
+
+    func download(_ requestedID: String) {
+        guard let canonical = Self.numericID(requestedID) else { return }
+        let id = String(canonical)
         guard !downloads.contains(where: { $0.id == id && !$0.isFinished }) else { return }
         if let existing = library.wallpaper(workshopID: id) {
             downloads.insert(Download(id: id, title: existing.title, previewURL: nil, state: .done(existing.id)), at: 0)
@@ -139,7 +219,7 @@ final class SteamWorkshop {
     }
 
     private func startNext() {
-        guard worker == nil, let next = downloads.last(where: { $0.state == .queued }) else { return }
+        guard worker == nil, !isSigningIn, let next = downloads.last(where: { $0.state == .queued }) else { return }
         worker = Task { [weak self] in
             await self?.run(next.id)
             self?.worker = nil
@@ -148,50 +228,90 @@ final class SteamWorkshop {
     }
 
     private func run(_ id: String) async {
-        guard let account else {
+        guard isSignedIn else {
             update(id, .failed(SteamCMD.Failure.notSignedIn.localizedDescription))
             return
         }
         update(id, .preparing)
         do {
-            try await ensureInstalled()
-            try FileManager.default.createDirectory(at: SteamCMD.contentFolder, withIntermediateDirectories: true)
-            var downloadedPath: String?
-            var failure: SteamCMD.Failure?
-            let status = try await runSteamCMD(
-                ["+force_install_dir", SteamCMD.contentFolder.path, "+login", account,
-                 "+workshop_download_item", Self.appID, id, "validate", "+quit"]
-            ) { [weak self] event in
-                switch event {
-                case .progress(let value): self?.update(id, .downloading(value))
-                case .loggedIn: self?.update(id, .downloading(nil))
-                case .downloaded(_, let path): downloadedPath = path
-                case .failed(let error): failure = error
-                default: break
+            if let credential = nativeCredential, let itemID = UInt64(id), let appID = UInt64(Self.appID) {
+                let scratch = AppPaths.root.appending(path: "SteamNativeDownloads/\(UUID().uuidString)", directoryHint: .isDirectory)
+                defer { try? FileManager.default.removeItem(at: scratch) }
+                let folder = scratch.appending(path: id, directoryHint: .isDirectory)
+                update(id, .downloading(nil))
+                try await SteamNativeDownload(appID: appID).download(itemID: itemID, credential: credential, to: folder) { [weak self] progress in
+                    await self?.update(id, .downloading(progress))
                 }
-            }
-            let folder = downloadedPath.map { URL(fileURLWithPath: $0.replacingOccurrences(of: "\\", with: "/")) }
-                ?? SteamCMD.contentFolder.appending(path: "steamapps/workshop/content/\(Self.appID)/\(id)")
-            guard WEProject.isProjectFolder(folder) else {
-                throw failure ?? SteamCMD.Failure.downloadFailed(status == 0 ? String(localized: "nothing was downloaded") : "SteamCMD \(status)")
-            }
-            update(id, .importing)
-            let result = await library.importFiles([folder], source: "steam")
-            // Lumen keeps its own copy; SteamCMD's is no longer needed.
-            try? FileManager.default.removeItem(at: folder)
-            if let added = result.added.first {
-                update(id, .done(added.id))
-            } else {
-                update(id, .failed(result.failures.first?.reason ?? String(localized: "Couldn't add it to the library.")))
+                await importDownload(id, folder: folder)
+            } else if let steamCMDAccount {
+                try await ensureInstalled()
+                try FileManager.default.createDirectory(at: SteamCMD.contentFolder, withIntermediateDirectories: true)
+                let folder = try await downloadWithSteamCMD(id, account: steamCMDAccount)
+                defer { try? FileManager.default.removeItem(at: folder) }
+                await importDownload(id, folder: folder)
             }
         } catch {
+            if let failure = error as? SteamCMD.Failure, failure == .notSignedIn {
+                steamCMDAccount = nil
+                UserDefaults.standard.removeObject(forKey: Self.accountKey)
+            }
+            if let failure = error as? SteamNativeError, failure == .signInRequired || failure == .expired {
+                try? SteamNativeKeychain.remove()
+                nativeCredential = nil
+                nativeAccount = nil
+            }
             update(id, .failed(error.localizedDescription))
+        }
+    }
+
+    private func importDownload(_ id: String, folder: URL) async {
+        update(id, .importing)
+        let result = await library.importFiles([folder], source: "steam")
+        if let added = result.added.first {
+            update(id, .done(added.id))
+        } else {
+            update(id, .failed(result.failures.first?.reason ?? String(localized: "Couldn't add it to the library.")))
         }
     }
 
     private func update(_ id: String, _ state: Download.State) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
         downloads[index].state = state
+    }
+
+    private func downloadWithSteamCMD(_ id: String, account: String) async throws -> URL {
+        let arguments = ["+force_install_dir", SteamCMD.contentFolder.path, "+login", account,
+                         "+workshop_download_item", Self.appID, id, "validate", "+quit"]
+        let root = SteamCMD.contentFolder.resolvingSymlinksInPath().standardizedFileURL
+        var authenticated = false
+        var retries = 0
+        while true {
+            let result = await runSteamCMD(arguments) { [weak self] event in
+                switch event {
+                case .progress(let value): self?.update(id, .downloading(value))
+                case .loggedIn: self?.update(id, .downloading(nil))
+                default: break
+                }
+            }
+            authenticated = authenticated || result.loggedIn
+            if result.loggedIn, result.status == 0, let path = result.downloads[id] {
+                let folder = URL(fileURLWithPath: path.replacingOccurrences(of: "\\", with: "/"))
+                    .resolvingSymlinksInPath().standardizedFileURL
+                guard folder.path.hasPrefix(root.path + "/"), folder.lastPathComponent == id,
+                      WEProject.isProjectFolder(folder) else {
+                    throw SteamCMD.Failure.downloadFailed(String(localized: "SteamCMD did not return a Wallpaper Engine project."))
+                }
+                return folder
+            }
+            guard let failure = result.failure else {
+                throw SteamCMD.Failure.downloadFailed(String(localized: "SteamCMD did not confirm the download."))
+            }
+            guard let delay = SteamCMD.retryDelay(attempt: retries, authenticated: authenticated, failure: failure,
+                                                  cancelled: Task.isCancelled) else { throw failure }
+            retries += 1
+            update(id, .preparing)
+            try await Task.sleep(for: delay)
+        }
     }
 
     // MARK: SteamCMD
@@ -205,27 +325,25 @@ final class SteamWorkshop {
 
     /// Runs SteamCMD, answering the password prompt with the sign-in password (if any) and
     /// surfacing Steam Guard prompts to the UI.
-    private func runSteamCMD(_ arguments: [String], events: ((SteamCMDSession.Event) -> Void)? = nil) async throws -> Int32 {
+    private func runSteamCMD(_ arguments: [String], events: ((SteamCMDSession.Event) -> Void)? = nil) async -> SteamCMDSession.Result {
         let session = SteamCMDSession(arguments: ["+@ShutdownOnFailedCommand", "1", "+@NoPromptForPassword", "0"] + arguments)
-        session.onEvent = { [weak self] event in
+        session.onEvent = { [weak self, weak session] event in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, let session, self.session === session else { return }
                 switch event {
                 case .needsPassword:
                     if let password = self.pendingPassword {
                         self.pendingPassword = nil
                         session.send(password)
                     } else {
-                        self.prompt = .password
+                        session.stop(.notSignedIn)
                     }
                 case .needsGuardCode(let email):
                     self.prompt = .guardCode(email: email)
                 case .needsMobileConfirmation:
                     self.prompt = .mobileConfirmation
                 case .loggedIn:
-                    if self.prompt == .mobileConfirmation { self.prompt = nil }
-                case .failed(let failure):
-                    if self.isSigningIn { self.signInError = failure.localizedDescription }
+                    self.prompt = nil
                 default:
                     break
                 }
@@ -233,7 +351,10 @@ final class SteamWorkshop {
             }
         }
         self.session = session
-        defer { self.session = nil }
+        defer {
+            self.session = nil
+            prompt = nil
+        }
         return await session.run()
     }
 

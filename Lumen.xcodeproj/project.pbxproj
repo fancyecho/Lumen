@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		003E759CEFC3F5C879D6C280 /* SteamCM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6360661D5A0519AA9ED8AE /* SteamCM.swift */; };
 		00E0FF6C6723054C50C3E1C2 /* AerialSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A71DA2F8C3EB8B623DB6D70 /* AerialSystemTests.swift */; };
 		0666F51921E870528722F391 /* AmbientBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796508CF82781CECA422D840 /* AmbientBackdrop.swift */; };
 		0668915019BC6C699AFCCAB4 /* TexDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 278957CFDFFB2E28ADEF41FD /* TexDecoder.swift */; };
@@ -27,8 +28,10 @@
 		1F665F06C76FA56F87A13A72 /* LockScreenSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D43F0A4B7CC87F9254857C3 /* LockScreenSettings.swift */; };
 		223FCBCCE3D6B1E6AC0D8FCF /* WallpaperEngineProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */; };
 		237B0B35B21004BBBCE20581 /* WallpaperEngineProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */; };
+		23E8C11AF978A92A76C3798A /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = 86C71501F442C3AB00ADE840 /* libzstd */; };
 		257FC9A803A2F08EC2596739 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 260EDEBFB0FCA65EBDFB3C30 /* Models.swift */; };
 		294CF658258C57E265A4AE83 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE0D3CD8B0B03D2CCF87210 /* LibraryView.swift */; };
+		29801BBD3D23CA8E84BD10F8 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = D180E1BDEE080AA13812844D /* libzstd */; };
 		29F5162BC1F480F528E368A1 /* Framing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742E87EC609779C7783C9EC5 /* Framing.swift */; };
 		2AB76C5C0CDFE524547ECB7C /* StillFrameSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7768E168AD4BC9925BF5361 /* StillFrameSync.swift */; };
 		3596CBD5573774AA781143F0 /* SceneFileSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E69A288561E1B79D84D5C2 /* SceneFileSystem.swift */; };
@@ -38,6 +41,7 @@
 		41B33403FF16F7150091CC5C /* SceneDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C31C8B90CE5826A36437805 /* SceneDocument.swift */; };
 		42A74FA33361C5237EEB97B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE67EA26E9EB9536AA066034 /* SettingsView.swift */; };
 		439395E160363268AA32C005 /* SceneFileSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E69A288561E1B79D84D5C2 /* SceneFileSystem.swift */; };
+		44DC30A948D43CA48F1ED802 /* SteamWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EBD669334D19DD57D76C59 /* SteamWire.swift */; };
 		46CB4D8DE2C531E4ED062246 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F1B121E24A55D9A9616617 /* AppSettings.swift */; };
 		4818E3709751A3250D167DFE /* SceneInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E0048C98CCE52FEE49F10C /* SceneInstance.swift */; };
 		4A60E4AAEEDEA1E985AFD071 /* ShaderRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D757B59636AD39FE680263 /* ShaderRenderer.swift */; };
@@ -61,9 +65,11 @@
 		80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */; };
 		8416156A9FB7F4F76B0076BF /* PlaylistStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE68D1D450207C3D5BD48E5 /* PlaylistStore.swift */; };
 		85CD160709AE05B072BBC67B /* SceneSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40FAD20AD6D740C31FF87167 /* SceneSound.swift */; };
+		86E4681068E5C9A08ED884EB /* SteamWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EBD669334D19DD57D76C59 /* SteamWire.swift */; };
 		86F5D8B6F5D84E2980501C2D /* SceneModelCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1867B46652CB381C804EC68D /* SceneModelCamera.swift */; };
 		876903FE7BFE88EC2651B345 /* HEVCTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */; };
 		88A8740A7CB2B09CD3C8A152 /* OcclusionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77634FB81764312077A0248D /* OcclusionMonitor.swift */; };
+		8AF825C80293332BF272FA08 /* SteamCM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6360661D5A0519AA9ED8AE /* SteamCM.swift */; };
 		8C8D624ECF831DC0E516E073 /* SceneRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CC1C825DB34072D9717DC7 /* SceneRenderer.swift */; };
 		901D547B061F9E405A5A1DBC /* WESceneShader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B930FAE153266BF7B0C5F21 /* WESceneShader.swift */; };
 		920F1E1EBC68259000312A97 /* AssignmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91FFC02803C3734E6C033D4 /* AssignmentStore.swift */; };
@@ -72,20 +78,25 @@
 		994F782287920E4097852C07 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A344EC8028FF1FF31AA92DBD /* Assets.xcassets */; };
 		9A3ECB2DCC54AE9BCBD1C213 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5D43EA9088D7EED4B38A683 /* AppDelegate.swift */; };
 		9DDF916C538A2D639B2385A5 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB190E6A2FEBDAF2CCB08258 /* HomeView.swift */; };
+		9F1AB72377D62C5421196B7D /* SteamNativeProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5C0398E2C1DEF838E9AE39D /* SteamNativeProtocolTests.swift */; };
 		9F810374568EBA6531C01EAB /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFBD5C86D4BF7AF02DB9DACC /* LibraryStore.swift */; };
 		A1EDED739ADB6B57C815DA11 /* SceneParticles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA846667F3CFACF39D18E8E /* SceneParticles.swift */; };
 		A64FB2B23F443ED99EB5D067 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6124882AE9D574065F9AC0B5 /* SystemMonitor.swift */; };
+		ACF3EE0E2C9437B6F5D2AF14 /* SteamNativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */; };
 		AEB4A33D61CA1341A5016D46 /* MenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A15438D98A68DE986D91F0 /* MenuBarPanel.swift */; };
 		B323056511CC2322443C169B /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBB1CF76C83A7FA2D245B08 /* Support.swift */; };
 		B724420C3553E117937464BF /* PlaylistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C8B284BC7A52178D617C09B /* PlaylistsView.swift */; };
 		B78A9867644D1154DD8E962E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF2D45011297ED2AEBCFD8D /* AppModel.swift */; };
 		B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */; };
+		BB72D947572DB7EB720ECDD7 /* SteamNativeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */; };
 		BC452D9C051B3A4EEBA544CF /* WebRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D608A66374789D934A1E4C0B /* WebRenderer.swift */; };
+		BE3FC4814B9F9DF6E0B833AD /* SteamNativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */; };
 		BF81AAA72F88EFF9D0A5AFDC /* WallpaperRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */; };
 		C086B78155FD8DD67DE526A4 /* LocalContentSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A440091108727012FE21D5 /* LocalContentSchemeHandler.swift */; };
 		C24BFDA97A4F4C3901D30906 /* MediaInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF816B14AA073CA5F3EC601 /* MediaInspector.swift */; };
 		C2FA0CAE0F960EB81EC8A3CA /* PauseReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434FBF47296311D0EB8ADDE0 /* PauseReason.swift */; };
 		C384EEBFF3705571B5385B8D /* WEShaderPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */; };
+		C5E3EA2326DD909B03561221 /* SteamDepotFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DA5B69788E689A2AE659F9D /* SteamDepotFormat.swift */; };
 		C7C387DDB35AF2ADFF09E1D9 /* SceneText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C351152D3506D1AA07C165 /* SceneText.swift */; };
 		CA67C7EF2FD3302E4050C327 /* WorkshopSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37EA14A81399C3314173B26 /* WorkshopSources.swift */; };
 		CACA3D9ACF2A0447F4E0A924 /* LockScreenVideoBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B85A262D597CAABBF3BE41 /* LockScreenVideoBuilder.swift */; };
@@ -106,9 +117,11 @@
 		EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DB38C40FFF27490AAC894D /* WallpaperCard.swift */; };
 		ECCD6E52A68C7107D3F61D3E /* LockScreenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */; };
 		ED1FFBB300E5C4BD0F52538A /* WEShaderPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */; };
+		ED62B92DB05E24A2A3A9E1CB /* SteamNativeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */; };
 		EFE158DCF125FECC6CABC791 /* SceneAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4764DB2F8A1988E5DACCB3F6 /* SceneAnimation.swift */; };
 		F3FCA7DF25E7F07AE654BC94 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */; };
 		F4E638D9692A540554AA42E4 /* AudioSpectrum.swift in Sources */ = {isa = PBXBuildFile; fileRef = E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */; };
+		F539A459B930ED3A3E5C5B05 /* SteamDepotFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DA5B69788E689A2AE659F9D /* SteamDepotFormat.swift */; };
 		F5415CF0D0D895B86BB0ABFE /* TexDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 278957CFDFFB2E28ADEF41FD /* TexDecoder.swift */; };
 		F6F0AFCB2EE11E8512DE6AC0 /* SceneDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C31C8B90CE5826A36437805 /* SceneDocument.swift */; };
 		F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1925E15F5611478F76DDCD5 /* Artwork.swift */; };
@@ -117,6 +130,7 @@
 
 /* Begin PBXFileReference section */
 		00306F245817BC0D3C857F30 /* PropertiesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesPanel.swift; sourceTree = "<group>"; };
+		01EBD669334D19DD57D76C59 /* SteamWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWire.swift; sourceTree = "<group>"; };
 		029A06C41E41D605B173EDA3 /* WorkshopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkshopView.swift; sourceTree = "<group>"; };
 		056535C4C456D9679AD4B122 /* FramingControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramingControls.swift; sourceTree = "<group>"; };
 		068315FBE2E5B50B64DDFC0C /* LumenApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LumenApp.swift; sourceTree = "<group>"; };
@@ -127,6 +141,8 @@
 		0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperRenderer.swift; sourceTree = "<group>"; };
 		10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TexDecoderTests.swift; sourceTree = "<group>"; };
 		1867B46652CB381C804EC68D /* SceneModelCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneModelCamera.swift; sourceTree = "<group>"; };
+		1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamNativeSession.swift; sourceTree = "<group>"; };
+		1C6360661D5A0519AA9ED8AE /* SteamCM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCM.swift; sourceTree = "<group>"; };
 		1C8B284BC7A52178D617C09B /* PlaylistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistsView.swift; sourceTree = "<group>"; };
 		1D43F0A4B7CC87F9254857C3 /* LockScreenSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSettings.swift; sourceTree = "<group>"; };
 		202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenManager.swift; sourceTree = "<group>"; };
@@ -139,6 +155,7 @@
 		35A6A1FE4907B4DE10F11315 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		38BF80198BCD676AF7550277 /* RenderedLoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderedLoopRecorder.swift; sourceTree = "<group>"; };
 		39DB38C40FFF27490AAC894D /* WallpaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCard.swift; sourceTree = "<group>"; };
+		3DA5B69788E689A2AE659F9D /* SteamDepotFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotFormat.swift; sourceTree = "<group>"; };
 		3FD7CDCF7BD18261650FE168 /* SteamPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamPanel.swift; sourceTree = "<group>"; };
 		40FAD20AD6D740C31FF87167 /* SceneSound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSound.swift; sourceTree = "<group>"; };
 		412C249E27C5A37ECA710FCB /* SceneCursor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCursor.swift; sourceTree = "<group>"; };
@@ -188,6 +205,7 @@
 		AE67EA26E9EB9536AA066034 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AE73A19B90407A1926A8BBB0 /* LumenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LumenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B197EC3DF82148F20DC91B2C /* VideoRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRenderer.swift; sourceTree = "<group>"; };
+		B5C0398E2C1DEF838E9AE39D /* SteamNativeProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamNativeProtocolTests.swift; sourceTree = "<group>"; };
 		B5D43EA9088D7EED4B38A683 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B6E0048C98CCE52FEE49F10C /* SceneInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneInstance.swift; sourceTree = "<group>"; };
 		B6FDDF22F86AD5CE72F399C7 /* StudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioView.swift; sourceTree = "<group>"; };
@@ -207,6 +225,7 @@
 		DFBD5C86D4BF7AF02DB9DACC /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
 		E2E8D6A48A8B48410EE70E1B /* PackageImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageImporter.swift; sourceTree = "<group>"; };
 		E435D49B649CBC8FED581694 /* StudioEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioEditorView.swift; sourceTree = "<group>"; };
+		E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamNativeDownload.swift; sourceTree = "<group>"; };
 		E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HEVCTranscoder.swift; sourceTree = "<group>"; };
 		E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSpectrum.swift; sourceTree = "<group>"; };
 		EB190E6A2FEBDAF2CCB08258 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -217,6 +236,25 @@
 		FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAnimationPlaybackTests.swift; sourceTree = "<group>"; };
 		FF74219320866283D5E10984 /* AerialSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		30EB033B0EFFA568C350B17A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				29801BBD3D23CA8E84BD10F8 /* libzstd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B271374534900BFB4CBA307B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23E8C11AF978A92A76C3798A /* libzstd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		039A3F9511ECBAA9B0EA7653 /* Renderers */ = {
@@ -383,6 +421,7 @@
 				FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */,
 				47E75E28C5A1DC04D996B3AE /* SceneValuesTests.swift */,
 				A876A698B804682C4154BDBE /* SteamCMDOutputTests.swift */,
+				B5C0398E2C1DEF838E9AE39D /* SteamNativeProtocolTests.swift */,
 				10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */,
 				883F9388FF2B999E8EB2A138 /* WallpaperEngineProjectTests.swift */,
 				614C51B1F7D7F33E178EDA02 /* WEShaderPreprocessorTests.swift */,
@@ -455,6 +494,18 @@
 			path = Lumen;
 			sourceTree = "<group>";
 		};
+		BB37554412DD8FECA035D2D3 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				1C6360661D5A0519AA9ED8AE /* SteamCM.swift */,
+				3DA5B69788E689A2AE659F9D /* SteamDepotFormat.swift */,
+				E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */,
+				1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */,
+				01EBD669334D19DD57D76C59 /* SteamWire.swift */,
+			);
+			path = Native;
+			sourceTree = "<group>";
+		};
 		BFF892E2A252A6EDB95557EF /* Studio */ = {
 			isa = PBXGroup;
 			children = (
@@ -518,6 +569,7 @@
 			children = (
 				ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */,
 				8A386460131D1C0DDF521B11 /* SteamWorkshop.swift */,
+				BB37554412DD8FECA035D2D3 /* Native */,
 			);
 			path = Steam;
 			sourceTree = "<group>";
@@ -557,6 +609,7 @@
 			buildConfigurationList = 16932A0D91F6D85B9C2F2B98 /* Build configuration list for PBXNativeTarget "LumenTests" */;
 			buildPhases = (
 				19CB0F8005A92715467B8534 /* Sources */,
+				30EB033B0EFFA568C350B17A /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -564,6 +617,7 @@
 			);
 			name = LumenTests;
 			packageProductDependencies = (
+				D180E1BDEE080AA13812844D /* libzstd */,
 			);
 			productName = LumenTests;
 			productReference = AE73A19B90407A1926A8BBB0 /* LumenTests.xctest */;
@@ -575,6 +629,7 @@
 			buildPhases = (
 				04E1F8E02FA22F0432CCEA4F /* Sources */,
 				2F1ADCC8D621EDFBF2163C5B /* Resources */,
+				B271374534900BFB4CBA307B /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -582,6 +637,7 @@
 			);
 			name = Lumen;
 			packageProductDependencies = (
+				86C71501F442C3AB00ADE840 /* libzstd */,
 			);
 			productName = Lumen;
 			productReference = 337A3269E47126DC851115EE /* Lumen.app */;
@@ -611,6 +667,9 @@
 			);
 			mainGroup = 3D6C9A073723A54628361039;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8EDC9B650F43DAE0C7516A8A /* XCRemoteSwiftPackageReference "zstd" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 70C838A3277A6AAF3F2B0484 /* Products */;
 			projectDirPath = "";
@@ -700,8 +759,13 @@
 				4A60E4AAEEDEA1E985AFD071 /* ShaderRenderer.swift in Sources */,
 				CBC6B78079BAFAEF5F157F38 /* ShaderSources.swift in Sources */,
 				CF6FE635506FF68236EABAF4 /* ShaderUniforms.swift in Sources */,
+				8AF825C80293332BF272FA08 /* SteamCM.swift in Sources */,
 				6490A46F3E469AD0B59DBD49 /* SteamCMD.swift in Sources */,
+				F539A459B930ED3A3E5C5B05 /* SteamDepotFormat.swift in Sources */,
+				ED62B92DB05E24A2A3A9E1CB /* SteamNativeDownload.swift in Sources */,
+				BE3FC4814B9F9DF6E0B833AD /* SteamNativeSession.swift in Sources */,
 				667DF549EE542A50CB265CE9 /* SteamPanel.swift in Sources */,
+				86E4681068E5C9A08ED884EB /* SteamWire.swift in Sources */,
 				0FE35F7F808D88BF63AE2325 /* SteamWorkshop.swift in Sources */,
 				2AB76C5C0CDFE524547ECB7C /* StillFrameSync.swift in Sources */,
 				E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */,
@@ -741,8 +805,14 @@
 				41B33403FF16F7150091CC5C /* SceneDocument.swift in Sources */,
 				439395E160363268AA32C005 /* SceneFileSystem.swift in Sources */,
 				173DB01F2084478E5DB025E9 /* SceneValuesTests.swift in Sources */,
+				003E759CEFC3F5C879D6C280 /* SteamCM.swift in Sources */,
 				7CBE090D868EF178B7100A54 /* SteamCMD.swift in Sources */,
 				1F568EE5112920614A49657B /* SteamCMDOutputTests.swift in Sources */,
+				C5E3EA2326DD909B03561221 /* SteamDepotFormat.swift in Sources */,
+				BB72D947572DB7EB720ECDD7 /* SteamNativeDownload.swift in Sources */,
+				9F1AB72377D62C5421196B7D /* SteamNativeProtocolTests.swift in Sources */,
+				ACF3EE0E2C9437B6F5D2AF14 /* SteamNativeSession.swift in Sources */,
+				44DC30A948D43CA48F1ED802 /* SteamWire.swift in Sources */,
 				59FEDCEE4CD7689EEE71D03F /* Support.swift in Sources */,
 				F5415CF0D0D895B86BB0ABFE /* TexDecoder.swift in Sources */,
 				E76531935F953C819542FCF7 /* TexDecoderTests.swift in Sources */,
@@ -824,6 +894,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/Lumen/Library/Steam/Native/CArchive";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
@@ -934,6 +1005,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/Lumen/Library/Steam/Native/CArchive";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -1000,6 +1072,30 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8EDC9B650F43DAE0C7516A8A /* XCRemoteSwiftPackageReference "zstd" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/zstd.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.5.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		86C71501F442C3AB00ADE840 /* libzstd */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EDC9B650F43DAE0C7516A8A /* XCRemoteSwiftPackageReference "zstd" */;
+			productName = libzstd;
+		};
+		D180E1BDEE080AA13812844D /* libzstd */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8EDC9B650F43DAE0C7516A8A /* XCRemoteSwiftPackageReference "zstd" */;
+			productName = libzstd;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B6B7785E344ACFF4DA083092 /* Project object */;
 }
