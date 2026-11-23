@@ -2,7 +2,7 @@ import Foundation
 import Metal
 import simd
 
-/// Parsed Wallpaper Engine puppet model (`.mdl`: `MDLV`, `MDLS`, `MDAT`, `MDLA`).
+/// Parsed Wallpaper Engine mesh and optional puppet rig (`.mdl`: `MDLV`, `MDLS`, `MDAT`, `MDLA`).
 final class PuppetModel: @unchecked Sendable {
     struct Bone {
         let name: String
@@ -55,6 +55,7 @@ final class PuppetModel: @unchecked Sendable {
     let vertexBuffer: MTLBuffer
     let indexBuffer: MTLBuffer
     let indexCount: Int
+    let meshCount: Int
     let isSkinned: Bool
     let bones: [Bone]
     let boneCountBucket: Int
@@ -69,13 +70,14 @@ final class PuppetModel: @unchecked Sendable {
     var boundsCenter: SIMD2<Float> { (boundsMin + boundsMax) * 0.5 }
     var boundsSize: SIMD2<Float> { boundsMax - boundsMin }
 
-    private init(vertexBuffer: MTLBuffer, indexBuffer: MTLBuffer, indexCount: Int, isSkinned: Bool,
+    private init(vertexBuffer: MTLBuffer, indexBuffer: MTLBuffer, indexCount: Int, meshCount: Int, isSkinned: Bool,
                  bones: [Bone], attachments: [String: Attachment], animations: [Int: Animation],
                  submeshes: [Submesh], clippingMasks: [ClippingMask],
                  boundsMin: SIMD2<Float>, boundsMax: SIMD2<Float>) {
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
         self.indexCount = indexCount
+        self.meshCount = meshCount
         self.isSkinned = isSkinned && !bones.isEmpty
         self.bones = bones
         // Bucket BONECOUNT so models with similar bone counts share one compiled shader variant.
@@ -91,16 +93,25 @@ final class PuppetModel: @unchecked Sendable {
         self.boundsMax = boundsMax
     }
 
-    /// Parses a Wallpaper Engine `.mdl` binary (`MDLV0016`–`MDLV0023`).
+    static func materialPath(in data: Data) -> String? {
+        var reader = BinaryReader(data)
+        return readHeader(&reader)?.materialPath
+    }
+
+    private static func readHeader(_ reader: inout BinaryReader) -> (version: Int, meshCount: Int, materialPath: String)? {
+        guard let magic = reader.cString(), magic.hasPrefix("MDLV"),
+              let version = Int(magic.dropFirst(4)), reader.skip(8),
+              let meshCount = reader.u32(), let materialPath = reader.cString()
+        else { return nil }
+        return (version, Int(meshCount), materialPath)
+    }
+
+    /// Parses geometry and optional rig sections from a Wallpaper Engine model.
     static func parse(_ data: Data, imageExtent: SIMD2<Float>, device: MTLDevice) -> PuppetModel? {
         var reader = BinaryReader(data)
-        guard let magic = reader.cString(), magic.hasPrefix("MDLV"), let version = Int(magic.dropFirst(4)) else { return nil }
-
-        // Header: flags, unk, meshCount, material path, extra flags, optional bounding box.
-        guard reader.skip(12) else { return nil }
-        guard reader.cString() != nil else { return nil }
-        guard reader.skip(4) else { return nil }
-        if version >= 19 { guard reader.skip(24) else { return nil } }
+        guard let header = readHeader(&reader), reader.skip(4) else { return nil }
+        // The older MDLV0016 puppet files omit bounds. The MDLV0017 editor camera includes them.
+        if header.version == 17 || header.version >= 19 { guard reader.skip(24) else { return nil } }
 
         guard let vfmt = reader.u32(), let vbytes = reader.u32() else { return nil }
         let hasPos = (vfmt & 0x1) != 0
@@ -144,7 +155,7 @@ final class PuppetModel: @unchecked Sendable {
         var indices = [UInt16]()
         indices.reserveCapacity(indexCount)
         for _ in 0..<indexCount {
-            guard let i = reader.u16() else { return nil }
+            guard let i = reader.u16(), Int(i) < vertexCount else { return nil }
             indices.append(i)
         }
 
@@ -329,7 +340,7 @@ final class PuppetModel: @unchecked Sendable {
         }) else { return nil }
 
         return PuppetModel(
-            vertexBuffer: vertexBuffer, indexBuffer: indexBuffer, indexCount: indexCount,
+            vertexBuffer: vertexBuffer, indexBuffer: indexBuffer, indexCount: indexCount, meshCount: header.meshCount,
             isSkinned: hasSkin, bones: bones, attachments: attachments, animations: animations,
             submeshes: submeshes, clippingMasks: clippingMasks,
             boundsMin: minPos, boundsMax: maxPos
