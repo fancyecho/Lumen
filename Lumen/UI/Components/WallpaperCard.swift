@@ -3,6 +3,7 @@ import SwiftUI
 /// Grid card: thumbnail that turns into a live preview on hover.
 struct WallpaperCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let wallpaper: Wallpaper
     var showsCaption = true
 
@@ -17,7 +18,7 @@ struct WallpaperCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
             artwork
             if showsCaption { caption }
         }
@@ -40,35 +41,50 @@ struct WallpaperCard: View {
                 LiveWallpaperPreview(wallpaper: wallpaper)
                     .transition(.opacity)
             }
+            if hovering {
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.55)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
         }
         .aspectRatio(16.0 / 9.0, contentMode: .fit)
-        .overlay(alignment: .topLeading) { badges.padding(10) }
+        .overlay(alignment: .topLeading) { badges.padding(Theme.Space.sm - 2) }
         .overlay(alignment: .topTrailing) {
             if isOnDesktop {
-                ArtBadge(text: String(localized: "On desktop"), symbol: "display").padding(10)
+                ArtBadge(text: String(localized: "On desktop"), dotColor: Theme.playing)
+                    .padding(Theme.Space.sm - 2)
             }
         }
         .overlay(alignment: .bottomTrailing) {
             if hovering {
                 quickActions
-                    .padding(10)
-                    .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .bottomTrailing)))
+                    .padding(Theme.Space.sm - 2)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(hovering ? 0.3 : 0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(
+                    isOnDesktop
+                        ? Theme.playing.opacity(hovering ? 0.55 : 0.35)
+                        : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
+                    lineWidth: 1
+                )
         )
-        .shadow(color: .black.opacity(hovering ? 0.5 : 0.28), radius: hovering ? 24 : 12, y: hovering ? 14 : 6)
-        .scaleEffect(hovering ? 1.018 : 1)
-        .animation(.snappy(duration: 0.28), value: hovering)
-        .animation(.easeOut(duration: 0.3), value: previewing)
+        .shadow(color: .black.opacity(hovering ? 0.50 : 0.28), radius: hovering ? 22 : 12, y: hovering ? 12 : 6)
+        .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: hovering)
+        .animation(reduceMotion ? nil : Theme.Motion.smooth, value: previewing)
     }
 
     @ViewBuilder
     private var badges: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Theme.Space.xxs) {
             switch wallpaper.kind {
             case .video:
                 if let video = wallpaper.video {
@@ -87,13 +103,13 @@ struct WallpaperCard: View {
     }
 
     private var quickActions: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 8) {
+        GlassEffectContainer(spacing: Theme.Space.xs) {
+            HStack(spacing: Theme.Space.xs) {
                 Button {
                     model.library.toggleFavorite(wallpaper.id)
                 } label: {
                     Image(systemName: wallpaper.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(wallpaper.isFavorite ? Color.pink : Color.primary)
+                        .foregroundStyle(wallpaper.isFavorite ? Theme.favorite : Color.primary)
                         .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.glass)
@@ -120,13 +136,13 @@ struct WallpaperCard: View {
     }
 
     private var caption: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.xs) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(wallpaper.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.TypeScale.cardTitle)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -134,9 +150,10 @@ struct WallpaperCard: View {
             if wallpaper.isFavorite {
                 Image(systemName: "heart.fill")
                     .font(.system(size: 11))
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(Theme.favorite)
             }
         }
+        .padding(.horizontal, 2)
     }
 
     private var subtitle: String {

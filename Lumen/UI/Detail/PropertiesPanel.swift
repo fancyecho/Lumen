@@ -9,31 +9,50 @@ struct PropertiesPanel: View {
     var body: some View {
         let values = package.resolvedValues
         let visible = package.properties.filter { $0.isEditable && WEProperty.conditionHolds($0.condition, values: values) }
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Customize", systemImage: "slider.horizontal.3")
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack(spacing: Theme.Space.sm) {
+                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 15, weight: .semibold))
-                Spacer()
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Theme.accentSoft))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Customize").font(Theme.TypeScale.cardTitle)
+                    Text("\(visible.count) options · applied live")
+                        .font(Theme.TypeScale.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Spacer(minLength: Theme.Space.sm)
                 if !package.values.isEmpty {
                     Button("Reset") { model.resetProperties(for: wallpaper.id) }
                         .buttonStyle(.glass)
                 }
             }
+
             if visible.isEmpty {
                 Text("Nothing to customize with the current options.")
-                    .font(.system(size: 13))
+                    .font(Theme.TypeScale.body)
                     .foregroundStyle(.secondary)
-            }
-            ForEach(visible) { property in
-                PropertyRow(property: property, value: values[property.id] ?? property.defaultValue) { newValue in
-                    let stored: PropertyValue? = newValue == property.defaultValue ? nil : newValue
-                    model.setProperty(stored, key: property.id, for: wallpaper.id)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, property in
+                        if index > 0 {
+                            Rectangle()
+                                .fill(Theme.Surface.divider)
+                                .frame(height: 1)
+                        }
+                        PropertyRow(property: property, value: values[property.id] ?? property.defaultValue) { newValue in
+                            let stored: PropertyValue? = newValue == property.defaultValue ? nil : newValue
+                            model.setProperty(stored, key: property.id, for: wallpaper.id)
+                        }
+                        .padding(.vertical, Theme.Space.sm - 2)
+                    }
                 }
             }
         }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.surfaceStroke))
+        .padding(Theme.Space.lg)
+        .lumenSurface(radius: Theme.Radius.xl)
     }
 }
 
@@ -43,11 +62,12 @@ private struct PropertyRow: View {
     let onChange: (PropertyValue) -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: Theme.Space.md) {
             Text(verbatim: property.label)
-                .font(.system(size: 13))
+                .font(Theme.TypeScale.body)
                 .lineLimit(2)
-                .frame(width: 200, alignment: .leading)
+                .frame(minWidth: 160, idealWidth: 210, maxWidth: 240, alignment: .leading)
+            Spacer(minLength: Theme.Space.xs)
             control
         }
     }
@@ -59,18 +79,22 @@ private struct PropertyRow: View {
             Toggle("", isOn: Binding(get: { value.boolValue }, set: { onChange(.bool($0)) }))
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .controlSize(.small)
         case .slider:
             let lower = property.min ?? 0
             let upper = max(property.max ?? 1, lower + 0.0001)
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.Space.sm) {
                 Slider(
                     value: Binding(get: { min(max(value.doubleValue, lower), upper) }, set: { onChange(.number(rounded($0))) }),
                     in: lower...upper
                 )
+                .controlSize(.small)
+                .frame(minWidth: 160, maxWidth: 320)
                 Text(verbatim: formatted(value.doubleValue))
-                    .font(.system(size: 12).monospacedDigit())
+                    .font(Theme.TypeScale.caption.weight(.medium))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .trailing)
+                    .frame(width: 54, alignment: .trailing)
             }
         case .combo:
             Picker("", selection: Binding(get: { value.stringValue }, set: { onChange(.string($0)) })) {
@@ -86,6 +110,7 @@ private struct PropertyRow: View {
         case .textinput:
             TextField("", text: Binding(get: { value.stringValue }, set: { onChange(.string($0)) }))
                 .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 180, maxWidth: 320)
         default:
             EmptyView()
         }

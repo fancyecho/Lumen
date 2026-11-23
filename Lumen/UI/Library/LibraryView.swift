@@ -47,7 +47,7 @@ struct LibraryView: View {
     var body: some View {
         let wallpapers = filtered
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
                 header
                 controls
                 if !model.library.importJobs.isEmpty { importProgress }
@@ -55,9 +55,9 @@ struct LibraryView: View {
                     EmptyLibraryView(isSearching: !model.router.searchText.isEmpty, filter: filter)
                 } else {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 270, maximum: 440), spacing: 24, alignment: .top)],
+                        columns: [GridItem(.adaptive(minimum: 264, maximum: 420), spacing: Theme.Space.lg, alignment: .top)],
                         alignment: .leading,
-                        spacing: 30
+                        spacing: Theme.Space.xl + Theme.Space.xxs
                     ) {
                         ForEach(wallpapers) { wallpaper in
                             WallpaperCard(wallpaper: wallpaper)
@@ -65,10 +65,10 @@ struct LibraryView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, 26)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 1480, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
     }
@@ -84,14 +84,18 @@ struct LibraryView: View {
     }
 
     private var controls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ForEach(LibraryFilter.allCases) { item in
-                    FilterChip(title: item.title, symbol: item.symbol, count: count(for: item), isSelected: filter == item) {
-                        filter = item
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            HStack(spacing: Theme.Space.sm) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Space.xs) {
+                        ForEach(LibraryFilter.allCases) { item in
+                            FilterChip(title: item.title, symbol: item.symbol, count: count(for: item), isSelected: filter == item) {
+                                filter = item
+                            }
+                        }
                     }
+                    .padding(.vertical, 1)
                 }
-                Spacer()
                 Menu {
                     Picker("Sort By", selection: $sort) {
                         ForEach(LibrarySort.allCases) { Text($0.title).tag($0) }
@@ -99,7 +103,7 @@ struct LibraryView: View {
                     .pickerStyle(.inline)
                 } label: {
                     Label(sort.title, systemImage: "arrow.up.arrow.down")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.TypeScale.bodyMedium)
                 }
                 .menuStyle(.button)
                 .buttonStyle(.glass)
@@ -107,29 +111,33 @@ struct LibraryView: View {
             }
             let categories = availableCategories
             if categories.count > 1 {
-                HStack(spacing: 8) {
-                    FilterChip(title: String(localized: "Any category"), isSelected: category == nil) { category = nil }
-                    ForEach(categories, id: \.self) { name in
-                        FilterChip(title: WallpaperCategories.displayName(name), isSelected: category == name) {
-                            category = category == name ? nil : name
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Space.xs) {
+                        FilterChip(title: String(localized: "Any category"), isSelected: category == nil) { category = nil }
+                        ForEach(categories, id: \.self) { name in
+                            FilterChip(title: WallpaperCategories.displayName(name), isSelected: category == name) {
+                                category = category == name ? nil : name
+                            }
                         }
                     }
+                    .padding(.vertical, 1)
                 }
             }
         }
     }
 
     private var importProgress: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.sm - 2) {
             ProgressView().controlSize(.small)
             Text("Importing \(model.library.importJobs.map(\.name).joined(separator: ", "))…")
-                .font(.system(size: 13))
+                .font(Theme.TypeScale.bodyMedium)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Capsule().fill(Theme.surface))
+        .padding(.horizontal, Theme.Space.md)
+        .padding(.vertical, Theme.Space.sm - 2)
+        .background(Capsule().fill(Theme.Surface.base))
+        .overlay(Capsule().strokeBorder(Theme.Surface.stroke))
     }
 
     private var availableCategories: [String] {
@@ -178,13 +186,13 @@ struct EmptyLibraryView: View {
     let filter: LibraryFilter
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Theme.Space.md) {
             Image(systemName: isSearching ? "magnifyingglass" : "square.and.arrow.down.on.square")
-                .font(.system(size: 40, weight: .light))
+                .font(.system(size: 38, weight: .light))
                 .foregroundStyle(Theme.accent)
             Text(title).font(Theme.display(22))
             Text(message)
-                .font(.system(size: 14))
+                .font(Theme.TypeScale.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 440)
@@ -196,15 +204,19 @@ struct EmptyLibraryView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .padding(.top, 4)
+                .padding(.top, Theme.Space.xxs)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 64)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                .fill(Theme.Surface.base)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
-                .foregroundStyle(Color.white.opacity(0.16))
+                .foregroundStyle(Theme.Surface.strokeHover)
         )
     }
 

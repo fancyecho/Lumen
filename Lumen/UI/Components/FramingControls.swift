@@ -15,42 +15,41 @@ struct FramingControls: View {
 
     var body: some View {
         let framing = wallpaper.resolvedFraming
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 14) {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            HStack(alignment: .center, spacing: Theme.Space.md) {
                 Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Color.white.opacity(0.07)))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Position & Zoom").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Theme.accentSoft))
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                    Text("Position & Zoom").font(Theme.TypeScale.cardTitle)
                     Text("Drag the preview or pinch to zoom. Changes show on your desktop right away.")
-                        .font(.system(size: 13))
+                        .font(Theme.TypeScale.caption)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 12)
+                Spacer(minLength: Theme.Space.sm)
                 FramingResetButton(wallpaper: wallpaper)
             }
 
-            HStack(alignment: .center, spacing: 30) {
+            HStack(alignment: .center, spacing: Theme.Space.xl) {
                 displayMock(framing)
-                    .frame(width: 320)
-                VStack(alignment: .leading, spacing: 10) {
+                    .frame(width: 300)
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     FramingSliders(wallpaper: wallpaper)
                     if let hint = roomHint(for: framing) {
                         Label(hint, systemImage: "info.circle")
-                            .font(.system(size: 12))
+                            .font(Theme.TypeScale.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 4)
+                            .padding(.top, Theme.Space.xxs)
                     }
                 }
                 .frame(maxWidth: .infinity)
             }
         }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.surfaceStroke))
+        .padding(Theme.Space.lg)
+        .lumenSurface(radius: Theme.Radius.xl)
     }
 
     // MARK: Display mock
@@ -66,25 +65,25 @@ struct FramingControls: View {
                             .transition(.opacity)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xs, style: .continuous))
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { previewSize = $0 }
-                .padding(7)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.85)))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.16)))
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).fill(Color.black.opacity(0.85)))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Surface.scrimStroke))
                 .contentShape(Rectangle())
                 .gesture(panGesture)
                 .simultaneousGesture(zoomGesture)
                 .pointerStyle(dragStart == nil ? .grabIdle : .grabActive)
-                .animation(.easeOut(duration: 0.15), value: isAdjusting)
+                .animation(Theme.Motion.quick, value: isAdjusting)
                 .help("Drag to move the wallpaper, pinch to zoom")
 
             // Stand: reads as "this is your display" at a glance.
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(LinearGradient(colors: [Color.white.opacity(0.16), Color.white.opacity(0.07)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 44, height: 16)
+                .frame(width: 44, height: 14)
             Capsule()
                 .fill(Color.white.opacity(0.14))
-                .frame(width: 118, height: 5)
+                .frame(width: 112, height: 4)
         }
     }
 

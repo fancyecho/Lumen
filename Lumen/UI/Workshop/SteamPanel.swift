@@ -15,34 +15,12 @@ struct SteamPanel: View {
 
     var body: some View {
         let steam = model.steam
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Label("Steam Workshop", systemImage: "arrow.down.circle")
-                    .font(.system(size: 17, weight: .semibold))
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-            }
-
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            header
             account(steam)
 
             if steam.isSignedIn, !steam.isQRSignIn {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Download").font(.system(size: 13, weight: .semibold))
-                    HStack {
-                        TextField("Workshop link or item ID", text: $link)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit(startDownload)
-                        Button("Download", action: startDownload)
-                            .disabled(SteamWorkshop.itemID(from: link) == nil)
-                    }
-                    Button {
-                        showsBrowser = true
-                    } label: {
-                        Label("Browse the Steam Workshop…", systemImage: "safari")
-                    }
-                    .buttonStyle(.glass)
-                }
+                downloadSection
             }
 
             if let prompt = steam.prompt { promptView(prompt) }
@@ -51,8 +29,11 @@ struct SteamPanel: View {
 
             Spacer(minLength: 0)
         }
-        .padding(22)
-        .frame(width: 520, height: 560)
+        .padding(Theme.Space.xl)
+        .frame(width: 540, height: 560)
+        .background(Theme.Surface.canvas)
+        .preferredColorScheme(.dark)
+        .tint(Theme.accent)
         .onDisappear { steam.cancelQRSignIn() }
         .sheet(isPresented: $showsBrowser) {
             SteamWorkshopBrowser { id in
@@ -61,48 +42,107 @@ struct SteamPanel: View {
         }
     }
 
+    private var header: some View {
+        HStack(alignment: .top, spacing: Theme.Space.md) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                Text(verbatim: "STEAM WORKSHOP")
+                    .font(Theme.TypeScale.eyebrow)
+                    .tracking(1.8)
+                    .foregroundStyle(Theme.accent)
+                Text("Download to Lumen")
+                    .font(Theme.display(22))
+            }
+            Spacer()
+            Button("Done") { dismiss() }
+                .buttonStyle(.glass)
+                .keyboardShortcut(.cancelAction)
+        }
+    }
+
+    private var downloadSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            Text("Download by Link or ID")
+                .font(Theme.TypeScale.cardTitle)
+            HStack(spacing: Theme.Space.xs) {
+                TextField("Workshop link or item ID", text: $link)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(startDownload)
+                Button("Download", action: startDownload)
+                    .buttonStyle(.glassProminent)
+                    .disabled(SteamWorkshop.itemID(from: link) == nil)
+            }
+            Button {
+                showsBrowser = true
+            } label: {
+                Label("Browse the Steam Workshop…", systemImage: "safari")
+            }
+            .buttonStyle(.glass)
+        }
+        .padding(Theme.Space.md)
+        .lumenSurface(radius: Theme.Radius.lg)
+    }
+
     @ViewBuilder
     private func account(_ steam: SteamWorkshop) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
             if let account = steam.account, !steam.isQRSignIn {
-                HStack {
-                    Image(systemName: "person.crop.circle.badge.checkmark").foregroundStyle(Theme.playing)
-                    Text("Signed in as \(account)")
+                HStack(spacing: Theme.Space.sm) {
+                    Image(systemName: "person.crop.circle.badge.checkmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.playing)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Theme.playing.opacity(0.15)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Signed in as \(account)")
+                            .font(Theme.TypeScale.cardTitle)
+                        Text(steam.usesSteamCMD ? "Connected via SteamCMD" : "Connected to Steam")
+                            .font(Theme.TypeScale.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Button("Sign Out") { steam.signOut() }
+                        .buttonStyle(.glass)
                         .disabled(steam.isBusy)
                 }
                 if steam.usesSteamCMD { qrSignInButton(steam) }
             } else {
                 Text("Workshop downloads need a Steam account that owns Wallpaper Engine.")
-                    .font(.system(size: 12.5))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                 if let challenge = steam.qrChallenge {
-                    HStack(alignment: .center, spacing: 16) {
+                    HStack(alignment: .center, spacing: Theme.Space.md) {
                         SteamSignInCode(url: challenge)
-                        VStack(alignment: .leading, spacing: 7) {
+                        VStack(alignment: .leading, spacing: Theme.Space.sm) {
                             Text("Scan with Steam Guard in the Steam Mobile app, then approve the sign-in.")
+                                .font(Theme.TypeScale.bodyMedium)
+                                .fixedSize(horizontal: false, vertical: true)
                             Button("Cancel") { steam.cancelQRSignIn() }
+                                .buttonStyle(.glass)
                         }
-                        .font(.system(size: 13))
                     }
                 } else if steam.isQRSignIn {
-                    HStack {
+                    HStack(spacing: Theme.Space.sm) {
                         ProgressView().controlSize(.small)
-                        Text("Requesting a Steam QR code…").foregroundStyle(.secondary)
+                        Text("Requesting a Steam QR code…")
+                            .font(Theme.TypeScale.bodyMedium)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         Button("Cancel") { steam.cancelQRSignIn() }
+                            .buttonStyle(.glass)
                     }
                 } else {
                     qrSignInButton(steam)
                     DisclosureGroup("Advanced: Sign In with SteamCMD", isExpanded: $showsSteamCMD) {
-                        VStack(alignment: .leading, spacing: 7) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             TextField("Steam account name", text: $username)
+                                .textFieldStyle(.roundedBorder)
                             SecureField("Password", text: $password)
+                                .textFieldStyle(.roundedBorder)
                             HStack {
                                 if steam.isSigningIn {
                                     ProgressView().controlSize(.small)
                                     Text(steam.isInstalling ? "Installing SteamCMD…" : "Signing in…")
+                                        .font(Theme.TypeScale.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
@@ -110,19 +150,24 @@ struct SteamPanel: View {
                                     steam.signIn(username: username, password: password)
                                     password = ""
                                 }
+                                .buttonStyle(.glassProminent)
                                 .disabled(username.isEmpty || password.isEmpty || steam.isBusy)
                             }
+                            .padding(.top, Theme.Space.xxs)
                         }
-                        .padding(.top, 8)
+                        .padding(.top, Theme.Space.xs)
                     }
+                    .font(Theme.TypeScale.bodyMedium)
                 }
             }
             if let error = steam.signInError {
-                Text(error).foregroundStyle(.red).font(.system(size: 12))
+                Text(error)
+                    .foregroundStyle(Theme.danger)
+                    .font(Theme.TypeScale.caption)
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.surface))
+        .padding(Theme.Space.md)
+        .lumenSurface(radius: Theme.Radius.lg)
     }
 
     private func qrSignInButton(_ steam: SteamWorkshop) -> some View {
@@ -131,49 +176,55 @@ struct SteamPanel: View {
         } label: {
             Label("Sign In with Steam QR Code", systemImage: "qrcode")
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.glassProminent)
         .disabled(steam.isBusy)
     }
 
     @ViewBuilder
     private func promptView(_ prompt: SteamWorkshop.Prompt) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.xs) {
             switch prompt {
             case .guardCode(let email):
                 Text(email ? "Enter the Steam Guard code Steam emailed you." : "Enter the code from the Steam Mobile app.")
-                    .font(.system(size: 13, weight: .semibold))
-                HStack {
+                    .font(Theme.TypeScale.bodyMedium.weight(.semibold))
+                HStack(spacing: Theme.Space.xs) {
                     TextField("Code", text: $guardCode)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(sendGuardCode)
                     Button("Continue", action: sendGuardCode)
+                        .buttonStyle(.glassProminent)
                         .disabled(guardCode.isEmpty)
                     Button("Cancel") { model.steam.cancelPrompt() }
+                        .buttonStyle(.glass)
                 }
             case .mobileConfirmation:
-                HStack {
+                HStack(spacing: Theme.Space.sm) {
                     ProgressView().controlSize(.small)
                     Text("Open Steam Guard in the Steam Mobile app, choose Steam Client, and approve the sign-in.")
-                        .font(.system(size: 13))
+                        .font(Theme.TypeScale.bodyMedium)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Theme.Space.xs)
                     Button("Cancel") { model.steam.cancelPrompt() }
+                        .buttonStyle(.glass)
                 }
             }
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.accent.opacity(0.6)))
+        .padding(Theme.Space.md)
+        .lumenSurface(radius: Theme.Radius.lg, stroke: Theme.accent.opacity(0.6))
     }
 
     private func downloadsList(_ steam: SteamWorkshop) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.xs) {
             HStack {
-                Text("Downloads").font(.system(size: 13, weight: .semibold))
+                Text("Downloads")
+                    .font(Theme.TypeScale.cardTitle)
                 Spacer()
                 Button("Clear Finished") { steam.clearFinished() }
-                    .buttonStyle(.borderless)
-                    .font(.system(size: 12))
+                    .buttonStyle(.link)
+                    .font(Theme.TypeScale.caption)
             }
             ScrollView {
-                VStack(spacing: 6) {
+                VStack(spacing: Theme.Space.xs) {
                     ForEach(steam.downloads) { download in
                         DownloadRow(download: download) { id in
                             dismiss()
@@ -182,7 +233,7 @@ struct SteamPanel: View {
                     }
                 }
             }
-            .frame(maxHeight: 220)
+            .frame(maxHeight: 210)
         }
     }
 
@@ -215,9 +266,9 @@ private struct SteamSignInCode: View {
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 128, height: 128)
-                .padding(10)
-                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .frame(width: 124, height: 124)
+                .padding(Theme.Space.sm - 2)
+                .background(.white, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .accessibilityLabel(Text("Steam sign-in QR code"))
         }
     }
@@ -228,46 +279,59 @@ private struct DownloadRow: View {
     let open: (UUID) -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.sm - 2) {
             AsyncImage(url: download.previewURL) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                Color.white.opacity(0.06)
+                Theme.Surface.mediaFill
             }
-            .frame(width: 54, height: 34)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .frame(width: 56, height: 34)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xs, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.xs, style: .continuous)
+                    .strokeBorder(Theme.Surface.stroke, lineWidth: 0.75)
+            )
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: download.title).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+                Text(verbatim: download.title)
+                    .font(Theme.TypeScale.bodyMedium)
+                    .lineLimit(1)
                 status
             }
             Spacer()
             if case .done(let id?) = download.state {
                 Button("Show") { open(id) }
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
             }
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.04)))
+        .padding(Theme.Space.xs + 2)
+        .lumenSurface(radius: Theme.Radius.sm)
     }
 
     @ViewBuilder
     private var status: some View {
         switch download.state {
         case .queued:
-            Text("Waiting").font(.system(size: 11.5)).foregroundStyle(.secondary)
+            Text("Waiting").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
         case .preparing:
-            Text("Preparing download…").font(.system(size: 11.5)).foregroundStyle(.secondary)
+            Text("Preparing download…").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
         case .downloading(let progress):
             if let progress {
                 ProgressView(value: progress).frame(width: 140)
             } else {
-                Text("Downloading…").font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text("Downloading…").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
             }
         case .importing:
-            Text("Adding to library…").font(.system(size: 11.5)).foregroundStyle(.secondary)
+            Text("Adding to library…").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
         case .done:
-            Label("In your library", systemImage: "checkmark.circle.fill").font(.system(size: 11.5)).foregroundStyle(Theme.playing)
+            Label("In your library", systemImage: "checkmark.circle.fill")
+                .font(Theme.TypeScale.caption)
+                .foregroundStyle(Theme.playing)
         case .failed(let message):
-            Text(message).font(.system(size: 11.5)).foregroundStyle(.red).lineLimit(2)
+            Text(message)
+                .font(Theme.TypeScale.caption)
+                .foregroundStyle(Theme.danger)
+                .lineLimit(2)
         }
     }
 }
@@ -284,14 +348,20 @@ struct SteamWorkshopBrowser: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Button { navigator.webView?.goBack() } label: { Image(systemName: "chevron.left") }
-                Button { navigator.webView?.goForward() } label: { Image(systemName: "chevron.right") }
-                Button { navigator.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
+            HStack(spacing: Theme.Space.xs) {
+                GlassEffectContainer(spacing: Theme.Space.xxs) {
+                    HStack(spacing: Theme.Space.xxs) {
+                        Button { navigator.webView?.goBack() } label: { Image(systemName: "chevron.left") }
+                        Button { navigator.webView?.goForward() } label: { Image(systemName: "chevron.right") }
+                        Button { navigator.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
+                    }
+                    .buttonStyle(.glass)
+                }
                 Text(verbatim: currentURL?.host() ?? "steamcommunity.com")
-                    .font(.system(size: 12))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .padding(.leading, Theme.Space.xxs)
                 Spacer()
                 if let itemID {
                     Button {
@@ -304,13 +374,18 @@ struct SteamWorkshopBrowser: View {
                     .disabled(requested.contains(itemID))
                 }
                 Button("Done") { dismiss() }
+                    .buttonStyle(.glass)
             }
-            .padding(10)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.vertical, Theme.Space.sm - 2)
+            .background(Theme.Surface.canvas)
             SteamWebView(url: URL(string: "https://steamcommunity.com/app/431960/workshop/")!, navigator: navigator) { url in
                 currentURL = url
             }
         }
         .frame(width: 1100, height: 760)
+        .preferredColorScheme(.dark)
+        .tint(Theme.accent)
     }
 }
 

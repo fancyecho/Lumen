@@ -26,28 +26,30 @@ struct WorkshopView: View {
         let workshop = model.workshop
         let projects = filtered
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                PageHeader(eyebrow: "Wallpaper Engine", title: String(localized: "Workshop"), subtitle: subtitle) {
-                    HStack(spacing: 8) {
-                        Button {
-                            model.isSteamPanelPresented = true
-                        } label: {
-                            Label("Download from Steam", systemImage: "arrow.down.circle")
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                PageHeader(eyebrow: "Wallpaper Engine", title: "Workshop", subtitle: subtitle) {
+                    GlassEffectContainer(spacing: Theme.Space.xs) {
+                        HStack(spacing: Theme.Space.xs) {
+                            Button {
+                                model.isSteamPanelPresented = true
+                            } label: {
+                                Label("Download from Steam", systemImage: "arrow.down.circle")
+                            }
+                            .buttonStyle(.glassProminent)
+                            Button {
+                                chooseFolder()
+                            } label: {
+                                Label("Add Folder…", systemImage: "folder.badge.plus")
+                            }
+                            .buttonStyle(.glass)
+                            Button {
+                                workshop.scan()
+                            } label: {
+                                Label("Refresh", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.glass)
+                            .disabled(workshop.isScanning)
                         }
-                        .buttonStyle(.glassProminent)
-                        Button {
-                            chooseFolder()
-                        } label: {
-                            Label("Add Folder…", systemImage: "folder.badge.plus")
-                        }
-                        .buttonStyle(.glass)
-                        Button {
-                            workshop.scan()
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(.glass)
-                        .disabled(workshop.isScanning)
                     }
                 }
                 if model.settings.sceneAssets == nil && workshop.projects.contains(where: { $0.kind == .scene }) {
@@ -59,17 +61,21 @@ struct WorkshopView: View {
                 } else if projects.isEmpty {
                     emptyState
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 230, maximum: 340), spacing: 20, alignment: .top)], alignment: .leading, spacing: 24) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 256, maximum: 380), spacing: Theme.Space.lg, alignment: .top)],
+                        alignment: .leading,
+                        spacing: Theme.Space.xl
+                    ) {
                         ForEach(projects) { project in
                             WorkshopCard(project: project)
                         }
                     }
                 }
             }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, 26)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 1480, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .task { if workshop.lastScan == nil { workshop.scan() } }
@@ -84,11 +90,17 @@ struct WorkshopView: View {
 
     private func controls(_ projects: [DiscoveredProject]) -> some View {
         let addable = projects.filter { $0.isSupported && !isAdded($0) }
-        return HStack(spacing: 8) {
-            ForEach(WorkshopFilter.allCases) { item in
-                FilterChip(title: item.title, count: base(for: item).count, isSelected: filter == item) { filter = item }
+        return HStack(spacing: Theme.Space.sm) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.Space.xs) {
+                    ForEach(WorkshopFilter.allCases) { item in
+                        FilterChip(title: item.title, count: base(for: item).count, isSelected: filter == item) {
+                            filter = item
+                        }
+                    }
+                }
+                .padding(.vertical, 1)
             }
-            Spacer()
             if !addable.isEmpty {
                 Button {
                     model.importWorkshop(addable)
@@ -96,25 +108,35 @@ struct WorkshopView: View {
                     Label("Add \(addable.count) to Library", systemImage: "plus")
                 }
                 .buttonStyle(.glassProminent)
+                .fixedSize()
                 .disabled(!model.library.importJobs.isEmpty)
             }
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Theme.Space.sm) {
             Image(systemName: "shippingbox")
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(Theme.accent)
             Text("Nothing here yet").font(Theme.display(22))
             Text("Lumen looks in Steam's Wallpaper Engine Workshop folder and other apps' libraries. You can also add a folder of projects, for example one copied from a Windows PC.")
-                .font(.system(size: 14))
+                .font(Theme.TypeScale.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 480)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                .fill(Theme.Surface.base)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
+                .foregroundStyle(Theme.Surface.strokeHover)
+        )
     }
 
     private func base(for filter: WorkshopFilter) -> [DiscoveredProject] {
@@ -156,6 +178,7 @@ struct WorkshopView: View {
 
 private struct WorkshopCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let project: DiscoveredProject
     @State private var image: NSImage?
     @State private var hovering = false
@@ -163,38 +186,70 @@ private struct WorkshopCard: View {
     private var existing: Wallpaper? { project.workshopID.flatMap { model.library.wallpaper(workshopID: $0) } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            ZStack {
-                Color.white.opacity(0.04)
-                if let image {
-                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+            // Place preview inside `.overlay` on a fixed 16:9 surface so square 512×512 Workshop previews never stretch the grid.
+            Theme.Surface.mediaFill
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .overlay {
+                    if let image {
+                        Image(nsImage: image)
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fill)
+                            .transition(.opacity)
+                    } else {
+                        Image(systemName: kindSymbol)
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(.quaternary)
+                    }
                 }
-            }
-            .aspectRatio(16.0 / 9.0, contentMode: .fit)
-            .clipped()
-            .overlay(alignment: .topLeading) {
-                HStack(spacing: 5) {
-                    ArtBadge(text: kindLabel, symbol: kindSymbol)
-                    if let rating = project.contentRating, rating != "Everyone" { ArtBadge(text: rating) }
+                .overlay {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.50),
+                            .init(color: .black.opacity(hovering ? 0.62 : 0.42), location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
                 }
-                .padding(8)
-            }
-            .overlay(alignment: .bottomTrailing) { action.padding(8) }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(hovering ? 0.28 : 0.08)))
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    HStack(spacing: Theme.Space.xxs) {
+                        ArtBadge(text: kindLabel, symbol: kindSymbol)
+                        if let rating = project.contentRating, rating != "Everyone" { ArtBadge(text: rating) }
+                    }
+                    .padding(Theme.Space.sm - 2)
+                }
+                .overlay(alignment: .bottomTrailing) { action.padding(Theme.Space.sm - 2) }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                        .strokeBorder(hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(hovering ? 0.45 : 0.26), radius: hovering ? 20 : 12, y: hovering ? 10 : 6)
+                .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: project.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Theme.TypeScale.cardTitle)
                     .lineLimit(1)
-                Text(verbatim: project.tags.prefix(3).joined(separator: " · "))
-                    .font(.system(size: 11.5))
+                Text(verbatim: tagsLine)
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            .padding(.horizontal, 2)
         }
         .onHover { hovering = $0 }
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: hovering)
         .task(id: project.preview) { image = await WorkshopThumbnails.image(for: project.preview) }
+    }
+
+    private var tagsLine: String {
+        let joined = project.tags.prefix(3).joined(separator: " · ")
+        return joined.isEmpty ? kindLabel : joined
     }
 
     @ViewBuilder
@@ -267,23 +322,25 @@ enum WorkshopThumbnails {
 /// Shown when scenes can't be drawn because Wallpaper Engine's shared assets are missing.
 struct AssetsNotice: View {
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Theme.Space.md) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(Theme.paused)
-                .font(.system(size: 18))
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Theme.paused.opacity(0.15)))
             VStack(alignment: .leading, spacing: 3) {
                 Text("Scenes need Wallpaper Engine's shared assets")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.TypeScale.cardTitle)
                 Text("Scenes use shaders and effects that ship with Wallpaper Engine, not with each Workshop item. Point Lumen at an assets folder in Settings › Wallpaper Engine.")
-                    .font(.system(size: 12.5))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: Theme.Space.sm)
             SettingsLink { Text("Open Settings") }
                 .buttonStyle(.glass)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.surfaceStroke))
+        .padding(Theme.Space.md)
+        .lumenSurface(radius: Theme.Radius.lg, stroke: Theme.paused.opacity(0.32))
     }
 }

@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// The window background: a softly blurred echo of what's on the desktop right now
-/// (or of the wallpaper being viewed). It's a static, pre-blurred bitmap, so it
-/// costs nothing per frame.
+/// The window background: a calm, deep neutral obsidian canvas with a restrained,
+/// pre-blurred echo of the active (or inspected) wallpaper so artwork always stays the hero.
 struct AmbientBackdrop: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var focus: Wallpaper?
     @State private var image: NSImage?
 
@@ -18,7 +18,7 @@ struct AmbientBackdrop: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.03, green: 0.03, blue: 0.05)
+            Theme.Surface.canvas
             Color.clear
                 .overlay {
                     if let image {
@@ -26,7 +26,7 @@ struct AmbientBackdrop: View {
                             .resizable()
                             .interpolation(.high)
                             .aspectRatio(contentMode: .fill)
-                            .opacity(0.9)
+                            .opacity(0.34)
                             .transition(.opacity)
                             .id(ObjectIdentifier(image))
                     }
@@ -34,9 +34,9 @@ struct AmbientBackdrop: View {
                 .clipped()
             LinearGradient(
                 stops: [
-                    .init(color: .black.opacity(0.28), location: 0),
-                    .init(color: .black.opacity(0.58), location: 0.5),
-                    .init(color: .black.opacity(0.8), location: 1),
+                    .init(color: Theme.Surface.canvas.opacity(0.52), location: 0),
+                    .init(color: Theme.Surface.canvas.opacity(0.78), location: 0.48),
+                    .init(color: Theme.Surface.canvas.opacity(0.95), location: 1),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -49,7 +49,11 @@ struct AmbientBackdrop: View {
                 return
             }
             let loaded = await ThumbnailCache.shared.backdrop(for: source, library: model.library)
-            withAnimation(.easeInOut(duration: 0.9)) { image = loaded }
+            if reduceMotion {
+                image = loaded
+            } else {
+                withAnimation(Theme.Motion.backdrop) { image = loaded }
+            }
         }
     }
 }

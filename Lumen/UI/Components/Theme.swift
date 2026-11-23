@@ -1,28 +1,121 @@
 import SwiftUI
 
 enum Theme {
-    static let accent = Color(red: 0.49, green: 0.42, blue: 1.0)
-    static let playing = Color(red: 0.36, green: 0.88, blue: 0.58)
-    static let paused = Color(red: 1.0, green: 0.76, blue: 0.32)
-    static let saving = Color(red: 0.55, green: 0.86, blue: 0.45)
+    // MARK: Semantic Colors
 
-    static let pagePadding: CGFloat = 40
-    static let cardRadius: CGFloat = 16
-    static let surface = Color.white.opacity(0.055)
-    static let surfaceStroke = Color.white.opacity(0.09)
+    static let accent = Color(red: 0.52, green: 0.44, blue: 1.0)
+    static let accentSoft = accent.opacity(0.15)
+    static let playing = Color(red: 0.30, green: 0.86, blue: 0.56)
+    static let paused = Color(red: 0.98, green: 0.74, blue: 0.28)
+    static let saving = Color(red: 0.45, green: 0.86, blue: 0.48)
+    static let favorite = Color(red: 0.98, green: 0.36, blue: 0.54)
+    static let danger = Color(red: 0.96, green: 0.36, blue: 0.38)
+
+    // MARK: Neutral Surfaces
+
+    enum Surface {
+        static let canvas = Color(red: 0.045, green: 0.048, blue: 0.060)
+        static let base = Color.white.opacity(0.045)
+        static let elevated = Color.white.opacity(0.075)
+        static let hover = Color.white.opacity(0.115)
+        static let pressed = Color.white.opacity(0.17)
+        static let mediaFill = Color.white.opacity(0.04)
+        static let stroke = Color.white.opacity(0.085)
+        static let strokeHover = Color.white.opacity(0.24)
+        static let divider = Color.white.opacity(0.10)
+        static let scrim = Color.black.opacity(0.60)
+        static let scrimStroke = Color.white.opacity(0.14)
+    }
+
+    // MARK: 4/8pt Spacing Grid
+
+    enum Space {
+        static let xxs: CGFloat = 4
+        static let xs: CGFloat = 8
+        static let sm: CGFloat = 12
+        static let md: CGFloat = 16
+        static let lg: CGFloat = 20
+        static let xl: CGFloat = 24
+        static let xxl: CGFloat = 32
+        static let page: CGFloat = 36
+    }
+
+    // MARK: Concentric Corner Radii
+
+    enum Radius {
+        static let xs: CGFloat = 6
+        static let sm: CGFloat = 10
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+    }
+
+    // MARK: Layout Constraints
+
+    enum Layout {
+        static let galleryMaxWidth: CGFloat = 1480
+        static let detailMaxWidth: CGFloat = 1120
+        static let minWindowWidth: CGFloat = 1020
+        static let minWindowHeight: CGFloat = 680
+        static let detailHeroMaxHeight: CGFloat = 440
+    }
+
+    // MARK: Typography Scale
+
+    enum TypeScale {
+        static let heroTitle = Theme.display(46)
+        static let pageTitle = Theme.display(34)
+        static let detailTitle = Theme.display(30)
+        static let sectionTitle = Theme.display(18, weight: .semibold)
+        static let displayCardTitle = Theme.display(16, weight: .semibold)
+        static let eyebrow = Font.system(size: 11, weight: .semibold).width(.expanded)
+        static let cardTitle = Font.system(size: 14, weight: .semibold)
+        static let body = Font.system(size: 13.5, weight: .regular)
+        static let bodyMedium = Font.system(size: 13, weight: .medium)
+        static let caption = Font.system(size: 12, weight: .regular)
+        static let micro = Font.system(size: 10.5, weight: .bold)
+    }
+
+    // MARK: Motion
+
+    enum Motion {
+        static let quick = Animation.easeOut(duration: 0.14)
+        static let snappy = Animation.snappy(duration: 0.22)
+        static let smooth = Animation.smooth(duration: 0.24)
+        static let backdrop = Animation.easeInOut(duration: 0.65)
+    }
+
+    // Legacy aliases kept for Batch 2 views until they migrate to nested tokens.
+    static let pagePadding: CGFloat = Space.page
+    static let cardRadius: CGFloat = Radius.lg
+    static let surface = Surface.base
+    static let surfaceStroke = Surface.stroke
+    static let eyebrow = TypeScale.eyebrow
 
     /// Wide display face for titles — the signature of the app's typography.
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
         .system(size: size, weight: weight).width(.expanded)
     }
 
-    static let eyebrow = Font.system(size: 11.5, weight: .semibold).width(.expanded)
     static let playbackRates: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
     static func rateLabel(_ rate: Double) -> String {
         "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 }
+
+// MARK: Shared Surface Modifier
+
+extension View {
+    /// Standard Lumen content surface (solid translucent neutral fill + 1pt hairline border, never glass).
+    func lumenSurface(radius: CGFloat = Theme.Radius.xl, stroke: Color = Theme.Surface.stroke) -> some View {
+        background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Theme.Surface.base))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(stroke, lineWidth: 1))
+    }
+}
+
+// MARK: Headers
 
 /// Eyebrow + wide title + subtitle, with an optional trailing accessory.
 struct PageHeader<Trailing: View>: View {
@@ -32,23 +125,23 @@ struct PageHeader<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 24) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(eyebrow.uppercased())
-                    .font(Theme.eyebrow)
+        HStack(alignment: .bottom, spacing: Theme.Space.xl) {
+            VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                Text(verbatim: eyebrow.uppercased())
+                    .font(Theme.TypeScale.eyebrow)
                     .tracking(1.8)
                     .foregroundStyle(Theme.accent)
-                Text(title)
-                    .font(Theme.display(42))
+                Text(verbatim: title)
+                    .font(Theme.TypeScale.pageTitle)
                     .lineLimit(2)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 15))
+                        .font(Theme.TypeScale.body)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Theme.Space.md)
             trailing
         }
     }
@@ -66,14 +159,17 @@ struct SectionTitle<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(alignment: .lastTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(Theme.display(20, weight: .semibold))
+        HStack(alignment: .lastTextBaseline, spacing: Theme.Space.md) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                Text(verbatim: title)
+                    .font(Theme.TypeScale.sectionTitle)
                 if let subtitle {
-                    Text(subtitle).font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(subtitle)
+                        .font(Theme.TypeScale.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            Spacer()
+            Spacer(minLength: Theme.Space.sm)
             trailing
         }
     }
@@ -85,6 +181,8 @@ extension SectionTitle where Trailing == EmptyView {
     }
 }
 
+// MARK: Chips & Badges
+
 /// Capsule filter control for the content layer (solid fills, no glass).
 struct FilterChip: View {
     let title: String
@@ -93,6 +191,7 @@ struct FilterChip: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
@@ -100,27 +199,34 @@ struct FilterChip: View {
                 if let symbol {
                     Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
                 }
-                Text(title).font(.system(size: 13, weight: .medium))
+                Text(title)
+                    .font(Theme.TypeScale.bodyMedium)
+                    .lineLimit(1)
                 if let count {
-                    Text("\(count)")
+                    Text(verbatim: "\(count)")
                         .font(.system(size: 11, weight: .semibold))
                         .monospacedDigit()
-                        .opacity(0.7)
+                        .opacity(isSelected ? 0.85 : 0.65)
                 }
             }
-            .padding(.horizontal, 13)
+            .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .foregroundStyle(isSelected ? Color.white : Color.primary)
             .background(
-                Capsule().fill(isSelected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.white.opacity(hovering ? 0.12 : 0.065)))
+                Capsule().fill(
+                    isSelected
+                        ? AnyShapeStyle(Theme.accent)
+                        : AnyShapeStyle(hovering ? Theme.Surface.hover : Theme.Surface.elevated)
+                )
             )
-            .overlay(Capsule().strokeBorder(Color.white.opacity(isSelected ? 0 : 0.08)))
+            .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.Surface.stroke))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
         .onHover { hovering = $0 }
-        .animation(.snappy(duration: 0.18), value: isSelected)
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: isSelected)
+        .animation(reduceMotion ? nil : Theme.Motion.quick, value: hovering)
     }
 }
 
@@ -135,32 +241,39 @@ struct MetaChip: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(tint ?? Color.secondary)
             Text(text)
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .monospacedDigit()
+                .lineLimit(1)
         }
-        .padding(.horizontal, 11)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Capsule().fill(Color.white.opacity(0.065)))
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.08)))
+        .background(Capsule().fill(Theme.Surface.elevated))
+        .overlay(Capsule().strokeBorder(Theme.Surface.stroke))
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
-/// Small label drawn over artwork.
+/// Small high-contrast label drawn over artwork.
 struct ArtBadge: View {
     let text: String
     var symbol: String?
+    var dotColor: Color?
 
     var body: some View {
-        HStack(spacing: 3) {
-            if let symbol { Image(systemName: symbol) }
+        HStack(spacing: 4) {
+            if let dotColor {
+                StatusDot(color: dotColor)
+            } else if let symbol {
+                Image(systemName: symbol)
+            }
             Text(text)
         }
-        .font(.system(size: 10, weight: .bold))
+        .font(Theme.TypeScale.micro)
         .foregroundStyle(.white)
-        .padding(.horizontal, 7)
+        .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Capsule().fill(.black.opacity(0.5)))
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
+        .background(Capsule().fill(Theme.Surface.scrim))
+        .overlay(Capsule().strokeBorder(Theme.Surface.scrimStroke))
     }
 }
 
@@ -168,6 +281,7 @@ struct StatusDot: View {
     let color: Color
     var pulsing = false
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Circle()
@@ -176,13 +290,14 @@ struct StatusDot: View {
             .background(
                 Circle()
                     .fill(color.opacity(0.45))
-                    .scaleEffect(pulse ? 2.2 : 1)
-                    .opacity(pulse ? 0 : 0.8)
+                    .scaleEffect(pulse ? 2.1 : 1)
+                    .opacity(pulse ? 0 : (pulsing && !reduceMotion ? 0.75 : 0))
             )
             .onAppear {
-                guard pulsing else { return }
+                guard pulsing, !reduceMotion else { return }
                 withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { pulse = true }
             }
+            .onDisappear { pulse = false }
     }
 }
 
@@ -209,8 +324,8 @@ struct DisplayStatusPill: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(Capsule().fill(.black.opacity(0.5)))
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
+        .background(Capsule().fill(Theme.Surface.scrim))
+        .overlay(Capsule().strokeBorder(Theme.Surface.scrimStroke))
     }
 }
 
@@ -226,15 +341,67 @@ struct BarIconButtonStyle: ButtonStyle {
         let configuration: Configuration
         let size: CGFloat
         @State private var hovering = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             configuration.label
                 .frame(width: size, height: size)
-                .background(Circle().fill(Color.white.opacity(configuration.isPressed ? 0.2 : (hovering ? 0.1 : 0))))
+                .background(
+                    Circle().fill(
+                        configuration.isPressed
+                            ? Theme.Surface.pressed
+                            : (hovering ? Theme.Surface.hover : Color.clear)
+                    )
+                )
                 .contentShape(Circle())
-                .scaleEffect(configuration.isPressed ? 0.92 : 1)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.93 : 1)
                 .onHover { hovering = $0 }
-                .animation(.easeOut(duration: 0.12), value: hovering)
+                .animation(reduceMotion ? nil : Theme.Motion.quick, value: hovering)
+        }
+    }
+}
+
+// MARK: Flow Layout
+
+/// Left-aligned wrapping flow layout for metadata chips that must never clip at narrow widths.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = Theme.Space.xs
+    var lineSpacing: CGFloat = Theme.Space.xs
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            totalWidth = max(totalWidth, x - spacing)
+        }
+        return CGSize(width: min(totalWidth, maxWidth), height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
         }
     }
 }
