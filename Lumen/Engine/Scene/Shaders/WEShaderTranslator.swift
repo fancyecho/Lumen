@@ -529,7 +529,8 @@ enum WEShaderTranslator {
         func rewrite(_ source: String) -> String {
             var text = source
             // C++ / Metal reserved words used as GLSL identifiers.
-            text = text.replacing(Self.reservedWords) { match in "we_" + match.output.1 }
+            // Simple word boundaries: Unicode ones treat `fragment.x` as a single word.
+            text = text.replacing(Self.reservedWords.wordBoundaryKind(.simple)) { match in "we_" + match.output.1 }
             // GLSL parameter qualifiers.
             text = text.replacing(/\b(?:inout|out)\s+((?:highp\s+|mediump\s+|lowp\s+)?[A-Za-z_]\w*)\s+([A-Za-z_]\w*)/) { match in
                 "thread \(match.output.1)& \(match.output.2)"
@@ -539,11 +540,14 @@ enum WEShaderTranslator {
             }
             // Array constructors: float[3](a, b, c) -> {a, b, c}
             text = Self.replaceArrayConstructors(text)
+            // GLSL copies arrays by assignment (`float a[16] = g_AudioSpectrum16Left;`); C++ can't.
+            text = Self.copyArrayInitialisers(text)
             // HLSL lets a wider vector initialise, assign or return into a narrower one; Metal wants it explicit.
             let types = knownTypes(in: text)
             text = Self.narrowVec4TexCoordVaryings(text, stage: stage, varyings: varyings)
-            text = Self.widenVectorInitialisers(text)
+            text = Self.widenVectorInitialisers(text, types: types)
             text = Self.wrapAssignments(text, types: types)
+            text = Self.matchLiteralTypes(text)
             text = Self.wrapReturns(text)
             // HLSL accepts float `%`, float array subscripts, and packed 2D `[i/4][i%4]` on 1D scalar uniform arrays.
             text = Self.rewriteModulo(text)
@@ -578,7 +582,7 @@ enum WEShaderTranslator {
         static func narrowVec4TexCoordVaryings(_ text: String, stage: Stage, varyings: [WEVarying]) -> String {
             guard stage == .fragment else { return text }
             var result = text
-            for varying in varyings where varying.type == "vec4" && varying.count == 1 && varying.name.lowercased().contains("texcoord") {
+            for varying in varyings where (varying.type == "vec4" || varying.type == "vec3") && varying.count == 1 && varying.name.lowercased().contains("texcoord") {
                 let name = varying.name
                 guard let zwRegex = try? Regex("\\b\(name)\\.[xyzwrgba]*[zwba]"),
                       result.firstMatch(of: zwRegex) == nil,
@@ -589,10 +593,89 @@ enum WEShaderTranslator {
             return result
         }
 
-        static func widenVectorInitialisers(_ text: String) -> String {
+        static func copyArrayInitialisers(_ text: String) -> String {
+            text.replacing(/(?m)(^|[;{}]\s*|\n\s*)((?:vec|ivec|uvec)[234]|float|int|uint)\s+([A-Za-z_]\w*)\s*\[([^\]]+)\]\s*=\s*([A-Za-z_]\w*)\s*;/) { match in
+                let (lead, type, name, size, source) = (match.output.1, match.output.2, match.output.3, match.output.4, match.output.5)
+                return "\(lead)\(type) \(name)[\(size)]; for (int we_i = 0; we_i < int(\(size)); we_i++) \(name)[we_i] = \(source)[we_i];"
+            }
+        }
+
+        static func widenVectorInitialisers(_ text: String, types: [String: String] = [:]) -> String {
             text.replacing(/(?m)(^|[;{}(]\s*|\n\s*)((?:vec|ivec|uvec)[234]|float)\s+([A-Za-z_]\w*)\s*=\s*([^;{}=]+?);/) { match in
-                let value = match.output.4.trimmingCharacters(in: .whitespacesAndNewlines)
-                return "\(match.output.1)\(match.output.2) \(match.output.3) = we_\(match.output.2)(\(value));"
+                var value = match.output.4.trimmingCharacters(in: .whitespacesAndNewlines)
+                // `vec3 color = vec3(0.0), other;` declares a second variable after the comma.
+                var rest = ""
+                if let comma = topLevelComma(in: value) {
+                    rest = String(value[comma...])
+                    value = String(value[..<comma]).trimmingCharacters(in: .whitespaces)
+                }
+                let type = String(match.output.2)
+                value = truncateWideOperands(value, toWidth: width(of: type), types: types)
+                return "\(match.output.1)\(type) \(match.output.3) = we_\(type)(\(value))\(rest);"
+            }
+        }
+
+        private static func width(of type: String) -> Int {
+            type.last.flatMap { Int(String($0)) } ?? 1
+        }
+
+        /// The first comma outside parentheses and brackets, if any.
+        private static func topLevelComma(in text: String) -> String.Index? {
+            var depth = 0
+            for index in text.indices {
+                switch text[index] {
+                case "(", "[": depth += 1
+                case ")", "]": depth -= 1
+                case "," where depth == 0: return index
+                default: break
+                }
+            }
+            return nil
+        }
+
+        /// HLSL truncates a wider vector operand to the result's width (`vec2 a = v4 * v2;`).
+        /// Swizzling bare top-level operands keeps component-wise maths identical; anything
+        /// inside a call is left alone, since `dot`/`length` would change meaning.
+        static func truncateWideOperands(_ value: String, toWidth target: Int, types: [String: String]) -> String {
+            guard target >= 2, !types.isEmpty else { return value }
+            let swizzle = String("xyzw".prefix(target))
+            var result = ""
+            var depth = 0
+            var index = value.startIndex
+            while index < value.endIndex {
+                let character = value[index]
+                if character == "(" || character == "[" { depth += 1 }
+                if character == ")" || character == "]" { depth -= 1 }
+                let startsName = (character.isLetter || character == "_")
+                    && (index == value.startIndex || !(value[value.index(before: index)].isLetter || value[value.index(before: index)].isNumber
+                        || value[value.index(before: index)] == "_" || value[value.index(before: index)] == "."))
+                guard startsName else {
+                    result.append(character)
+                    index = value.index(after: index)
+                    continue
+                }
+                var end = index
+                while end < value.endIndex, value[end].isLetter || value[end].isNumber || value[end] == "_" { end = value.index(after: end) }
+                let name = String(value[index..<end])
+                result += name
+                let next = value[end...].first { !$0.isWhitespace }
+                if depth == 0, next != "(", next != ".", next != "[",
+                   let declared = types[name], declared.contains("vec"), width(of: declared) > target {
+                    result += "." + swizzle
+                }
+                index = end
+            }
+            return result
+        }
+
+        /// `clamp(0, 0.15, x)`: Metal won't pick an overload for mixed int and float literals,
+        /// so integer literals become floats in calls that already pass a float literal.
+        static func matchLiteralTypes(_ text: String) -> String {
+            text.replacing(/\b(clamp|min|max|mix|step|smoothstep|pow)\(([^()]*)\)/.wordBoundaryKind(.simple)) { match in
+                let arguments = String(match.output.2)
+                guard arguments.contains(/\d\.\d|\d\./) else { return String(match.output.0) }
+                let fixed = arguments.replacing(/(^|[,(\s])(-?\d+)(?=\s*(?:,|$))/) { "\($0.output.1)\($0.output.2).0" }
+                return "\(match.output.1)(\(fixed))"
             }
         }
 
@@ -602,7 +685,7 @@ enum WEShaderTranslator {
                 guard let declared = types[String(match.output.2)], declared.contains("vec") else { return whole }
                 let base = declared.hasPrefix("i") ? "ivec" : declared.hasPrefix("u") ? "uvec" : "vec"
                 let width = match.output.3.map { $0.count - 1 } ?? Int(String(declared.last!)) ?? 4
-                let value = match.output.5.trimmingCharacters(in: .whitespacesAndNewlines)
+                let value = truncateWideOperands(match.output.5.trimmingCharacters(in: .whitespacesAndNewlines), toWidth: width, types: types)
                 let target = width == 1 ? (base == "vec" ? "float" : base == "ivec" ? "int" : "uint") : "\(base)\(width)"
                 return "\(match.output.1)\(match.output.2)\(match.output.3 ?? "") \(match.output.4) we_\(target)(\(value));"
             }

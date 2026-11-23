@@ -119,6 +119,15 @@ struct WEShaderPreprocessor {
                     defines[name] = Self.stripLineComment(rest.trimmingCharacters(in: .whitespaces))
                 }
                 emittedMacros.append(name)
+                // `#define mask 1.0;` works in HLSL (a stray `;;`) but breaks once the macro sits
+                // inside an expression the translator wraps; drop the trailing `;` of plain values.
+                if !rest.hasPrefix("("), let value = defines[name], value.hasSuffix(";"),
+                   value.dropLast().allSatisfy({ $0.isLetter || $0.isNumber || " ._+-*/".contains($0) }) {
+                    let trimmed = String(value.dropLast()).trimmingCharacters(in: .whitespaces)
+                    defines[name] = trimmed
+                    output.append("#define \(name) \(trimmed)")
+                    continue
+                }
                 output.append(line)
             case "undef":
                 guard active else { continue }

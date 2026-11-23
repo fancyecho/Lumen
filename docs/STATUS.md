@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（第二次合并）
+> 最后更新：2026-11-23 · claude（T19）
 
 ## 1. 阶段进度
 
@@ -37,7 +37,7 @@
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
 | 加载耗时（着色器缓存命中） | 中位 0.39s，最大 1.4s |
 | GPU 帧时间（原生约 4.7MP） | 中位 4.7ms，p90 9.1ms，最大 14.8ms；`LUMEN_BENCH=1` 连续 60 帧：中位约 4.9ms、均值约 5.6ms |
-| 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
+| 着色器翻译 + 编译 | 310/316 通过（剩下 6 个是 3D 模型用的：fur4、chroma4、generic4、foliage4、volumetricsfront、puppettexturechannels） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
 | 单元测试（`Tools/test.sh unit`） | 18/18 通过 |
@@ -52,9 +52,9 @@
 | T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 已合并 `main`（`ca5ee70`）：MDL 网格、骨骼蒙皮、animationlayers、MDL 内嵌裁剪蒙版；Chisa 眼睛错位已修复。未做：`MORPHING` |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
-| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
+| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 分支 `claude/T05-lockscreen-rendered`：场景离屏录 30 秒、网页快照录 12 秒，末尾溶回首帧做无缝循环，再走原有一小时编辑列表。只缺真机安装验证（会改系统锁屏，需用户开启） |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
-| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | 另需核对 3436945972 的视差下拉框。项目把「关」保存为非零值 `2`，直接绑定缺少选项匹配条件 |
+| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 进行中 | gemini | 分支 `gemini/T07-timeline-and-layout`（工作树 `build/worktrees/gemini-T07`）：核查 3436945972 片头/时间线与视差下拉框（`2`=关），以及 3463692991 多画幅布局 |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
@@ -63,9 +63,11 @@
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`d8663af`）：组合层子图层画进父层缓冲，支持 `copybackground`；「清风」背景字列已正常 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
-| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
-| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
-| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
+| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 完成 | gpt | `gpt/T17-visual-regression`。CLI 对本轮渲染做 0–100 相似度排序，输出 JSON 与最差 N 张对比拼图。全库 75/75 配对成功，待提交 |
+| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 进行中 | gpt | `gpt/T18-scene-animation-control`，接入命名和属性绑定的时间线动画 |
+| T19 | 修复仍编译失败的 10 个工坊特效着色器（翻译层）：数组初始化、`clamp` 歧义、向量隐式截断、`sample`/`currentColor` 等未声明标识符、宏展开语法 | 场景 | 中 | 待验证 | claude | 分支 `claude/T19-shader-translation`：10 个工坊特效全部能编译（着色器 300→310/316），剩下 6 个都是 3D 用的（归 T08）。全库渲染与 main 对比无回归 |
+| T20 | 3347416586（海边摩托）画面上有大片白色「裂纹」图层，作者预览里没有：查明是哪层、为什么可见（可能是条件可见、遮罩或混合模式） | 场景 | 中 | 待认领 |  | T19 修好该场景的模糊特效后发现；对照 `build/tools/scenes/3347416586-ref.png` |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -79,6 +81,20 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 分支 `claude/T19-shader-translation`（未合并）
+
+- **做了什么**：修好仍编译失败的 10 个工坊特效着色器（影响 8 个场景，之前这些特效被静默跳过），全部是 `WEShaderTranslator`/`WEShaderPreprocessor` 的问题：
+  - **Swift 正则的 `\b` 默认按 Unicode 规则**，`fragment.x` 被当成一个词，保留字 `fragment` 没改名（test_shader）。保留字替换改用 `.wordBoundaryKind(.simple)`。其他用 `\b` 的正则检查过，不受影响。
+  - 数组整体赋值 `float a[N] = g_AudioSpectrum32Left;` 改成声明加逐元素拷贝循环（simple_gradient_audio_bar）。
+  - 一行多个变量 `vec3 color = CAST3(0.0), currentColor;` 只包裹第一个初值（bokeh、downsample）。
+  - HLSL 隐式截断：给向量赋值时，顶层的更宽向量操作数加 `.xy`/`.xyz`（pixelate、iris_movement、iris_follow_cursor）；函数参数里的不动，避免改变 `dot`/`length` 的含义。
+  - 名字含 texcoord 的 vec3 varying 也按原规则窄化（cutout_vignette）。
+  - `clamp(0, 0.15, x)` 这类调用里有浮点字面量时，整数字面量改成浮点（gaussian）；注意不误伤科学计数法。
+  - 预处理器去掉 `#define mask 1.0;` 这类简单宏末尾的分号（crt_screen）。
+- **验证**：`shaders` 300→310/316；`scenes` 75/75、0 洋红；全库用 main 和本分支各渲染一遍逐图对比，只有修好的场景有变化（另有两个场景本身每次渲染都不一样，属正常）；`unit` 18/18；build 通过。
+- **发现**：3347416586 修好模糊后，画面上仍有大片白色「裂纹」图层，作者预览里没有，已记为 T20。
+- **建议下一步**：剩下 6 个 3D 着色器缺 `PerformLighting_V1` 等光照函数，留给 T08。
 
 ### 2026-11-23 · claude · 第二次合并到 `main`
 
