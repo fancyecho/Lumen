@@ -16,26 +16,13 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
-    @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var loginError: String?
 
     var body: some View {
         @Bindable var settings = model.settings
         Form {
+            ApplicationSection()
+
             Section {
-                Toggle("Open Lumen when you log in", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in
-                        do {
-                            try LoginItem.setEnabled(enabled)
-                            loginError = nil
-                        } catch {
-                            loginError = error.localizedDescription
-                            launchAtLogin = LoginItem.isEnabled
-                        }
-                    }
-                if let loginError {
-                    Text(loginError).font(.caption).foregroundStyle(.red)
-                }
                 Picker("Show Dock icon", selection: $settings.dockIconMode) {
                     ForEach(DockIconMode.allCases) { Text($0.title).tag($0) }
                 }
@@ -61,6 +48,77 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct ApplicationSection: View {
+    @Environment(\.openURL) private var openURL
+    @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var loginRequiresApproval = LoginItem.requiresApproval
+    @State private var loginError: String?
+    @State private var checking = false
+    @State private var update: ReleaseUpdate?
+    @State private var showsUpdate = false
+    @State private var updateStatus: String?
+
+    var body: some View {
+        Section("Application") {
+            Toggle("Open Lumen when you log in", isOn: Binding(
+                get: { launchAtLogin },
+                set: { enabled in
+                    do {
+                        try LoginItem.setEnabled(enabled)
+                        loginError = nil
+                    } catch {
+                        loginError = error.localizedDescription
+                    }
+                    refreshLoginItem()
+                }
+            ))
+            if loginRequiresApproval {
+                Button("Approve in Login Items Settings") { LoginItem.openSettings() }
+            }
+            if let loginError {
+                Text(loginError).font(.caption).foregroundStyle(.red)
+            }
+            if let feed = ReleaseUpdate.feedURL {
+                Button(checking ? "Checking for Updates…" : "Check for Updates") {
+                    Task { await check(feed) }
+                }
+                .disabled(checking)
+                if let updateStatus {
+                    Text(updateStatus).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .onAppear(perform: refreshLoginItem)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLoginItem()
+        }
+        .alert("Lumen Update Available", isPresented: $showsUpdate, presenting: update) { release in
+            Button("Download") { openURL(release.downloadURL) }
+            Button("Later", role: .cancel) {}
+        } message: { release in
+            Text("Lumen \(release.version) is available.\n\n\(release.notes)")
+        }
+    }
+
+    private func refreshLoginItem() {
+        launchAtLogin = LoginItem.isEnabled
+        loginRequiresApproval = LoginItem.requiresApproval
+    }
+
+    private func check(_ feed: URL) async {
+        checking = true
+        updateStatus = nil
+        defer { checking = false }
+        do {
+            update = try await ReleaseUpdate.check(feed)
+            showsUpdate = update != nil
+            if update == nil { updateStatus = String(localized: "Lumen is up to date.") }
+        } catch {
+            updateStatus = error.localizedDescription
+        }
     }
 }
 

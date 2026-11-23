@@ -1,0 +1,2 @@
+LUMEN_CODE_SIGN_IDENTITY = -
+#include? "../build/LocalSigning.xcconfig"

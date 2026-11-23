@@ -60,6 +60,7 @@
 		66AD082C3B13A55B4C233150 /* SceneTextures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5FFE7FCECB1E90C2B81F6A /* SceneTextures.swift */; };
 		6E71C3E48E0DB59B7EA8FDEB /* StudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FDDF22F86AD5CE72F399C7 /* StudioView.swift */; };
 		6FBF643940644EA3228599D7 /* LumenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068315FBE2E5B50B64DDFC0C /* LumenApp.swift */; };
+		75B7F07E666788FEEF8FEEC2 /* ReleaseUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */; };
 		78A71F0685250309A6BD666A /* WallpaperEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A8A05087F50BE21AF67935 /* WallpaperEngine.swift */; };
 		7CBE090D868EF178B7100A54 /* SteamCMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */; };
 		80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */; };
@@ -68,6 +69,7 @@
 		86E4681068E5C9A08ED884EB /* SteamWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EBD669334D19DD57D76C59 /* SteamWire.swift */; };
 		86F5D8B6F5D84E2980501C2D /* SceneModelCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1867B46652CB381C804EC68D /* SceneModelCamera.swift */; };
 		876903FE7BFE88EC2651B345 /* HEVCTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */; };
+		87C8C3341D6CD5EB85A950B6 /* LocalDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62572C9F44F40DC74C6EC13E /* LocalDiagnostics.swift */; };
 		88A8740A7CB2B09CD3C8A152 /* OcclusionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77634FB81764312077A0248D /* OcclusionMonitor.swift */; };
 		8AF825C80293332BF272FA08 /* SteamCM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6360661D5A0519AA9ED8AE /* SteamCM.swift */; };
 		8C8D624ECF831DC0E516E073 /* SceneRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CC1C825DB34072D9717DC7 /* SceneRenderer.swift */; };
@@ -173,6 +175,7 @@
 		6124882AE9D574065F9AC0B5 /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
 		614C51B1F7D7F33E178EDA02 /* WEShaderPreprocessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WEShaderPreprocessorTests.swift; sourceTree = "<group>"; };
 		61C63CF187C4E862FB3FCB35 /* NowPlayingBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingBar.swift; sourceTree = "<group>"; };
+		62572C9F44F40DC74C6EC13E /* LocalDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDiagnostics.swift; sourceTree = "<group>"; };
 		66C351152D3506D1AA07C165 /* SceneText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneText.swift; sourceTree = "<group>"; };
 		69A8A05087F50BE21AF67935 /* WallpaperEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperEngine.swift; sourceTree = "<group>"; };
 		6CBB1CF76C83A7FA2D245B08 /* Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support.swift; sourceTree = "<group>"; };
@@ -219,6 +222,7 @@
 		C6F9E5B437570F9233341812 /* ShaderSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderSources.swift; sourceTree = "<group>"; };
 		C825817C6CEE7EE71AE14A76 /* SceneMaterials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneMaterials.swift; sourceTree = "<group>"; };
 		C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WEShaderPreprocessor.swift; sourceTree = "<group>"; };
+		CC9FCEE52D31009DEFC4A5F0 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		D608A66374789D934A1E4C0B /* WebRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRenderer.swift; sourceTree = "<group>"; };
 		D7768E168AD4BC9925BF5361 /* StillFrameSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StillFrameSync.swift; sourceTree = "<group>"; };
 		DD5FFE7FCECB1E90C2B81F6A /* SceneTextures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTextures.swift; sourceTree = "<group>"; };
@@ -231,6 +235,7 @@
 		EB190E6A2FEBDAF2CCB08258 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
 		F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
+		F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseUpdate.swift; sourceTree = "<group>"; };
 		F9A0E10328A0020DA6E66474 /* DesktopHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHost.swift; sourceTree = "<group>"; };
 		FB69623C5BC7D5FECD47DBA0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAnimationPlaybackTests.swift; sourceTree = "<group>"; };
@@ -324,6 +329,7 @@
 		3D6C9A073723A54628361039 = {
 			isa = PBXGroup;
 			children = (
+				BC478E0C75651E474237D1C9 /* Config */,
 				9A87E38572968714465B9877 /* Lumen */,
 				70C563EFC11B056FBA07C812 /* LumenTests */,
 				70C838A3277A6AAF3F2B0484 /* Products */,
@@ -381,7 +387,9 @@
 				B5D43EA9088D7EED4B38A683 /* AppDelegate.swift */,
 				9BF2D45011297ED2AEBCFD8D /* AppModel.swift */,
 				28F1B121E24A55D9A9616617 /* AppSettings.swift */,
+				62572C9F44F40DC74C6EC13E /* LocalDiagnostics.swift */,
 				068315FBE2E5B50B64DDFC0C /* LumenApp.swift */,
+				F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */,
 				4808C95144734787B81A2AA2 /* Router.swift */,
 			);
 			path = App;
@@ -504,6 +512,14 @@
 				01EBD669334D19DD57D76C59 /* SteamWire.swift */,
 			);
 			path = Native;
+			sourceTree = "<group>";
+		};
+		BC478E0C75651E474237D1C9 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				CC9FCEE52D31009DEFC4A5F0 /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		BFF892E2A252A6EDB95557EF /* Studio */ = {
@@ -718,6 +734,7 @@
 				9F810374568EBA6531C01EAB /* LibraryStore.swift in Sources */,
 				294CF658258C57E265A4AE83 /* LibraryView.swift in Sources */,
 				C086B78155FD8DD67DE526A4 /* LocalContentSchemeHandler.swift in Sources */,
+				87C8C3341D6CD5EB85A950B6 /* LocalDiagnostics.swift in Sources */,
 				ECCD6E52A68C7107D3F61D3E /* LockScreenManager.swift in Sources */,
 				1F665F06C76FA56F87A13A72 /* LockScreenSettings.swift in Sources */,
 				CACA3D9ACF2A0447F4E0A924 /* LockScreenVideoBuilder.swift in Sources */,
@@ -733,6 +750,7 @@
 				8416156A9FB7F4F76B0076BF /* PlaylistStore.swift in Sources */,
 				B724420C3553E117937464BF /* PlaylistsView.swift in Sources */,
 				D2DCE31CE32DDC35D600E83A /* PropertiesPanel.swift in Sources */,
+				75B7F07E666788FEEF8FEEC2 /* ReleaseUpdate.swift in Sources */,
 				5568F3F306A6C4C06989D167 /* RenderedLoopRecorder.swift in Sources */,
 				1AB6D9D828188A4141BC258A /* RootView.swift in Sources */,
 				6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */,
@@ -919,10 +937,11 @@
 		};
 		495B8F62CC5EA7D99DAD8F2D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CC9FCEE52D31009DEFC4A5F0 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "$(LUMEN_CODE_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -939,6 +958,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;
 				SDKROOT = macosx;
@@ -1013,10 +1033,11 @@
 		};
 		DB69D605D392822F88A42FB2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CC9FCEE52D31009DEFC4A5F0 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "$(LUMEN_CODE_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1033,6 +1054,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;
 				SDKROOT = macosx;
