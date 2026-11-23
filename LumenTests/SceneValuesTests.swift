@@ -56,4 +56,53 @@ final class SceneValuesTests: XCTestCase {
         let disabled = SceneValues(properties: ["enabled": .bool(false)])
         XCTAssertEqual(disabled.float(["user": "enabled", "value": 0.2], default: 1), 0)
     }
+
+    func testTwoOptionOnOffComboMapsOffOptionToFalseForDirectBooleanBinding() {
+        let projectJSON: [String: Any] = [
+            "general": [
+                "properties": [
+                    "parallax": [
+                        "type": "combo",
+                        "value": "1",
+                        "options": [
+                            ["label": "开", "value": "1"],
+                            ["label": "关", "value": "2"],
+                        ],
+                    ],
+                    "theme": [
+                        "type": "combo",
+                        "value": "1",
+                        "options": [
+                            ["label": "Day", "value": "1"],
+                            ["label": "Night", "value": "2"],
+                        ],
+                    ],
+                ],
+            ],
+        ]
+        let comboOff = SceneValues.comboOffValues(from: projectJSON)
+        XCTAssertEqual(comboOff["parallax"], ["2"])
+        XCTAssertNil(comboOff["theme"])
+
+        let onValues = SceneValues(properties: ["parallax": .string("1"), "theme": .string("2")], comboOffValues: comboOff)
+        let offValues = SceneValues(properties: ["parallax": .string("2"), "theme": .string("2")], comboOffValues: comboOff)
+        let parallaxBinding: [String: Any] = ["user": "parallax", "value": true]
+        let themeBinding: [String: Any] = ["user": "theme", "value": true]
+
+        XCTAssertTrue(onValues.bool(parallaxBinding, default: false))
+        XCTAssertFalse(offValues.bool(parallaxBinding, default: true))
+        XCTAssertTrue(offValues.bool(themeBinding, default: false))
+    }
+
+    func testUnwrapsNestedUserPropertyFallbacks() {
+        let nested: [String: Any] = [
+            "user": "missingOuter",
+            "value": ["user": "innerProp", "value": -4] as [String: Any],
+        ]
+        let withInner = SceneValues(properties: ["innerProp": .number(42)])
+        let withoutAny = SceneValues(properties: [:])
+
+        XCTAssertEqual(withInner.float(nested, default: 0), 42)
+        XCTAssertEqual(withoutAny.float(nested, default: 0), -4)
+    }
 }

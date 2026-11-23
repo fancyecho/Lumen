@@ -284,6 +284,18 @@ final class SceneScriptRuntime: @unchecked Sendable {
     };
 
     var __layers = {}, __byName = {}, __order = [], __scripts = [], __touched = {}, __canvas = new Vec2(1920, 1080);
+    var __timers = [], __timerSeq = 0;
+    function __setTimeout(fn, ms) {
+      if (typeof fn !== 'function') return 0;
+      var id = ++__timerSeq;
+      __timers.push({ id: id, fn: fn, due: engine.runtime + Math.max(0, (+ms || 0) / 1000) });
+      return id;
+    }
+    function __clearTimeout(id) {
+      __timers = __timers.filter(function (t) { return t.id !== id; });
+    }
+    var setTimeout = __setTimeout;
+    var clearTimeout = __clearTimeout;
     function __vec(a) { return a ? new Vec3(a[0], a[1], a[2]) : new Vec3(0, 0, 0); }
     function __makeLayer(d) {
       var layer = {
@@ -313,7 +325,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
         __audioBuffers.push(b);
         return b;
       },
-      registerAsset: function () { return {}; }, openUserShortcut: function () {}, setTimeout: function () {}, getScreenResolution: function () { return this.screenResolution; }
+      registerAsset: function () { return {}; }, openUserShortcut: function () {}, setTimeout: __setTimeout, clearTimeout: __clearTimeout, getScreenResolution: function () { return this.screenResolution; }
     };
     var input = { cursorWorldPosition: new Vec3(0, 0, 0), cursorScreenPosition: new Vec2(0, 0), cursorLeftDown: false };
     var thisScene = {
@@ -321,7 +333,23 @@ final class SceneScriptRuntime: @unchecked Sendable {
       getLayerCount: function () { return __order.length; },
       enumerateLayers: function () { return __order.map(__touch); },
       getLayerIndex: function (layer) { return __order.indexOf(layer); },
-      sortLayer: function () {}, createLayer: function () { return __makeLayer({ id: -1, name: '', visible: false, alpha: 0 }); }, destroyLayer: function () {},
+      sortLayer: function () {}, createLayer: function () { return __makeLayer({ id: -1, name: '', visible: false, alpha: 0 }); },
+      destroyLayer: function (key) {
+        var layer = typeof key === 'string' ? __byName[key] : (typeof key === 'number' ? __order[key] : key);
+        if (!layer) return;
+        layer.visible = false;
+        layer.alpha = 0;
+        __touch(layer);
+        delete __layers[layer.id];
+        if (__byName[layer.name] === layer) {
+          delete __byName[layer.name];
+          for (var i = 0; i < __order.length; i++) {
+            if (__order[i] !== layer && __order[i].name === layer.name) { __byName[layer.name] = __order[i]; break; }
+          }
+        }
+        var idx = __order.indexOf(layer);
+        if (idx >= 0) __order.splice(idx, 1);
+      },
       getCameraTransforms: function () { return { eye: new Vec3(__canvas.x / 2, __canvas.y / 2, 1000), center: new Vec3(__canvas.x / 2, __canvas.y / 2, 0), up: new Vec3(0, 1, 0) }; },
       clearColor: new Vec3(0, 0, 0), bloom: false
     };
@@ -413,6 +441,15 @@ final class SceneScriptRuntime: @unchecked Sendable {
     function __frame(time, delta, daytime, cursor, down, screen, cursorEvents, audio) {
       if (audio) __audio(audio);
       engine.runtime = time; engine.frametime = delta; engine.timeOfDay = daytime;
+      if (__timers.length > 0) {
+        var ready = [], pending = [];
+        for (var ti = 0; ti < __timers.length; ti++) {
+          if (__timers[ti].due <= time) ready.push(__timers[ti]);
+          else pending.push(__timers[ti]);
+        }
+        __timers = pending;
+        for (var ri = 0; ri < ready.length; ri++) { try { ready[ri].fn(); } catch (e) {} }
+      }
       if (cursorEvents) __dispatchCursorEvents(cursorEvents);
       if (cursor) input.cursorWorldPosition = new Vec3(cursor[0], cursor[1], 0);
       if (screen) input.cursorScreenPosition = new Vec2(screen[0], screen[1]);

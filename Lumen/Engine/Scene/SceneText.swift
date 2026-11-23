@@ -19,14 +19,20 @@ final class SceneTextTexture: DynamicTexture, @unchecked Sendable {
         var vertical: String
         var padding: SIMD2<Float>
         var background: SIMD4<Float>?
-        /// Extra width on each side for lines longer than the box (Wallpaper Engine doesn't wrap).
+        /// Extra width on each side for unwrapped lines longer than the box.
         var overflow: Float = 0
+        /// Optional maximum line width in canvas units (`limitwidth` / `maxwidth`).
+        var maxWidth: Float?
+        /// Optional maximum number of rows (`limitrows` / `maxrows`).
+        var maxRows: Int?
+        /// Append `…` when truncating rows (`limituseellipsis`).
+        var ellipsis: Bool = false
     }
 
     let pixelSize: SIMD2<Int>
     private let device: MTLDevice
     private let style: Style
-    /// Canvas units to texture pixels.
+    /// Canvas units to texture pixels (clamped consistently with `pixelSize`).
     private let scale: Float
     private var current: MTLTexture?
     private(set) var text: String
@@ -36,8 +42,10 @@ final class SceneTextTexture: DynamicTexture, @unchecked Sendable {
         self.device = device
         self.text = text
         self.style = style
-        self.scale = scale
-        pixelSize = SIMD2(max(1, min(4096, Int(size.x * scale))), max(1, min(4096, Int(size.y * scale))))
+        let clampedScale = min(scale, 4096 / max(size.x, 1), 4096 / max(size.y, 1))
+        self.scale = clampedScale
+        pixelSize = SIMD2(max(1, min(4096, Int((size.x * clampedScale).rounded()))),
+                          max(1, min(4096, Int((size.y * clampedScale).rounded()))))
         render()
     }
 
@@ -68,18 +76,21 @@ final class SceneTextTexture: DynamicTexture, @unchecked Sendable {
                 context.setFillColor(CGColor(srgbRed: CGFloat(background.x), green: CGFloat(background.y), blue: CGFloat(background.z), alpha: CGFloat(background.w)))
                 context.fill(CGRect(x: 0, y: 0, width: width, height: height))
             }
-            // The text box sits inside the padding; Wallpaper Engine doesn't wrap, so lines
-            // longer than the box are shrunk to fit rather than cut off.
+            // The text box sits inside the padding; wrap to `maxWidth` when `limitwidth` is set,
+            // otherwise shrink to fit the available width/height so lines aren't clipped.
             let padding = CGSize(width: CGFloat(style.padding.x * scale), height: CGFloat(style.padding.y * scale))
             let extra = CGFloat(style.overflow * scale)
             let box = CGRect(x: padding.width + extra, y: padding.height,
                              width: max(1, CGFloat(width) - (padding.width + extra) * 2), height: max(1, CGFloat(height) - padding.height * 2))
+            let wrapWidth = style.maxWidth.map { min(CGFloat($0 * scale), box.width) }
             var fontSize = CTFontGetSize(style.font) * CGFloat(scale)
-            var layout = Self.layout(text, font: CTFontCreateCopyWithAttributes(style.font, fontSize, nil, nil))
+            var layout = Self.layout(text, font: CTFontCreateCopyWithAttributes(style.font, fontSize, nil, nil),
+                                     maxWidth: wrapWidth, maxRows: style.maxRows, ellipsis: style.ellipsis)
             let overflow = max(layout.size.width / (box.width + extra * 2), layout.size.height / (box.height + padding.height * 2))
             if overflow > 1 {
                 fontSize /= overflow
-                layout = Self.layout(text, font: CTFontCreateCopyWithAttributes(style.font, fontSize, nil, nil))
+                layout = Self.layout(text, font: CTFontCreateCopyWithAttributes(style.font, fontSize, nil, nil),
+                                     maxWidth: wrapWidth, maxRows: style.maxRows, ellipsis: style.ellipsis)
             }
             var y: CGFloat
             switch style.vertical {
@@ -132,7 +143,7 @@ final class SceneTextTexture: DynamicTexture, @unchecked Sendable {
         var leading: CGFloat
     }
 
-    private static func layout(_ text: String, font: CTFont) -> Layout {
+    private static func layout(_ text: String, font: CTFont, maxWidth: CGFloat? = nil, maxRows: Int? = nil, ellipsis: Bool = false) -> Layout {
         let attributes: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
             NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
@@ -140,12 +151,47 @@ final class SceneTextTexture: DynamicTexture, @unchecked Sendable {
         let ascent = CTFontGetAscent(font), descent = CTFontGetDescent(font), leading = max(CTFontGetLeading(font), 0)
         var lines: [(CTLine, CGFloat)] = []
         var width: CGFloat = 0
+        var truncated = false
         for part in text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: part, attributes: attributes))
-            let lineWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-            width = max(width, lineWidth)
-            lines.append((line, lineWidth))
+            if let limit = maxRows, lines.count >= limit {
+                truncated = true
+                break
+            }
+            if let maxWidth, maxWidth > 0, !part.isEmpty {
+                let attr = NSAttributedString(string: part, attributes: attributes)
+                let typesetter = CTTypesetterCreateWithAttributedString(attr)
+                let total = attr.length
+                var offset = 0
+                while offset < total {
+                    if let limit = maxRows, lines.count >= limit {
+                        truncated = true
+                        break
+                    }
+                    let count = CTTypesetterSuggestLineBreak(typesetter, offset, Double(maxWidth))
+                    let step = max(1, count)
+                    let isLastAllowed = maxRows.map { lines.count + 1 == $0 } ?? false
+                    let hasMore = offset + step < total
+                    let line: CTLine
+                    if ellipsis && isLastAllowed && hasMore {
+                        let sub = (part as NSString).substring(with: NSRange(location: offset, length: step))
+                            .trimmingCharacters(in: .whitespaces) + "…"
+                        line = CTLineCreateWithAttributedString(NSAttributedString(string: sub, attributes: attributes))
+                    } else {
+                        line = CTTypesetterCreateLine(typesetter, CFRange(location: offset, length: step))
+                    }
+                    let lineWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                    width = max(width, lineWidth)
+                    lines.append((line, lineWidth))
+                    offset += step
+                }
+            } else {
+                let line = CTLineCreateWithAttributedString(NSAttributedString(string: part, attributes: attributes))
+                let lineWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                width = max(width, lineWidth)
+                lines.append((line, lineWidth))
+            }
         }
+        _ = truncated
         let height = CGFloat(lines.count) * (ascent + descent) + CGFloat(max(lines.count - 1, 0)) * leading
         return Layout(lines: lines, size: CGSize(width: width, height: height), ascent: ascent, descent: descent, leading: leading)
     }
