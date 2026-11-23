@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（重新均衡分工：Gemini T28→T12，GPT T29→T26→T27→T11）
+> 最后更新：2026-11-23 · claude（收尾阶段全部合并，发布 0.1.0）
 
 ## 1. 阶段进度
 
@@ -11,9 +11,9 @@
 | 2 | 锁屏视频、画面裁切（framing）、遮挡阈值、简体中文本地化 | ✅ 已提交（`509c56d`、`0af720e`） |
 | 3 | Web 壁纸（本地 HTML / 网址，WE web 项目属性 API） | ✅ 已提交（`23d33aa`） |
 | 4 | Wallpaper Engine 场景壁纸 + Steam 创意工坊下载 | ✅ 完成（木偶、裁剪蒙版、组合层、音频、鼠标事件、3D 光照等已合并；Steam 扫码登录和下载用户实测通过） |
-| 6 | **通用问题与可用性**：锁屏免手动、鼠标输入、原生 Steam 扫码登录、通用还原度 | ✅ 已合并（`a966ee5`），用户实测基本正常；剩 T28/T29 两个共性问题 |
-| 7 | 发布准备与能耗：T26、T27（暂不公证，用自签名证书 + DMG） | 🔵 进行中（gpt），计划见 [`PLAN.md`](PLAN.md) |
-| 5 | 全局 UI 打磨 + 补翻译：T12（gemini，分两批）、T11（gpt，跟批次翻译） | 🔵 进行中，计划见 [`PLAN.md`](PLAN.md) |
+| 6 | **通用问题与可用性**：锁屏免手动、鼠标输入、原生 Steam 扫码登录、通用还原度 | ✅ 完成（含 T28/T29） |
+| 7 | 发布准备与能耗：T26、T27（暂不公证，用自签名证书 + DMG） | ✅ 完成，0.1.0 已打包发布到 GitHub 私有仓库 |
+| 5 | 全局 UI 打磨 + 补翻译：T12、T11 | ✅ 完成 |
 
 ## 2. 功能现状
 
@@ -32,17 +32,17 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-23 合并 T17/T21/T22/T23/T25 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景）
+**回归基线**（2026-11-23 收尾阶段全部合并后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景）
 
 | 项目 | 基线 |
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
-| 加载耗时（着色器缓存命中） | 中位 0.46s，最大 1.4s |
-| GPU 帧时间（原生约 4.7MP） | 中位 4.3ms，p90 9.5ms，最大约 16ms（3808922316 全量跑时偶发 25.8ms，单独重跑 15–16ms，属测量噪声） |
+| 加载耗时（着色器缓存命中） | 中位约 0.45s，最大约 1.4s（与构建并行跑时会升到 0.7s / 2.8s） |
+| GPU 帧时间（原生约 4.7MP） | 中位 4.7ms，p90 11.3ms，最大 17.7ms（Elisa 3808922316）；桌面上由 T26 按实测自动降档 |
 | 着色器翻译 + 编译 | 316/316 通过 |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 40/40 通过 |
+| 单元测试（`Tools/test.sh unit`） | 42/42 通过 |
 
 ## 3. 任务板
 
@@ -60,8 +60,8 @@
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`c0a0e7f`）。`gpt/T08-scene-lighting`。静态单网格、点光照与正交点光体积通过应用预览和真实桌面验证，已提交 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 完成 | 用户 | 用户本人扫码登录并下载成功（T23 原生客户端） |
-| T11 | 补全简体中文翻译（T12 改动后的全部界面，及 Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 中 | 待开始 | gpt | 已分配给 gpt：T12 每合并一批就翻译那一批，T27 之后做。见 `PLAN.md` |
-| T12 | 全局 UI 打磨：参考 Wallper 的质感，颜色和布局更高级；先出 `docs/DESIGN.md`，分两批交付并附前后截图 | UI | 高 | 待开始 | gemini | 已分配，T28 之后做。见 `PLAN.md` |
+| T11 | 补全简体中文翻译（T12 改动后的全部界面，及 Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 中 | 完成 | claude | gemini 额度用尽、gpt 未做，由 claude 接手：补齐 158 条 zh-Hans（Steam、创意工坊、场景、更新、锁屏等），另加 `InfoPlist.xcstrings` 翻译系统音频授权提示。已合并 `main` |
+| T12 | 全局 UI 打磨：参考 Wallper 的质感，颜色和布局更高级；先出 `docs/DESIGN.md`，分两批交付并附前后截图 | UI | 高 | 完成 | gemini / claude | 第一批 gemini（`docs/DESIGN.md`、Theme、主窗口各页）；第二批 claude（播放列表、创作及编辑器、菜单栏面板、添加网页、锁屏预览改用 Theme，抽出 `EmptyStatePanel`，卡片补辅助功能动作）。已合并 `main` |
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`d8663af`）：组合层子图层画进父层缓冲，支持 `copybackground`；「清风」背景字列已正常 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
@@ -74,10 +74,10 @@
 | T22 | 鼠标输入管线：位置改为轮询、按需开启；补 `g_EffectTextureProjectionMatrix`；核对坐标系 | 场景/Web | 高 | 完成 | gemini | 已合并 `main`（`0eba484`）：只在有交互壁纸播放时按帧率轮询（≤60Hz，静止时跳过）；补特效投影矩阵及逆矩阵，`g_ParallaxPosition` 改为 [0,1] 居中。用户实测正常；粒子控制点跟随鼠标另见 T28 |
 | T23 | 原生 Steam 客户端：扫码登录（钥匙串存 token）+ CM/CDN 下载创意工坊；先改好 SteamCMD 的错误分类和重试 | Steam | 高 | 完成 | gpt | 已合并 `main`（`72b575b`）：二维码登录、CM/CDN 下载与校验、SteamCMD 错误分类和重试。用户实测登录和下载成功 |
 | T25 | 通用场景还原度：用 T17 报告和「不支持特性统计」找影响面最大的共性问题，逐类修 | 场景 | 中 | 完成 | gemini | 已合并 `main`（`6135397`）：离屏/组合层 Z 深度映射、`rope`/`ropetrail` 粒子、场景全局 bloom、最后一个着色器。着色器 316/316 |
-| T26 | 能耗与稳定：按 GPU 实测自适应分辨率、加载失败与内存压力降级、长时间播放稳定性检查 | 引擎 | 中 | 待开始 | gpt | 已分配，T29 之后做。见 `PLAN.md` |
-| T27 | 发布准备（暂不公证）：自签名证书固定签名身份、DMG 打包脚本、安装说明、开机启动、检查更新、本地崩溃记录 | 发布 | 中 | 待开始 | gpt | 已分配，T26 之后做。用户没有开发者账号；证书脚本由用户本人运行。见 `PLAN.md` |
-| T28 | 粒子控制点跟随鼠标：发射器、`mapsequencearoundcontrolpoint`/`betweencontrolpoints`、`vortex` 等以控制点为中心；测试工具支持模拟指针 | 场景 | 高 | 待开始 | gemini | 已分配给 gemini，先做（粒子和指针代码是它在 T22/T25 写的）。32 个场景的粒子带鼠标控制点；用户反馈「战双帕弥什 赛琳娜」3516294127 鼠标樱花不跟随。见 `PLAN.md` |
-| T29 | 父层 alpha 不再乘到子图层（只传可见性和变换），用 T17 打分验证 | 场景 | 高 | 待开始 | gpt | 已分配，先做。「清风」3420988161 印章的父层 alpha 为 0；全库约 10 个场景用透明容器。顺带给 T17 工具加前后两次渲染对比。见 `PLAN.md` |
+| T26 | 能耗与稳定：按 GPU 实测自适应分辨率、加载失败与内存压力降级、长时间播放稳定性检查 | 引擎 | 中 | 完成 | gpt | 已合并 `main`（`e92c19a`）：按实测 GPU 时间自动降档、内存压力与加载失败降级、`Tools/test.sh stability` |
+| T27 | 发布准备（暂不公证）：自签名证书固定签名身份、DMG 打包脚本、安装说明、开机启动、检查更新、本地崩溃记录 | 发布 | 中 | 完成 | gpt | 已合并 `main`（`1915d89`）：`Tools/make-signing-identity.sh`（用户本人运行）、`Tools/release.sh`、`docs/INSTALL.md`、开机启动、检查更新、MetricKit 本地记录。0.1.0 DMG 为临时签名 |
+| T28 | 粒子控制点跟随鼠标：发射器、`mapsequencearoundcontrolpoint`/`betweencontrolpoints`、`vortex` 等以控制点为中心；测试工具支持模拟指针 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`22b3a36`）：控制点统一解析（跟随鼠标/世界空间/父级链接）、发射器跟随控制点、`mapsequence*`、`vortex` 控制点；`LUMEN_POINTER` 模拟指针 |
+| T29 | 父层 alpha 不再乘到子图层（只传可见性和变换），用 T17 打分验证 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`c5afad0`）：普通父层只传可见性和变换；「清风」印章恢复；`Tools/test.sh visual diff` 前后对比 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -91,6 +91,75 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 收尾：合并全部任务、接手 T12 第二批与 T11、发布 0.1.0
+
+- **合并**：
+  - 先在各自分支提交未提交的改动：T29 `c5afad0`、T28 `22b3a36`、T26 `e92c19a`、T27 `1915d89`、T12 第一批 `0ce75b2`。
+  - 依次合并到 `main`。`project.pbxproj` 冲突按约定重新 `xcodegen generate`。`WallpaperDetailView.swift` 冲突两边都保留：T26 的降级提示加上 gemini 的新按钮组。
+- **T12 第二批**（gemini 额度用尽，claude 接手，分支 `claude/T12-ui-polish-batch2`）：
+  - 播放列表、创作页和着色器编辑器、菜单栏面板、添加网页弹窗、锁屏预览全部改用 `Theme` 令牌，并删除旧别名。
+  - 新增 `EmptyStatePanel`，资源库和播放列表的空状态共用。新增 `Surface.recessed` 和 `TypeScale.panelTitle` 两个令牌。
+  - 修了一个辅助功能问题：壁纸卡片、播放列表卡片、首页显示器卡片原来只响应鼠标点击，VoiceOver 无法打开，现在补了辅助功能动作。
+- **T11**：`xcodebuild -exportLocalizations` 同步字符串目录后，补齐 158 条 zh-Hans，原有译文无一丢失。新增 `InfoPlist.xcstrings` 翻译系统音频授权提示。术语：Steam Guard → Steam 令牌，Workshop → 创意工坊，引号用「」。
+- **验证**：build 通过；`unit` 42/42；`shaders` 316/316；`scenes` 75/75、0 洋红；`steam` 通过；中文界面逐页截图，无截断。
+- **发布**：`Tools/release.sh` 生成 0.1.0 通用版 DMG（arm64 + x86_64，临时签名），已推送并发布到 GitHub 私有仓库。用户运行 `Tools/make-signing-identity.sh` 之后，再打的包会改用固定的本地证书签名。
+- **后续可做**：用户运行证书脚本后验证权限跨构建保留；真实 MetricKit 回调；有开发者账号后改为 Developer ID + 公证 + Sparkle。
+
+### 2026-11-23 · gpt · `gpt/T26-scene-adaptive`（待验证）
+
+- 以实机 `DesktopHost` 临时可见区域、原生 2940×1912 drawable 和 30fps 播放上限校准阈值。轻场景 GPU p50 约 2.4ms、实测 30fps，重场景约 22–27ms 开始掉帧。以帧间隔的 65% 为阈值，8 个稀疏样本有 6 个超限才减小像素预算，最多三次。按约每秒四次读取已有 Metal 时间戳，未加 GPU pass；重建时尽量延续当前画面，仅内存压力时先释放旧资源。
+- Elisa 的实际渲染尺寸 3266×1837→2771×1559，轻场景 1700×956 保持原档、继续 30fps。重场景的短测未证实能维持 30fps。模拟内存压力复现暂停期间延迟重载、恢复后低分辨率加载、预算耗尽显示预览图。结束后撤销临时窗口，系统壁纸未变。
+- Debug 构建、42/42 XCTest、75/75 场景、0 洋红、316/316 着色器通过。`Tools/test.sh stability 3808922316 5` 连续绘制 6,992 帧，内存 −0.3 MiB、Metal 分配不变、末段 GPU p50 +5.23ms（在 25% 容差内）。中途重叠的桌面探针带来一次 GPU 争用尖峰，内存始终稳定。日志在 `build/tools/stability.log`。
+- T11 依赖 T12 每批实际合并。已检查 main，第一批仍在 Gemini 工作树。
+
+### 2026-11-23 · gpt · `gpt/T27-local-release`（待验证）
+
+- XcodeGen 为 Debug/Release 自动解析 `Lumen Local Signing`，支持指定指纹和临时签名。独立钥匙串验证两个 Xcode 构建的证书指定要求一致，并验证同一证书签署的两个 Lumen 版本要求一致。测试钥匙串已移除，搜索列表复原。
+- `Tools/release.sh` 从项目版本生成双架构 DMG、Applications 链接和 SHA-256。Debug 构建通过，Release DMG 已只读挂载验证签名、版本、内置空更新源和 arm64/x86_64。
+- General 的 Application 分区沿用 `SMAppService` 登录启动，补上系统批准入口；可选 HTTPS 版本源只在用户点击时请求。MetricKit 崩溃和卡顿报告保存在本地。版本解析和日志去重、保留上限已复测。
+- 用户本人运行证书脚本后验收系统音频权限跨构建保留；系统生成的真实 MetricKit 崩溃/卡顿回调待验证。后续公证需切换 Developer ID Application、Hardened Runtime 和安全时间戳，再通过 notarytool 提交并 stapler 装订。
+
+### 2026-11-23 · gpt · `gpt/T29-parent-opacity`（复核）
+
+- 在实机 `DesktopHost` 的原生 Metal 呈现帧确认《清风·兰亭》红印章。桌面窗口完全被遮挡时，临时提高测试窗口层级并保留 2940×1912 drawable，结束后撤销窗口，系统壁纸未变。前后差异仍仅在印章区域；作者预览 67.48→67.25，保留数值验收差异。
+
+### 2026-11-23 · gpt · `gpt/T27-local-release`（进行中）
+
+- T26 实现及 Debug/XCTest 验证完成，剩场景回归和桌面校准。认领 T27：现有登录启动控件移入 General 的应用分区，同区加入可选更新检查，其他设置 UI 交由 T12。加入项目级签名配置、DMG 和本地 MetricKit 日志。
+
+### 2026-11-23 · gemini · `gemini/T28-particle-control-points`（待验证，未提交，工作树 `build/worktrees/gemini-T28`）
+
+- **做了什么**：
+  - 统一粒子控制点解析（`ParticleSystem.controlPointPosition(_:)`）：支持 `flags & 1`（锁定鼠标，移出桌面保留 `lastPointer`、从未收到指针时退回 `offset`）、`flags & 2`（世界/画布空间坐标经 `worldToLocal` 转换，涵盖 `Bird.json`/`thunderbolt.json`）、`flags & 4`（链接父系统控制点 `parentcontrolpoint`），并解析 `instanceoverride.controlpoint0..7` 覆盖根系统控制点偏移。
+  - 发射器 `Emitter.controlPoint`（默认 0）在 `spawn` 时以 `controlPointPosition(cp) + emitter.origin` 生成新粒子，已生成粒子保持原位形成拖尾；同步修复 `.rope` 渲染器淘汰过期粒子时用保序 `remove(at:)` 替代 `swapAt`，避免拖尾超过生命周期后头尾折返乱连。
+  - 实现 `mapsequencearoundcontrolpoint`（含 `count`/`axis`/`speedmin`/`speedmax`/`bounds`/`limitbehavior` 顺序排布与绕轴速度旋转）与 `mapsequencebetweencontrolpoints`（含 `arcamount` 弧度）；`vortex` 支持 `controlpoint` 中心与 `flags & 1` 环形距离；补 `reducemovementnearcontrolpoint`。
+  - `SceneInstance` 传入带视差补偿的 `pointerCanvas` 给粒子层；`SceneLoader` 预热时传入 `localModel.inverse`。
+  - `Tools/SceneHarness` 新增 `LUMEN_POINTER`（单点 `0.3,0.6` 或分号分隔轨迹 `0.2,0.7;0.8,0.3`）与 `LUMEN_FRAMES` 环境变量，并更新 `docs/TESTING.md`。
+- **CPU/GPU/能耗代价**：沿用 T22 既有 `usesPointer` 按需轮询机制（无鼠标粒子时不开启轮询），控制点解析为每帧/每粒子 O(1) 向量运算，无额外 GPU pass、内存分配或能耗增加。
+- **验证结果**：
+  - `Tools/test.sh build`：Debug 构建通过。
+  - `Tools/test.sh unit`：40/40 通过。
+  - `Tools/test.sh shaders`：316/316 通过。
+  - `Tools/test.sh scenes`：75/75 OK，0 FAIL，0 洋红；`Tools/test.sh visual 10` 75/75 全部计分，无退化。
+  - `LUMEN_POINTER` 抽查：赛琳娜 `3516294127` 定点 `0.75,0.25` 在右上光标处生成 5 瓣旋绕樱花、轨迹 `0.2,0.7;0.8,0.3` 留下平滑斜向樱花尾迹；`3373818743` / `1723129994`（`.rope` 鼠标拖尾）45 帧（1.5s > 1s 寿命）轨迹连续无折返；`3593194513`、`3615984066` 画面正常。
+- **未做 / 下一步**：等待审核与合并 `gemini/T28-particle-control-points`；按分工下一步进入 **T12 第一批**（全局 UI 打磨：`docs/DESIGN.md` + `Theme.swift` + 主窗口核心页面 + 前后截图）。
+
+### 2026-11-23 · gpt · `gpt/T26-scene-adaptive`（进行中）
+
+- 认领 T26。先在桌面窗口测量 30fps 实际 GPU 用时，再实现预算下调和加载/内存降级。详情页通过 `WallpaperEngine` 查询当前场景的降级说明，沿用现有渲染器接口。
+
+### 2026-11-23 · gpt · `gpt/T29-parent-opacity`（待验证）
+
+- 普通父层只传递可见性，世界变换和骨骼附着继续沿用同一条父链。透明度留在各图层，组合层仍在输出时应用一次。没有新增逐帧计算或 GPU pass。
+- `Tools/test.sh visual diff <before> <after> [N]` 输出两轮渲染的全分辨率 RGB 像素差、跳过原因及分页拼图。原作者预览评分入口继续可用。保存的同一批次自比 75/75 零差异，真实前后批次 75/75 配对、0 跳过。
+- Debug 构建、40/40 XCTest、316/316 着色器通过。全库 75/75 成功、0 洋红。Metal 夹具验证零和部分父层 alpha、子层自有 alpha、父层位移、隐藏链、`disablepropagation`、组合层及隐藏合成源。
+- 《清风·兰亭》确认恢复作者预览中的红印章，实际变化的 12,994 像素全在印章区域。作者预览为 224×224 方形且印章显得更小、更淡，全图相似度 67.48→67.25。复测 Elisa 与 Chisa 的变化集中于拆分阴影和日期，分数降幅 ≤0.03。檐花穗影重复单版本渲染也有动画差异，另可见透明父层下原有控件恢复。原计划的「分数不降」尚未全部满足，保留实际结果供画面验收。
+- 串行全库对照的加载中位 0.48→0.43s，GPU 单帧中位 4.57→5.13ms。连续 60 帧对照中，《清风》8.67→8.64ms、Elisa 15.16→15.36ms、檐花穗影 7.23→7.57ms。报告、逐帧对照和复测日志都在工作树的 `build/tools`。
+
+### 2026-11-23 · gpt · `gpt/T29-parent-opacity`（进行中）
+
+- 基于 `main` 的 `5521c25`。核对父层可见性、变换与组的合成透明度，新增 T17 的前后帧像素对比。
 
 ### 2026-11-23 · claude · 重新均衡分工（未改代码）
 
