@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00E0FF6C6723054C50C3E1C2 /* AerialSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A71DA2F8C3EB8B623DB6D70 /* AerialSystemTests.swift */; };
 		0666F51921E870528722F391 /* AmbientBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796508CF82781CECA422D840 /* AmbientBackdrop.swift */; };
 		0668915019BC6C699AFCCAB4 /* TexDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 278957CFDFFB2E28ADEF41FD /* TexDecoder.swift */; };
 		06CE6FFEFDE3B9E8EC1560F3 /* BuiltinShaders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C932D96CA0C5C997BC0B7E5 /* BuiltinShaders.swift */; };
@@ -47,6 +48,7 @@
 		5568F3F306A6C4C06989D167 /* RenderedLoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BF80198BCD676AF7550277 /* RenderedLoopRecorder.swift */; };
 		59FEDCEE4CD7689EEE71D03F /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBB1CF76C83A7FA2D245B08 /* Support.swift */; };
 		5B6C6632EE1ED8DEDD0B0743 /* SceneAssetsLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B8E58D600AAAD5BD271D584 /* SceneAssetsLocator.swift */; };
+		5D3BAFE9BD1C2C93ABB500D6 /* AerialSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF74219320866283D5E10984 /* AerialSystem.swift */; };
 		6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4808C95144734787B81A2AA2 /* Router.swift */; };
 		6490A46F3E469AD0B59DBD49 /* SteamCMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */; };
 		64E35083EB6146B4B365E15A /* SceneScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BAE6B222A45E9B85E7049C8 /* SceneScript.swift */; };
@@ -131,6 +133,7 @@
 		260EDEBFB0FCA65EBDFB3C30 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		278957CFDFFB2E28ADEF41FD /* TexDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TexDecoder.swift; sourceTree = "<group>"; };
 		28F1B121E24A55D9A9616617 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		2A71DA2F8C3EB8B623DB6D70 /* AerialSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialSystemTests.swift; sourceTree = "<group>"; };
 		2B930FAE153266BF7B0C5F21 /* WESceneShader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WESceneShader.swift; sourceTree = "<group>"; };
 		337A3269E47126DC851115EE /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35A6A1FE4907B4DE10F11315 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -374,6 +377,7 @@
 		70C563EFC11B056FBA07C812 /* LumenTests */ = {
 			isa = PBXGroup;
 			children = (
+				2A71DA2F8C3EB8B623DB6D70 /* AerialSystemTests.swift */,
 				8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */,
 				458923F6348C7E22B0926E6C /* ParserFixtures.swift */,
 				FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */,
@@ -728,6 +732,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5D3BAFE9BD1C2C93ABB500D6 /* AerialSystem.swift in Sources */,
+				00E0FF6C6723054C50C3E1C2 /* AerialSystemTests.swift in Sources */,
 				14054500F5EADD2BE253861F /* PackageArchiveTests.swift in Sources */,
 				9759F3CEFD065C9F2DB7833D /* ParserFixtures.swift in Sources */,
 				EFE158DCF125FECC6CABC791 /* SceneAnimation.swift in Sources */,

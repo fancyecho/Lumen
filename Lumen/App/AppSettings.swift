@@ -104,6 +104,8 @@ final class AppSettings {
     var dockIconMode: DockIconMode { didSet { store(dockIconMode.rawValue, "dockIconMode", nil) } }
 
     var lockScreenEnabled: Bool { didSet { store(lockScreenEnabled, "lockScreenEnabled", .lockScreen) } }
+    /// Whether Lumen's Lock Screen Aerial is also used for the screen saver ("Idle" choices).
+    var lockScreenScreenSaver: Bool { didSet { store(lockScreenScreenSaver, "lockScreenScreenSaver", .lockScreen) } }
     /// `nil` follows the main display's wallpaper; otherwise a specific wallpaper.
     var lockScreenWallpaperID: UUID? {
         didSet { store(lockScreenWallpaperID?.uuidString ?? "", "lockScreenWallpaperID", .lockScreen) }
@@ -130,6 +132,7 @@ final class AppSettings {
             "pauseWhenCovered": true,
             "coverageThreshold": 0.95,
             "lockScreenEnabled": false,
+            "lockScreenScreenSaver": true,
             "lockScreenWallpaperID": "",
             "pauseOnBattery": false,
             "pauseOnLowPower": true,
@@ -150,6 +153,7 @@ final class AppSettings {
         pauseWhenCovered = defaults.bool(forKey: "pauseWhenCovered")
         coverageThreshold = min(max(defaults.double(forKey: "coverageThreshold"), 0.5), 1)
         lockScreenEnabled = defaults.bool(forKey: "lockScreenEnabled")
+        lockScreenScreenSaver = defaults.bool(forKey: "lockScreenScreenSaver")
         lockScreenWallpaperID = UUID(uuidString: defaults.string(forKey: "lockScreenWallpaperID") ?? "")
         pauseOnBattery = defaults.bool(forKey: "pauseOnBattery")
         pauseOnLowPower = defaults.bool(forKey: "pauseOnLowPower")

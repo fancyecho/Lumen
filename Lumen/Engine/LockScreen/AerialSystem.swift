@@ -6,11 +6,18 @@ import UniformTypeIdentifiers
 /// Talks to the per-user Aerial catalog that macOS uses for the Lock Screen and screen saver.
 ///
 /// macOS keeps its Aerial manifest (`entries.json`) and downloaded videos in the user's
-/// Library, and records the chosen Lock Screen / screen saver Aerial in the wallpaper store
-/// (`Index.plist`, the "Idle" choices). Lumen adds one asset under its own "Lumen" category,
-/// points the Idle choices at it, and restarts `WallpaperAgent` so the change is picked up.
+/// Library, and records the chosen wallpaper/Lock Screen ("Desktop") and screen saver ("Idle")
+/// choices in the wallpaper store (`Index.plist`). macOS 14+ plays the Desktop Aerial on the
+/// Lock Screen and requires display overrides to carry both Desktop and Idle entries. Lumen adds
+/// one asset under its own "Lumen" category, updates the store choices while backing up originals,
+/// and restarts `WallpaperAgent` so the change takes effect without visiting System Settings.
 /// No administrator rights are needed, and nothing outside Lumen's own IDs is touched.
 enum AerialSystem {
+    enum Slot: String, CaseIterable, Hashable {
+        case desktop = "Desktop"
+        case idle = "Idle"
+    }
+
     static let wallpaperRoot = FileManager.default.homeDirectoryForCurrentUser
         .appending(path: "Library/Application Support/com.apple.wallpaper", directoryHint: .isDirectory)
     static let aerialsRoot = wallpaperRoot.appending(path: "aerials", directoryHint: .isDirectory)
@@ -26,6 +33,9 @@ enum AerialSystem {
     static let assetSlots = ["4C554D45-AE00-4000-8000-0000000000A1", "4C554D45-AE00-4000-8000-0000000000A2"]
 
     private static let aerialProvider = "com.apple.wallpaper.choice.aerials"
+    private static let absentMarkerKey = "__lumenAbsent"
+    private static let originalTypeKey = "originalType"
+    private static let typeBackupSuffix = "__type"
 
     enum Failure: LocalizedError {
         case unsupported
@@ -160,62 +170,168 @@ enum AerialSystem {
 
     // MARK: Selection
 
-    /// Points every Lock Screen / screen saver ("Idle") choice at `assetID`.
-    /// The first time a choice is replaced, its original content is added to `backup`.
-    static func select(assetID: String, backup: inout [String: Data]) throws {
-        var root = try readIndex()
-        var touched = 0
+    /// Points Desktop (Lock Screen) and optionally Idle (screen saver) choices at `assetID`
+    /// across `SystemDefault`, `AllSpacesAndDisplays`, `Displays/<id>`, `Spaces/<id>/Default`,
+    /// and `Spaces/<id>/Displays/<id>`.
+    ///
+    /// Displays in `excludedDesktopDisplayIDs` keep their Desktop choice (for secondary monitors
+    /// managed by `StillFrameSync`). Every container carrying a Desktop choice is guaranteed to
+    /// also carry an Idle choice, because macOS rejects partial display overrides.
+    static func select(
+        assetID: String,
+        includeIdle: Bool = true,
+        excludedDesktopDisplayIDs: Set<String> = [],
+        backup: inout [String: Data]
+    ) throws {
+        let root = try readIndex()
+        let updated = try applySelection(
+            to: root,
+            assetID: assetID,
+            includeIdle: includeIdle,
+            excludedDesktopDisplayIDs: excludedDesktopDisplayIDs,
+            backup: &backup
+        )
+        try writeIndex(updated)
+    }
+
+    /// Puts back the original Desktop and Idle choices, only where Lumen's asset is still selected.
+    static func restoreSelection(from backup: [String: Data], slots: Set<Slot> = [.desktop, .idle]) throws {
+        let root = try readIndex()
+        let restored = applyRestore(to: root, from: backup, slots: slots)
+        try writeIndex(restored)
+    }
+
+    /// Whether every managed container in the wallpaper store currently matches Lumen's expected selection.
+    static func isSelectionActive(
+        assetID: String,
+        includeIdle: Bool = true,
+        excludedDesktopDisplayIDs: Set<String> = []
+    ) -> Bool {
+        guard let root = try? readIndex() else { return false }
+        return isSelectionActive(
+            in: root,
+            assetID: assetID,
+            includeIdle: includeIdle,
+            excludedDesktopDisplayIDs: excludedDesktopDisplayIDs
+        )
+    }
+
+    /// Pure store rewrite for `select`, exposed for unit tests.
+    static func applySelection(
+        to root: [String: Any],
+        assetID: String,
+        includeIdle: Bool = true,
+        excludedDesktopDisplayIDs: Set<String> = [],
+        backup: inout [String: Data],
+        now: Date = Date()
+    ) throws -> [String: Any] {
         let choice = try aerialChoice(assetID: assetID)
-        root = rewriteIdle(in: root, path: []) { path, content in
-            let key = path.joined(separator: "/")
-            if backup[key] == nil, !contentPointsAtLumen(content),
-               let original = try? PropertyListSerialization.data(fromPropertyList: content, format: .binary, options: 0) {
-                backup[key] = original
+        let fallbackIdle = firstExistingSlot(.idle, in: root) ?? makeSlot(choice: choice, now: now)
+
+        return mapContainers(in: root, ensureRoots: true) { path, displayID, container in
+            var updated = container
+            let originalType = updated["Type"] as? String
+            let wantsDesktop = displayID.map { !excludedDesktopDisplayIDs.contains($0) } ?? true
+
+            if wantsDesktop {
+                recordBackupIfNeeded(for: .desktop, in: updated, path: path, originalType: originalType, backup: &backup)
+                updated[Slot.desktop.rawValue] = updatedSlot(updated[Slot.desktop.rawValue], choice: choice, now: now)
             }
-            var updated = content
-            updated["Choices"] = [choice]
-            touched += 1
+
+            if includeIdle {
+                recordBackupIfNeeded(for: .idle, in: updated, path: path, originalType: originalType, backup: &backup)
+                updated[Slot.idle.rawValue] = updatedSlot(updated[Slot.idle.rawValue], choice: choice, now: now)
+            } else {
+                // Turning off screen-saver mirroring restores any Idle slot Lumen previously took over.
+                restoreSlot(.idle, in: &updated, path: path, from: backup, now: now)
+                if updated[Slot.desktop.rawValue] != nil, updated[Slot.idle.rawValue] == nil {
+                    // macOS requires display overrides to carry both Desktop and Idle.
+                    updated[Slot.idle.rawValue] = fallbackIdle
+                }
+            }
+
+            if updated[Slot.desktop.rawValue] != nil, updated[Slot.idle.rawValue] != nil {
+                let desiredType: String
+                if let originalType, originalType != "idle", (includeIdle || originalType != "linked") {
+                    desiredType = originalType
+                } else {
+                    desiredType = "individual"
+                }
+                if desiredType != originalType {
+                    recordTypeBackupIfNeeded(originalType, path: path, backup: &backup)
+                    updated["Type"] = desiredType
+                }
+            } else if updated[Slot.idle.rawValue] != nil, updated["Type"] == nil {
+                updated["Type"] = "idle"
+            }
+
             return updated
         }
-        if touched == 0 {
-            // No Idle choice yet (fresh account): create one for all Spaces and displays.
-            var all = root["AllSpacesAndDisplays"] as? [String: Any] ?? ["Type": "idle"]
-            all["Idle"] = [
-                "Content": ["Choices": [choice], "EncodedOptionValues": "$null", "Shuffle": "$null"],
-                "LastSet": Date(),
-                "LastUse": Date(),
-            ] as [String: Any]
-            root["AllSpacesAndDisplays"] = all
-        }
-        try writeIndex(root)
     }
 
-    /// Puts back the original Idle choices, but only where Lumen's asset is still selected.
-    static func restoreSelection(from backup: [String: Data]) throws {
-        var root = try readIndex()
-        root = rewriteIdle(in: root, path: []) { path, content in
-            guard contentPointsAtLumen(content) else { return nil }
-            // Slots created after Lumen took over have no backup of their own; borrow any original.
-            if let data = backup[path.joined(separator: "/")] ?? backup.values.first,
-               let original = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
-                return original
+    /// Pure store restore for `restoreSelection`, exposed for unit tests.
+    static func applyRestore(
+        to root: [String: Any],
+        from backup: [String: Data],
+        slots: Set<Slot> = [.desktop, .idle],
+        now: Date = Date()
+    ) -> [String: Any] {
+        mapContainers(in: root, ensureRoots: false) { path, _, container in
+            var updated = container
+            for slot in Slot.allCases where slots.contains(slot) {
+                restoreSlot(slot, in: &updated, path: path, from: backup, now: now)
             }
-            var cleared = content
-            cleared["Choices"] = [Any]()
-            return cleared
+            let stillPointsAtLumen = Slot.allCases.contains { slot in
+                guard let content = slotContent(slot, in: updated) else { return false }
+                return contentPointsAtLumen(content)
+            }
+            if !stillPointsAtLumen, let savedType = savedTypeBackup(for: path, from: backup) {
+                let hasDesktop = updated[Slot.desktop.rawValue] != nil
+                let hasIdle = updated[Slot.idle.rawValue] != nil
+                if (savedType == "idle" && !hasDesktop && hasIdle) || (savedType != "idle" && hasDesktop && hasIdle) {
+                    updated["Type"] = savedType
+                }
+            }
+            return updated
         }
-        try writeIndex(root)
     }
 
-    /// Asset IDs currently selected for the Lock Screen / screen saver, across all Spaces and displays.
-    static func selectedIdleAssetIDs() -> [String] {
-        guard let root = try? readIndex() else { return [] }
-        var ids: [String] = []
-        _ = rewriteIdle(in: root, path: []) { _, content in
-            ids.append(contentsOf: assetIDs(in: content))
-            return nil
+    /// Pure verification against an in-memory store plist, exposed for unit tests.
+    static func isSelectionActive(
+        in root: [String: Any],
+        assetID: String,
+        includeIdle: Bool = true,
+        excludedDesktopDisplayIDs: Set<String> = []
+    ) -> Bool {
+        guard root["SystemDefault"] is [String: Any], root["AllSpacesAndDisplays"] is [String: Any] else {
+            return false
         }
-        return ids
+        var ok = true
+        _ = mapContainers(in: root, ensureRoots: false) { _, displayID, container in
+            let wantsDesktop = displayID.map { !excludedDesktopDisplayIDs.contains($0) } ?? true
+            if wantsDesktop {
+                guard let content = slotContent(.desktop, in: container),
+                      contentPointsExactlyAt(content, assetID: assetID) else {
+                    ok = false
+                    return container
+                }
+            }
+            if includeIdle {
+                guard let content = slotContent(.idle, in: container),
+                      contentPointsExactlyAt(content, assetID: assetID) else {
+                    ok = false
+                    return container
+                }
+            } else if let content = slotContent(.idle, in: container), contentPointsAtLumen(content) {
+                ok = false
+                return container
+            }
+            if container[Slot.desktop.rawValue] != nil, container[Slot.idle.rawValue] == nil {
+                ok = false
+            }
+            return container
+        }
+        return ok
     }
 
     static func restartWallpaperAgent() {
@@ -233,6 +349,156 @@ enum AerialSystem {
         return ["Configuration": configuration, "Files": [Any](), "Provider": aerialProvider]
     }
 
+    private static func makeSlot(choice: [String: Any], now: Date) -> [String: Any] {
+        [
+            "Content": [
+                "Choices": [choice],
+                "EncodedOptionValues": "$null",
+                "Shuffle": "$null",
+            ] as [String: Any],
+            "LastSet": now,
+            "LastUse": now,
+        ]
+    }
+
+    private static func updatedSlot(_ existing: Any?, choice: [String: Any], now: Date) -> [String: Any] {
+        guard var slot = existing as? [String: Any],
+              var content = slot["Content"] as? [String: Any] else {
+            return makeSlot(choice: choice, now: now)
+        }
+        content["Choices"] = [choice]
+        slot["Content"] = content
+        slot["LastSet"] = now
+        return slot
+    }
+
+    private static func slotContent(_ slot: Slot, in container: [String: Any]) -> [String: Any]? {
+        (container[slot.rawValue] as? [String: Any])?["Content"] as? [String: Any]
+    }
+
+    private static func firstExistingSlot(_ slot: Slot, in root: [String: Any]) -> [String: Any]? {
+        for key in ["SystemDefault", "AllSpacesAndDisplays"] {
+            if let container = root[key] as? [String: Any],
+               let existing = container[slot.rawValue] as? [String: Any] {
+                return existing
+            }
+        }
+        return nil
+    }
+
+    private static func backupKey(path: [String], slot: Slot) -> String {
+        (path + [slot.rawValue]).joined(separator: "/")
+    }
+
+    private static func typeBackupKey(path: [String]) -> String {
+        (path + [typeBackupSuffix]).joined(separator: "/")
+    }
+
+    private static func recordBackupIfNeeded(
+        for slot: Slot,
+        in container: [String: Any],
+        path: [String],
+        originalType: String?,
+        backup: inout [String: Data]
+    ) {
+        let key = backupKey(path: path, slot: slot)
+        guard backup[key] == nil else { return }
+        if let content = slotContent(slot, in: container) {
+            guard !contentPointsAtLumen(content),
+                  let data = try? PropertyListSerialization.data(fromPropertyList: content, format: .binary, options: 0)
+            else { return }
+            backup[key] = data
+        } else {
+            var marker: [String: Any] = [absentMarkerKey: true]
+            if let originalType { marker[originalTypeKey] = originalType }
+            if let data = try? PropertyListSerialization.data(fromPropertyList: marker, format: .binary, options: 0) {
+                backup[key] = data
+            }
+        }
+    }
+
+    private static func recordTypeBackupIfNeeded(_ originalType: String?, path: [String], backup: inout [String: Data]) {
+        guard let originalType else { return }
+        let key = typeBackupKey(path: path)
+        guard backup[key] == nil else { return }
+        backup[key] = Data(originalType.utf8)
+    }
+
+    private static func savedTypeBackup(for path: [String], from backup: [String: Data]) -> String? {
+        guard let data = backup[typeBackupKey(path: path)] else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func decodeBackup(_ data: Data) -> [String: Any]? {
+        try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+    }
+
+    private static func isAbsentMarker(_ dict: [String: Any]) -> Bool {
+        dict[absentMarkerKey] as? Bool == true
+    }
+
+    private static func fallbackContent(for slot: Slot, from backup: [String: Data]) -> [String: Any]? {
+        let preferred = "SystemDefault/\(slot.rawValue)"
+        if let data = backup[preferred], let dict = decodeBackup(data), !isAbsentMarker(dict) {
+            return dict
+        }
+        let suffix = "/\(slot.rawValue)"
+        for key in backup.keys.sorted() where key.hasSuffix(suffix) {
+            if let data = backup[key], let dict = decodeBackup(data), !isAbsentMarker(dict) {
+                return dict
+            }
+        }
+        return nil
+    }
+
+    private static func restoreSlot(
+        _ slot: Slot,
+        in container: inout [String: Any],
+        path: [String],
+        from backup: [String: Data],
+        now: Date
+    ) {
+        guard var slotDict = container[slot.rawValue] as? [String: Any],
+              let content = slotDict["Content"] as? [String: Any],
+              contentPointsAtLumen(content) else { return }
+
+        let key = backupKey(path: path, slot: slot)
+        if let data = backup[key], let saved = decodeBackup(data) {
+            if isAbsentMarker(saved) {
+                container.removeValue(forKey: slot.rawValue)
+                if let originalType = saved[originalTypeKey] as? String {
+                    container["Type"] = originalType
+                }
+                return
+            }
+            slotDict["Content"] = saved
+            slotDict["LastSet"] = now
+            container[slot.rawValue] = slotDict
+            return
+        }
+
+        // Slots created after Lumen took over (e.g. a new Space) borrow a same-kind original.
+        if let borrowed = fallbackContent(for: slot, from: backup) {
+            slotDict["Content"] = borrowed
+            slotDict["LastSet"] = now
+            container[slot.rawValue] = slotDict
+            return
+        }
+
+        // AllSpacesAndDisplays normally has only Idle unless a Desktop backup existed.
+        if path == ["AllSpacesAndDisplays"], slot == .desktop, container[Slot.idle.rawValue] != nil {
+            container.removeValue(forKey: Slot.desktop.rawValue)
+            container["Type"] = "idle"
+            return
+        }
+
+        var cleared = content
+        cleared["Choices"] = [Any]()
+        slotDict["Content"] = cleared
+        slotDict["LastSet"] = now
+        container[slot.rawValue] = slotDict
+    }
+
     private static func assetIDs(in content: [String: Any]) -> [String] {
         let choices = content["Choices"] as? [[String: Any]] ?? []
         return choices.compactMap { choice in
@@ -248,26 +514,59 @@ enum AerialSystem {
         assetIDs(in: content).contains(where: isLumenID)
     }
 
-    /// Walks the store and lets `transform` rewrite the `Content` of every "Idle" entry
-    /// (returning nil leaves that entry untouched).
-    private static func rewriteIdle(
-        in node: [String: Any],
-        path: [String],
-        transform: ([String], [String: Any]) -> [String: Any]?
+    private static func contentPointsExactlyAt(_ content: [String: Any], assetID: String) -> Bool {
+        let choices = content["Choices"] as? [[String: Any]] ?? []
+        guard !choices.isEmpty else { return false }
+        let ids = assetIDs(in: content)
+        return ids.count == choices.count && ids.allSatisfy { $0 == assetID }
+    }
+
+    /// Visits every wallpaper container in `Index.plist`:
+    /// `SystemDefault`, `AllSpacesAndDisplays`, `Displays/<id>`, `Spaces/<id>/Default`,
+    /// and `Spaces/<id>/Displays/<id>`.
+    private static func mapContainers(
+        in root: [String: Any],
+        ensureRoots: Bool,
+        transform: (_ path: [String], _ displayID: String?, _ container: [String: Any]) -> [String: Any]
     ) -> [String: Any] {
-        var result = node
-        for (key, value) in node {
-            guard var child = value as? [String: Any] else { continue }
-            let childPath = path + [key]
-            if key == "Idle", let content = child["Content"] as? [String: Any] {
-                guard let updated = transform(childPath, content) else { continue }
-                child["Content"] = updated
-                child["LastSet"] = Date()
-            } else {
-                child = rewriteIdle(in: child, path: childPath, transform: transform)
+        var result = root
+
+        for key in ["SystemDefault", "AllSpacesAndDisplays"] {
+            if let existing = result[key] as? [String: Any] {
+                result[key] = transform([key], nil, existing)
+            } else if ensureRoots {
+                result[key] = transform([key], nil, [:])
             }
-            result[key] = child
         }
+
+        if var displays = result["Displays"] as? [String: Any] {
+            for (displayID, value) in displays {
+                guard let container = value as? [String: Any] else { continue }
+                displays[displayID] = transform(["Displays", displayID], displayID, container)
+            }
+            result["Displays"] = displays
+        }
+
+        if var spaces = result["Spaces"] as? [String: Any] {
+            for (spaceID, value) in spaces {
+                guard var space = value as? [String: Any] else { continue }
+                if let def = space["Default"] as? [String: Any] {
+                    space["Default"] = transform(["Spaces", spaceID, "Default"], nil, def)
+                } else if ensureRoots {
+                    space["Default"] = transform(["Spaces", spaceID, "Default"], nil, [:])
+                }
+                if var spaceDisplays = space["Displays"] as? [String: Any] {
+                    for (displayID, displayValue) in spaceDisplays {
+                        guard let container = displayValue as? [String: Any] else { continue }
+                        spaceDisplays[displayID] = transform(["Spaces", spaceID, "Displays", displayID], displayID, container)
+                    }
+                    space["Displays"] = spaceDisplays
+                }
+                spaces[spaceID] = space
+            }
+            result["Spaces"] = spaces
+        }
+
         return result
     }
 

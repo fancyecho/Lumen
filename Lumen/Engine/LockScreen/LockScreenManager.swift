@@ -156,10 +156,17 @@ final class LockScreenManager {
                 let thumbnail = await self.thumbnail(for: wallpaper)
                 let existingBackup = self.state?.backup ?? [:]
                 let previous = self.state?.assetID ?? AerialSystem.installedAssetID()
+                let includeIdle = self.settings.lockScreenScreenSaver
+                let excludedDesktopDisplays = self.engine.stillFrameManagedDisplayIDs()
                 let result = try await Task.detached(priority: .userInitiated) { () -> (String, [String: Data]) in
                     var backup = existingBackup
                     let id = try AerialSystem.install(video: movie, thumbnail: thumbnail, title: title, previousAssetID: previous)
-                    try AerialSystem.select(assetID: id, backup: &backup)
+                    try AerialSystem.select(
+                        assetID: id,
+                        includeIdle: includeIdle,
+                        excludedDesktopDisplayIDs: excludedDesktopDisplays,
+                        backup: &backup
+                    )
                     AerialSystem.restartWallpaperAgent()
                     return (id, backup)
                 }.value
@@ -185,20 +192,25 @@ final class LockScreenManager {
         state = nil
         InstalledState.clear()
         status = .off
-        Task.detached(priority: .utility) {
-            try? AerialSystem.restoreSelection(from: backup)
-            AerialSystem.removeFromCatalog()
-            AerialSystem.restartWallpaperAgent()
+        Task { @MainActor [weak self] in
+            await Task.detached(priority: .utility) {
+                try? AerialSystem.restoreSelection(from: backup)
+                AerialSystem.removeFromCatalog()
+                AerialSystem.restartWallpaperAgent()
+            }.value
+            self?.engine.syncStillFramesAfterLockScreenDisabled()
         }
     }
 
     // MARK: Verification
 
     /// macOS may drop Lumen's manifest entry on catalog updates, or the user may pick
-    /// another screen saver; restore what's missing without re-encoding.
+    /// another wallpaper/screen saver; restore what's missing without re-encoding.
     private func repairIfNeeded(_ current: inout InstalledState, title: String) async throws {
         let assetID = current.assetID
         let existingBackup = current.backup
+        let includeIdle = settings.lockScreenScreenSaver
+        let excludedDesktopDisplays = engine.stillFrameManagedDisplayIDs()
         let changed = try await Task.detached(priority: .utility) { () -> (Bool, [String: Data]) in
             var backup = existingBackup
             var changed = false
@@ -206,9 +218,17 @@ final class LockScreenManager {
                 try AerialSystem.repairManifest(assetID: assetID, title: title)
                 changed = true
             }
-            let selected = AerialSystem.selectedIdleAssetIDs()
-            if selected.isEmpty || selected.contains(where: { $0 != assetID }) {
-                try AerialSystem.select(assetID: assetID, backup: &backup)
+            if !AerialSystem.isSelectionActive(
+                assetID: assetID,
+                includeIdle: includeIdle,
+                excludedDesktopDisplayIDs: excludedDesktopDisplays
+            ) {
+                try AerialSystem.select(
+                    assetID: assetID,
+                    includeIdle: includeIdle,
+                    excludedDesktopDisplayIDs: excludedDesktopDisplays,
+                    backup: &backup
+                )
                 changed = true
             }
             if changed { AerialSystem.restartWallpaperAgent() }
@@ -226,11 +246,24 @@ final class LockScreenManager {
         try await Task.sleep(for: .seconds(2))
         let assetID = installed.assetID
         let existingBackup = installed.backup
-        let stillOurs = await Task.detached { AerialSystem.selectedIdleAssetIDs().allSatisfy { $0 == assetID } }.value
+        let includeIdle = settings.lockScreenScreenSaver
+        let excludedDesktopDisplays = engine.stillFrameManagedDisplayIDs()
+        let stillOurs = await Task.detached {
+            AerialSystem.isSelectionActive(
+                assetID: assetID,
+                includeIdle: includeIdle,
+                excludedDesktopDisplayIDs: excludedDesktopDisplays
+            )
+        }.value
         guard !stillOurs else { return }
         let backup = try await Task.detached(priority: .userInitiated) { () -> [String: Data] in
             var backup = existingBackup
-            try AerialSystem.select(assetID: assetID, backup: &backup)
+            try AerialSystem.select(
+                assetID: assetID,
+                includeIdle: includeIdle,
+                excludedDesktopDisplayIDs: excludedDesktopDisplays,
+                backup: &backup
+            )
             AerialSystem.restartWallpaperAgent()
             return backup
         }.value

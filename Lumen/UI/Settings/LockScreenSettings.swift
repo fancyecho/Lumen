@@ -16,6 +16,8 @@ struct LockScreenSettings: View {
             Section {
                 Toggle("Play on the Lock Screen", isOn: $settings.lockScreenEnabled)
                     .disabled(!lockScreen.isSupported && !settings.lockScreenEnabled)
+                Toggle("Also use as screen saver", isOn: $settings.lockScreenScreenSaver)
+                    .disabled(!settings.lockScreenEnabled)
                 Picker("Wallpaper", selection: $settings.lockScreenWallpaperID) {
                     Text("Same as the desktop").tag(UUID?.none)
                     Divider()
