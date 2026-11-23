@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（第二次合并）
+> 最后更新：2026-11-23 · claude（T05）
 
 ## 1. 阶段进度
 
@@ -52,9 +52,9 @@
 | T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 已合并 `main`（`ca5ee70`）：MDL 网格、骨骼蒙皮、animationlayers、MDL 内嵌裁剪蒙版；Chisa 眼睛错位已修复。未做：`MORPHING` |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
-| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
+| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 分支 `claude/T05-lockscreen-rendered`：场景离屏录 30 秒、网页快照录 12 秒，末尾溶回首帧做无缝循环，再走原有一小时编辑列表。只缺真机安装验证（会改系统锁屏，需用户开启） |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
-| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | 另需核对 3436945972 的视差下拉框。项目把「关」保存为非零值 `2`，直接绑定缺少选项匹配条件 |
+| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 进行中 | gemini | 分支 `gemini/T07-timeline-and-layout`（工作树 `build/worktrees/gemini-T07`）：核查 3436945972 片头/时间线与视差下拉框（`2`=关），以及 3463692991 多画幅布局 |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
@@ -63,8 +63,8 @@
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`d8663af`）：组合层子图层画进父层缓冲，支持 `copybackground`；「清风」背景字列已正常 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
-| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
-| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
+| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 进行中 | gpt | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
 | T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
@@ -79,6 +79,18 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 分支 `claude/T05-lockscreen-rendered`（未合并）
+
+- **做了什么**：场景和网页壁纸现在也能当锁屏（以前保留上一个视频）。
+  - 场景（`SceneLoopRecorder`）：离屏加载场景，先预热 3 秒（片头、粒子、脚本稳定下来），再按 30fps 录 30 秒；最后 1.5 秒溶回第一帧，所以一小时的重复没有跳变。画面按壁纸的 framing/缩放放置，和桌面一致。场景里有视频纹理时按真实时间录（视频跟墙钟走），否则全速录。声音不播放。
+  - 网页（`WebLoopRecorder`）：在屏幕外窗口里打开页面，用 WebKit 私有开关 `_setWindowOcclusionDetectionEnabled:` 让它在不可见时继续动画；每秒最多 30 张快照、按实际时间戳编码，录 12 秒，最后 1 秒溶回首帧。
+  - `LoopVideoWriter`：从 Metal 纹理或 CGImage 写 HEVC，场景、网页共用。
+  - `LockScreenManager`：场景缺包文件或缺 WE assets、网页缺文件时才保留旧锁屏（`.keepingPrevious`），设置页文案相应改了（英文，待翻译）。缓存键加入用户属性值，改了属性会重录。
+  - `WebRenderer` 新增 `keepRenderingWhenOccluded()` 和 `snapshot()`，只给录制用。
+- **验证**：build 通过。`Tools/test.sh lockloop`（新命令，不安装）实测：Chisa 30 秒录制用时 18 秒、41MB，首尾帧 0% 差异；清风 18 秒、38MB；网页「樱花」12 秒、20fps、11.5MB，花瓣在动，首尾帧 0% 差异。
+- **没验证**：真正安装到系统锁屏（会改用户的锁屏设置），需要用户在「设置 › 锁屏」开启后看一眼。
+- **代价**：录制只在锁屏的跟随壁纸变化时跑一次，场景约 20 秒 GPU 负载、网页约 15 秒；产物每个 10–40MB，沿用原来「只保留最新 4 个」的缓存清理。
 
 ### 2026-11-23 · claude · 第二次合并到 `main`
 

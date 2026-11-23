@@ -44,6 +44,7 @@
 		4CA57F5EE9ADAB3E0B546E91 /* SceneVideoTexture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54008D1AE4F0AEE5B67241D5 /* SceneVideoTexture.swift */; };
 		50AAEBC9239ECA499B81B4AA /* WallpaperEngineSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E0D697C2F8B53C9DC4D4659 /* WallpaperEngineSettings.swift */; };
 		53F92E64C6AF2A64F8306D27 /* FramingControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056535C4C456D9679AD4B122 /* FramingControls.swift */; };
+		5568F3F306A6C4C06989D167 /* RenderedLoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BF80198BCD676AF7550277 /* RenderedLoopRecorder.swift */; };
 		59FEDCEE4CD7689EEE71D03F /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBB1CF76C83A7FA2D245B08 /* Support.swift */; };
 		5B6C6632EE1ED8DEDD0B0743 /* SceneAssetsLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B8E58D600AAAD5BD271D584 /* SceneAssetsLocator.swift */; };
 		6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4808C95144734787B81A2AA2 /* Router.swift */; };
@@ -126,6 +127,7 @@
 		28F1B121E24A55D9A9616617 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		337A3269E47126DC851115EE /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35A6A1FE4907B4DE10F11315 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		38BF80198BCD676AF7550277 /* RenderedLoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderedLoopRecorder.swift; sourceTree = "<group>"; };
 		39DB38C40FFF27490AAC894D /* WallpaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCard.swift; sourceTree = "<group>"; };
 		3FD7CDCF7BD18261650FE168 /* SteamPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamPanel.swift; sourceTree = "<group>"; };
 		40FAD20AD6D740C31FF87167 /* SceneSound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSound.swift; sourceTree = "<group>"; };
@@ -515,6 +517,7 @@
 				FF74219320866283D5E10984 /* AerialSystem.swift */,
 				202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */,
 				84B85A262D597CAABBF3BE41 /* LockScreenVideoBuilder.swift */,
+				38BF80198BCD676AF7550277 /* RenderedLoopRecorder.swift */,
 			);
 			path = LockScreen;
 			sourceTree = "<group>";
@@ -652,6 +655,7 @@
 				8416156A9FB7F4F76B0076BF /* PlaylistStore.swift in Sources */,
 				B724420C3553E117937464BF /* PlaylistsView.swift in Sources */,
 				D2DCE31CE32DDC35D600E83A /* PropertiesPanel.swift in Sources */,
+				5568F3F306A6C4C06989D167 /* RenderedLoopRecorder.swift in Sources */,
 				1AB6D9D828188A4141BC258A /* RootView.swift in Sources */,
 				6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */,
 				3EDB86D5408D810CF1600327 /* SceneAnimation.swift in Sources */,
