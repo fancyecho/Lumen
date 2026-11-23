@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（第三次合并）
+> 最后更新：2026-11-23 · claude（合并 T07）
 
 ## 1. 阶段进度
 
@@ -40,7 +40,7 @@
 | 着色器翻译 + 编译 | 315/316 通过 |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 23/23 通过 |
+| 单元测试（`Tools/test.sh unit`） | 25/25 通过 |
 
 ## 3. 任务板
 
@@ -54,7 +54,7 @@
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
 | T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 已合并 `main`（`e079a73`）：场景离屏录 30 秒、网页快照录 12 秒做锁屏循环。待用户开启锁屏实测 |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
-| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 完成 | gemini | 分支 `gemini/T07-timeline-and-layout`（工作树 `build/worktrees/gemini-T07`，待提交）：实现 `thisScene.destroyLayer` 与帧时钟 `setTimeout`/`clearTimeout`；支持二选一开/关下拉框直绑布尔与嵌套用户属性回退；实现文本层 `limitwidth`/`limitrows`/省略号自动换行、对齐锚点偏移及 4096 纹理缩放一致性修复。3436945972 片头淡出与视差开关、3463692991/2867182492 文本布局均已修复 |
+| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 完成 | gemini | 已合并 `main`（`328e04c`）。分支 `gemini/T07-timeline-and-layout`：实现 `thisScene.destroyLayer` 与帧时钟 `setTimeout`/`clearTimeout`；支持二选一开/关下拉框直绑布尔与嵌套用户属性回退；实现文本层 `limitwidth`/`limitrows`/省略号自动换行、对齐锚点偏移及 4096 纹理缩放一致性修复。3436945972 片头淡出与视差开关、3463692991/2867182492 文本布局均已修复 |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`c0a0e7f`）。`gpt/T08-scene-lighting`。静态单网格、点光照与正交点光体积通过应用预览和真实桌面验证，已提交 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
@@ -81,6 +81,11 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 合并 T07 到 `main`
+
+- 合并 `gemini/T07-timeline-and-layout`（`328e04c`），无冲突。验证：build 通过；`unit` 25/25；`shaders` 315/316；`scenes` 75/75、0 洋红；`steam` 通过。
+- 还没合并：`gpt/T17-visual-regression`（未提交）。
 
 ### 2026-11-23 · claude · 第三次合并到 `main`
 
