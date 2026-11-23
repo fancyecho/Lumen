@@ -43,6 +43,14 @@ Tools/test.sh visual 10
 评分先把渲染图居中裁切到作者预览的宽高比，再缩小到同样尺寸。分数取 70% 局部亮度 SSIM 与 30% RGB 色彩一致度，100 为最相似。动画时刻、作者构图和裁切都可能影响结果。 GIF 首帧的黑场和渲染中的片头也会拉低分数。排名用于安排人工抽查，无通过阈值。 [SSIM 原论文](https://eceweb.uwaterloo.ca/~z70wang/publications/ssim.html)
 
 ```bash
+cp -R build/tools/scenes build/tools/scenes-before
+# 修改引擎后，沿用同样的参数重新执行 Tools/test.sh scenes
+Tools/test.sh visual diff build/tools/scenes-before build/tools/scenes 10
+```
+
+按两个批次的清单匹配同一场景。对同尺寸的渲染帧报告发生 RGB 变化的像素数、占比及平均通道差（0–255），按平均通道差排序，输出变化最大的前 N 组前后拼图。报告也记录尺寸不一致、渲染失败和缺失图片等情况。两轮应使用相同的渲染时间、画面预算、音频、图层筛选和 `LUMEN_BENCH` 设置。时钟、视频纹理和动画仍可能让画面产生变化。
+
+```bash
 Tools/test.sh shaders
 ```
 

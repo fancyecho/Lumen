@@ -4,6 +4,7 @@
 #   Tools/test.sh build                         build the app (Debug)
 #   Tools/test.sh scenes [ids] [time] [layers]  render scenes in the corpus to PNG
 #   Tools/test.sh visual [N]                    rank the latest scene renders against author previews
+#   Tools/test.sh visual diff <before> <after> [N]  rank pixel changes between two saved scene runs
 #   Tools/test.sh shaders [v|<name>|dump:<name>] translate + compile every WE shader
 #   Tools/test.sh steam                         check SteamCMD prompt parsing with a fake steamcmd
 #   Tools/test.sh lockloop scene|web <folder> [entry] [WxH]  record a Lock Screen loop to build/tools (no install)
@@ -45,12 +46,21 @@ case "${1:-}" in
     echo "PNGs: $OUT/scenes   log: $OUT/scenes.log"
     ;;
   visual)
-    if [[ $# -gt 2 ]]; then
-      echo "Usage: Tools/test.sh visual [N]" >&2
-      exit 2
+    if [[ "${2:-}" == diff ]]; then
+      if [[ $# -lt 4 || $# -gt 5 ]]; then
+        echo "Usage: Tools/test.sh visual diff <before-scenes> <after-scenes> [N]" >&2
+        exit 2
+      fi
+      args=(diff "$3" "$4" "$OUT/visual" "${5-10}")
+    else
+      if [[ $# -gt 2 ]]; then
+        echo "Usage: Tools/test.sh visual [N]" >&2
+        exit 2
+      fi
+      args=("$OUT/scenes" "$OUT/visual" "${2-10}")
     fi
     swiftc -O -module-cache-path "$OUT/visual-module-cache" -o "$OUT/visual-regression" "$ROOT"/Tools/SceneVisualRegression/*.swift
-    "$OUT/visual-regression" "$OUT/scenes" "$OUT/visual" "${2-10}"
+    "$OUT/visual-regression" "${args[@]}"
     ;;
   shaders)
     scene_sources | xargs swiftc -O -enable-bare-slash-regex -o "$OUT/shader-corpus" "$ROOT/Tools/ShaderCorpus/main.swift"
@@ -70,5 +80,5 @@ case "${1:-}" in
     echo "movie: $OUT/lockloop.mov"
     ;;
   *)
-    sed -n '2,10p' "$0"; exit 1 ;;
+    sed -n '2,11p' "$0"; exit 1 ;;
 esac

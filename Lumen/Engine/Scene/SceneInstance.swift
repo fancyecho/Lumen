@@ -196,7 +196,6 @@ final class SceneInstance: @unchecked Sendable {
     let drawables: [SceneDrawable]
     /// Top-level drawables not grouped under a passthrough composition layer.
     private let rootDrawables: [SceneDrawable]
-    private let groupParentIDs: Set<Int>
     var layers: [ImageLayer] { drawables.compactMap { if case .image(let layer) = $0 { layer } else { nil } } }
     var particleLayers: [ParticleLayer] { drawables.compactMap { if case .particles(let layer) = $0 { layer } else { nil } } }
     let textures: SceneTextureCache
@@ -248,15 +247,12 @@ final class SceneInstance: @unchecked Sendable {
         for object in document.objects where objects[object.id] == nil { objects[object.id] = object }
         self.objects = objects
         var puppets: [Int: PuppetAnimator] = [:]
-        var groupParents: Set<Int> = []
         for drawable in drawables {
             if case .image(let layer) = drawable {
                 if let puppet = layer.puppet { puppets[layer.object.id] = puppet }
-                if layer.isPassthrough, !layer.children.isEmpty { groupParents.insert(layer.object.id) }
             }
         }
         self.puppetsByID = puppets
-        self.groupParentIDs = groupParents
         canvas = document.canvas
         self.renderSize = renderSize
         self.drawables = drawables
@@ -413,8 +409,8 @@ final class SceneInstance: @unchecked Sendable {
         return false
     }()
 
-    /// This frame's state of an object: keyframes, then script changes, then what its
-    /// parents pass down (visibility and opacity propagate unless a parent opts out).
+    /// This frame's state of an object: keyframes, script changes, then inherited visibility.
+    /// A transparent container can have visible children; a composition group applies alpha to its output.
     func state(of id: Int) -> SceneDocument.State? {
         if let cached = frameStates[id] { return cached }
         guard let object = objects[id] else { return nil }
@@ -432,10 +428,6 @@ final class SceneInstance: @unchecked Sendable {
         if let parentID = object.parent, parentID != id, let parent = objects[parentID],
            parent.raw["disablepropagation"] as? Bool != true, let parentState = self.state(of: parentID) {
             state.visible = state.visible && parentState.visible
-            // Grouped composition layers apply their own alpha once when compositing the group.
-            if !groupParentIDs.contains(parentID) {
-                state.alpha *= parentState.alpha
-            }
         }
         frameStates[id] = state
         return state
