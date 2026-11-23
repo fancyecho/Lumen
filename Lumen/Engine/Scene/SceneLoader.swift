@@ -537,7 +537,9 @@ enum SceneLoader {
             else { throw SceneLoadError.missingFile(json["material"] as? String ?? "particle material") }
             let rendererName = ((json["renderer"] as? [Any])?.first as? [String: Any])?["name"] as? String
             var combos = ["THICKFORMAT": 1]
-            if rendererName == "spritetrail" { combos["TRAILRENDERER"] = 1 }
+            if rendererName == "spritetrail" || rendererName == "ropetrail" || rendererName == "rope" {
+                combos["TRAILRENDERER"] = 1
+            }
             let pass = try prepare(material, overrides: nil, combos: combos, base: nil, effect: false)
             let system = ParticleSystem(json: json, pass: pass, values: values, overrides: overrides, childKind: kind,
                                         localTransform: transform, childMaxCount: maxCount, seed: seed)

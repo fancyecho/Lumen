@@ -34,8 +34,19 @@ struct WEUniform {
     let name: String
     let kind: Kind
     let count: Int
+    /// Preserves array syntax even when a symbolic size (e.g. `BLENDROWCOUNT`) defaults to 1.
+    let isArray: Bool
     let annotation: [String: Any]?
     var slot = 0
+
+    init(name: String, kind: Kind, count: Int, isArray: Bool = false, annotation: [String: Any]? = nil, slot: Int = 0) {
+        self.name = name
+        self.kind = kind
+        self.count = count
+        self.isArray = isArray || count > 1
+        self.annotation = annotation
+        self.slot = slot
+    }
 
     var materialKey: String? { annotation?["material"] as? String }
     var defaultValue: Any? { annotation?["default"] }
@@ -303,7 +314,7 @@ enum WEShaderTranslator {
         var code = ""
         for declared in unit.uniforms {
             guard let uniform = uniforms.first(where: { $0.name == declared.name }) else { continue }
-            if uniform.count == 1 {
+            if !uniform.isArray && uniform.count == 1 {
                 code += "  p.\(uniform.name) = \(unpack(uniform.kind, slot: "\(uniform.slot)"));\n"
             } else {
                 let stride = uniform.kind.slots
@@ -411,7 +422,7 @@ enum WEShaderTranslator {
         func fieldDeclarations() -> String {
             var code = ""
             for uniform in uniforms {
-                let suffix = uniform.count > 1 ? "[\(uniform.count)]" : ""
+                let suffix = uniform.isArray ? "[\(uniform.count)]" : ""
                 code += "  \(WEShaderTranslator.mslType(uniform.kind.rawValue)) \(uniform.name)\(suffix);\n"
             }
             for (name, _, type) in samplers { code += "  \(type == "sampler2DComparison" ? type : "sampler2D") \(name);\n" }
@@ -461,7 +472,9 @@ enum WEShaderTranslator {
             let type = rest[rest.startIndex]
             var name = rest.dropFirst().joined(separator: " ").replacingOccurrences(of: ";", with: "").trimmingCharacters(in: .whitespaces)
             var count = 1
+            var isArray = false
             if let open = name.firstIndex(of: "["), let close = name.firstIndex(of: "]") {
+                isArray = true
                 let size = String(name[name.index(after: open)..<close]).trimmingCharacters(in: .whitespaces)
                 count = Int(size) ?? Int(defines[size] ?? "") ?? evaluateSize(size)
                 name = String(name[name.startIndex..<open]).trimmingCharacters(in: .whitespaces)
@@ -491,7 +504,7 @@ enum WEShaderTranslator {
                     if !samplers.contains(where: { $0.0 == name }) { samplers.append((name, annotation, type)) }
                 } else if let kind = WEUniform.Kind(rawValue: type) {
                     if !uniforms.contains(where: { $0.name == name }) {
-                        uniforms.append(WEUniform(name: name, kind: kind, count: max(count, 1), annotation: annotation))
+                        uniforms.append(WEUniform(name: name, kind: kind, count: max(count, 1), isArray: isArray, annotation: annotation))
                     }
                 } else {
                     return nil
@@ -680,7 +693,7 @@ enum WEShaderTranslator {
         }
 
         static func wrapAssignments(_ text: String, types: [String: String]) -> String {
-            text.replacing(/(?m)(^|[;{}]\s*|\n\s*|\)\s*)([A-Za-z_]\w*)(\.[xyzwrgba]{1,4})?\s*(\+=|-=|=)(?!=)\s*([^;{}=]+?);/) { match in
+            text.replacing(/(?m)(^|[;{}]\s*|\n\s*|\)\s*)([A-Za-z_]\w*)(\.[xyzwrgba]{1,4})?\s*(\+=|-=|\*=|\/=|=)(?!=)\s*([^;{}=]+?);/) { match in
                 let whole = String(match.output.0)
                 guard let declared = types[String(match.output.2)], declared.contains("vec") else { return whole }
                 let base = declared.hasPrefix("i") ? "ivec" : declared.hasPrefix("u") ? "uvec" : "vec"

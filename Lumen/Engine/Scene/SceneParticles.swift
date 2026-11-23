@@ -54,6 +54,9 @@ final class ParticleSystem {
     enum Renderer {
         case sprite
         case trail(length: Float, maxLength: Float, minLength: Float)
+        /// `ropetrail`: `duration` is seconds of position history behind each particle head (not scaled by particle size).
+        case ropeTrail(duration: Float, maxLength: Float, minLength: Float)
+        case rope
         case none
     }
 
@@ -247,8 +250,12 @@ final class ParticleSystem {
             renderer = .trail(length: values.float(rendererJSON?["length"], default: 0.05),
                               maxLength: values.float(rendererJSON?["maxlength"], default: 10_000),
                               minLength: values.float(rendererJSON?["minlength"], default: 0))
-        case "rope", "ropetrail":
-            renderer = .none
+        case "ropetrail":
+            renderer = .ropeTrail(duration: values.float(rendererJSON?["length"], default: 0.2),
+                                  maxLength: values.float(rendererJSON?["maxlength"], default: 10_000),
+                                  minLength: values.float(rendererJSON?["minlength"], default: 0))
+        case "rope":
+            renderer = .rope
         default:
             renderer = .sprite
         }
@@ -486,13 +493,78 @@ final class ParticleSystem {
         return min(max((life - start) / (end - start), 0), 1)
     }
 
-    /// Writes four vertices per live particle; returns how many particles were written.
-    func writeVertices(into pointer: UnsafeMutablePointer<SceneVertex>, capacity: Int) -> Int {
+    /// Writes four vertices per live particle (or per ribbon segment for `rope`); returns how many quads were written.
+    func writeVertices(into pointer: UnsafeMutablePointer<SceneVertex>, capacity: Int, textureRatio: Float = 1) -> Int {
         var written = 0
         let corners: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(1, 0), SIMD2(0, 1), SIMD2(1, 1)]
+        if case .rope = renderer {
+            guard particles.count >= 2 else { return 0 }
+            let states = particles.map(renderState(of:))
+            let ratio = max(textureRatio, 0.001)
+            for i in 0..<(states.count - 1) where written < capacity {
+                let a = states[i], b = states[i + 1]
+                let maxAlpha = max(a.alpha, b.alpha)
+                let size = (a.size + b.size) * 0.5
+                guard maxAlpha > 0.001, size > 0.01 else { continue }
+                let delta = b.position - a.position
+                let segLen = simd_length(delta)
+                guard segLen > 0.05 else { continue }
+                let mid = (a.position + b.position) * 0.5
+                // `ComputeParticlePosition` spans `size * |up| * textureRatio` along `up`, so dividing
+                // the segment vector by `size * textureRatio` joins `a` and `b` seamlessly.
+                let velocity = delta / max(size * ratio, 0.0001)
+                let frame = randomFrame ? particles[i].frame : 0
+                for (index, corner) in corners.enumerated() {
+                    // `ComputeParticlePosition` offsets `-up * (uv.y - 0.5)`: `y = 0` sits at `b`, `y = 1` at `a`.
+                    let end = corner.y < 0.5 ? b : a
+                    pointer[written * 4 + index] = SceneVertex(
+                        position: SIMD4(mid, 1),
+                        texcoord: SIMD4(corner.x, corner.y, 0, size),
+                        texcoord1: SIMD4(velocity, frame),
+                        texcoord2: .zero,
+                        color: SIMD4(end.color, end.alpha)
+                    )
+                }
+                written += 1
+            }
+            return written
+        }
+        if case .ropeTrail(let duration, let maxLength, let minLength) = renderer {
+            let ratio = max(textureRatio, 0.001)
+            for particle in particles where written < capacity {
+                let state = renderState(of: particle)
+                guard state.alpha > 0.001, state.size > 0.01 else { continue }
+                let speed = simd_length(particle.velocity)
+                guard speed > 1e-3 else { continue }
+                let dir = particle.velocity / speed
+                // Trail spans `duration` seconds behind the head (capped by particle age so new stars grow smoothly).
+                let trailLen = min(maxLength, max(minLength, speed * min(particle.age, duration)))
+                guard trailLen > 0.5 else { continue }
+                let center = state.position - dir * (trailLen * 0.5)
+                let scaledVel = dir * (trailLen / max(state.size * ratio, 0.0001))
+                let life = particle.age / particle.lifetime
+                let frame = randomFrame ? particle.frame : (life * sequenceMultiplier).truncatingRemainder(dividingBy: 1)
+                for (index, corner) in corners.enumerated() {
+                    // Fade the tail (`corner.y == 1`) smoothly to transparent while keeping the head bright.
+                    let endAlpha = corner.y < 0.5 ? state.alpha : 0
+                    pointer[written * 4 + index] = SceneVertex(
+                        position: SIMD4(center, 1),
+                        texcoord: SIMD4(corner.x, corner.y, 0, state.size),
+                        texcoord1: SIMD4(scaledVel, frame),
+                        texcoord2: .zero,
+                        color: SIMD4(state.color, endAlpha)
+                    )
+                }
+                written += 1
+            }
+            return written
+        }
+        let isTrail: Bool
+        if case .trail = renderer { isTrail = true } else { isTrail = false }
         for particle in particles where written < capacity {
             let state = renderState(of: particle)
             guard state.alpha > 0.001, state.size > 0.01 else { continue }
+            if isTrail, simd_length_squared(particle.velocity) < 1e-6 { continue }
             let life = particle.age / particle.lifetime
             let frame = randomFrame ? particle.frame : (life * sequenceMultiplier).truncatingRemainder(dividingBy: 1)
             for (index, corner) in corners.enumerated() {

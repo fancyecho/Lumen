@@ -211,6 +211,7 @@ final class SceneInstance: @unchecked Sendable {
 
     private let sceneTexture: MTLTexture
     private let frameCopy: MTLTexture
+    private let bloomTargets: [MTLTexture]
     private let utility: SceneUtilityPipelines
     private var frameCopyValid = false
     private var modelDepthTargets: [ObjectIdentifier: MTLTexture] = [:]
@@ -270,6 +271,15 @@ final class SceneInstance: @unchecked Sendable {
         self.unsupported = hasPointVolume && pointVolume == nil ? unsupported + ["point-light volumes"] : unsupported
         sceneTexture = try Self.makeTarget(device, renderSize)
         frameCopy = try Self.makeTarget(device, renderSize)
+        if document.bloomEnabled, document.bloomStrength > 0.001 {
+            let bloomSize = SIMD2(max(1, renderSize.x / 4), max(1, renderSize.y / 4))
+            bloomTargets = [
+                try Self.makeTarget(device, bloomSize, format: .rgba16Float),
+                try Self.makeTarget(device, bloomSize, format: .rgba16Float),
+            ]
+        } else {
+            bloomTargets = []
+        }
         if self.rootDrawables.contains(where: \.usesModelDepth) {
             modelDepthTargets[ObjectIdentifier(sceneTexture)] = try Self.makeModelDepthTarget(device, matching: sceneTexture)
         }
@@ -300,7 +310,7 @@ final class SceneInstance: @unchecked Sendable {
     /// New private textures hold whatever was in memory; effects that read a target before
     /// writing it (feedback trails, simulations) must start from transparent black.
     private func clearTargets(on queue: MTLCommandQueue?) {
-        var targets = [sceneTexture, frameCopy]
+        var targets = [sceneTexture, frameCopy] + bloomTargets
         for layer in layers {
             targets += layer.buffers
             targets += Array(layer.targets.values)
@@ -320,8 +330,8 @@ final class SceneInstance: @unchecked Sendable {
         buffer.waitUntilCompleted()
     }
 
-    static func makeTarget(_ device: MTLDevice, _ size: SIMD2<Int>) throws -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: max(1, size.x), height: max(1, size.y), mipmapped: false)
+    static func makeTarget(_ device: MTLDevice, _ size: SIMD2<Int>, format: MTLPixelFormat = .rgba8Unorm) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: max(1, size.x), height: max(1, size.y), mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
         guard let texture = device.makeTexture(descriptor: descriptor) else { throw SceneLoadError.unsupported("a render target this large") }
@@ -499,6 +509,58 @@ final class SceneInstance: @unchecked Sendable {
             }
         }
         session.end(clearIfUnused: buffer)
+        if bloomTargets.count == 2 { encodeBloom(into: buffer) }
+    }
+
+    /// Scene-wide `general.bloom` post-process: quarter-res bright-pass extract, separable
+    /// 9-tap Gaussian blur, and additive composite tinted by `bloomTint * bloomStrength`.
+    private func encodeBloom(into buffer: MTLCommandBuffer) {
+        let a = bloomTargets[0], b = bloomTargets[1]
+        let sampler = textures.samplers.state(nearest: false, clamp: true)
+        let texel = SIMD2<Float>(1 / Float(a.width), 1 / Float(a.height))
+
+        if let enc = beginPass(buffer, target: a, clear: false) {
+            var params = SIMD4<Float>(document.bloomThreshold, 1 / Float(sceneTexture.width), 1 / Float(sceneTexture.height), 0)
+            enc.setRenderPipelineState(utility.bloomExtract)
+            enc.setFragmentBytes(&params, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+            enc.setFragmentTexture(sceneTexture, index: 0)
+            enc.setFragmentSamplerState(sampler, index: 0)
+            enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            enc.endEncoding()
+        }
+        if let enc = beginPass(buffer, target: b, clear: false) {
+            var dir = SIMD2<Float>(texel.x, 0)
+            enc.setRenderPipelineState(utility.bloomBlur)
+            enc.setFragmentBytes(&dir, length: MemoryLayout<SIMD2<Float>>.size, index: 0)
+            enc.setFragmentTexture(a, index: 0)
+            enc.setFragmentSamplerState(sampler, index: 0)
+            enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            enc.endEncoding()
+        }
+        if let enc = beginPass(buffer, target: a, clear: false) {
+            var dir = SIMD2<Float>(0, texel.y)
+            enc.setRenderPipelineState(utility.bloomBlur)
+            enc.setFragmentBytes(&dir, length: MemoryLayout<SIMD2<Float>>.size, index: 0)
+            enc.setFragmentTexture(b, index: 0)
+            enc.setFragmentSamplerState(sampler, index: 0)
+            enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            enc.endEncoding()
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = sceneTexture
+        pass.colorAttachments[0].loadAction = .load
+        pass.colorAttachments[0].storeAction = .store
+        if let enc = buffer.makeRenderCommandEncoder(descriptor: pass) {
+            // Scale WE's SDR bloom strength gently so bright accents glow without clipping to flat white.
+            let gain = min(document.bloomStrength, 6) * 0.25
+            var tint = SIMD4<Float>(document.bloomTint * gain, 1)
+            enc.setRenderPipelineState(utility.bloomComposite)
+            enc.setFragmentBytes(&tint, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+            enc.setFragmentTexture(a, index: 0)
+            enc.setFragmentSamplerState(sampler, index: 0)
+            enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            enc.endEncoding()
+        }
     }
 
     private func samplePointLights() {
@@ -581,8 +643,7 @@ final class SceneInstance: @unchecked Sendable {
         var state = drawState(frame: frame, object: object)
         state.model = parentWorld(of: layer.object) * SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale)
         if let viewProjectionOverride {
-            // Composition-group projection keeps local Z in pixels, not clip-space units.
-            state.viewProjection = simd_float4x4(diagonal: SIMD4(1, 1, -0.0001, 1)) * viewProjectionOverride
+            state.viewProjection = viewProjectionOverride
         } else if let modelCamera {
             state.eye = modelCamera.eye
             state.viewProjection = modelCamera.viewProjection
@@ -698,8 +759,7 @@ final class SceneInstance: @unchecked Sendable {
             state.viewProjection = viewProjection
         } else {
             state.model = matrix_identity_float4x4
-            state.viewProjection = SceneMath.scale(SIMD2(2 / max(layer.chainSize.x, 1), 2 / max(layer.chainSize.y, 1)))
-                * SceneMath.translation(-layer.chainCenter)
+            state.viewProjection = SceneMath.localOrthographic(center: layer.chainCenter, size: layer.chainSize)
         }
         var current = 0
         if layer.isPassthrough, !layer.copyBackground {
@@ -730,9 +790,7 @@ final class SceneInstance: @unchecked Sendable {
 
         // Grouped composition layer children draw into Pass 0's buffer before parent effects run.
         if layer.isPassthrough, !layer.children.isEmpty, abs(simd_determinant(model)) > 1e-10 {
-            let groupVP = SceneMath.scale(SIMD2(2 / max(layer.chainSize.x, 1), 2 / max(layer.chainSize.y, 1)))
-                * SceneMath.translation(-layer.chainCenter)
-                * model.inverse
+            let groupVP = SceneMath.localOrthographic(center: layer.chainCenter, size: layer.chainSize) * model.inverse
             let groupTargetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
             let groupTarget = layer.buffers[0]
             var groupSession = SceneSession(target: groupTarget, clear: .zero, cleared: true,
@@ -955,7 +1013,21 @@ final class SceneInstance: @unchecked Sendable {
             guard case .none = system.renderer else {
                 guard let buffer = layer.vertexBuffer(for: system, device: device) else { continue }
                 let capacity = buffer.length / (MemoryLayout<SceneVertex>.stride * 4)
-                let count = system.writeVertices(into: buffer.contents().bindMemory(to: SceneVertex.self, capacity: capacity * 4), capacity: capacity)
+                let textureRatio: Float = {
+                    if let sheet = system.pass.spriteSheet, let first = sheet.frames.first {
+                        let width = max(first.xAxis.x, 0.0001), height = max(first.yAxis.y, 0.0001)
+                        return (height * sheet.textureSize.y) / max(width * sheet.textureSize.x, 0.0001)
+                    }
+                    if case .texture(let tex)? = system.pass.textures[0] {
+                        return tex.resolution.y / max(tex.resolution.x, 1)
+                    }
+                    return 1
+                }()
+                let count = system.writeVertices(
+                    into: buffer.contents().bindMemory(to: SceneVertex.self, capacity: capacity * 4),
+                    capacity: capacity,
+                    textureRatio: textureRatio
+                )
                 guard count > 0 else { continue }
                 var state = drawState(frame: frame, object: self.state(of: layer.object.id) ?? layer.object.state(at: frame.time))
                 state.model = system.childKind == .independent && system !== layer.root ? layer.model * system.localTransform : layer.model
@@ -964,8 +1036,13 @@ final class SceneInstance: @unchecked Sendable {
                 // Particle colour and alpha come from the simulation, not the object.
                 state.color = SIMD3(1, 1, 1)
                 state.alpha = 1
-                if case .trail(let length, let maxLength, let minLength) = system.renderer {
+                switch system.renderer {
+                case .trail(let length, let maxLength, let minLength):
                     state.renderVar0 = SIMD4(length, maxLength, minLength, 0)
+                case .rope, .ropeTrail:
+                    state.renderVar0 = SIMD4(1, 10_000, 0, 0)
+                case .sprite, .none:
+                    break
                 }
                 if let sheet = system.pass.spriteSheet, let first = sheet.frames.first {
                     let width = max(first.xAxis.x, 0.0001), height = max(first.yAxis.y, 0.0001)
@@ -1043,6 +1120,9 @@ final class SceneUtilityPipelines: @unchecked Sendable {
     let present: MTLRenderPipelineState
     /// Catmull-Rom filtering for when the scene is shown larger than it was rendered.
     let presentSharp: MTLRenderPipelineState
+    let bloomExtract: MTLRenderPipelineState
+    let bloomBlur: MTLRenderPipelineState
+    let bloomComposite: MTLRenderPipelineState
 
     init(device: MTLDevice) throws {
         let library = try device.makeLibrary(source: Self.source, options: nil)
@@ -1063,6 +1143,22 @@ final class SceneUtilityPipelines: @unchecked Sendable {
         present = try device.makeRenderPipelineState(descriptor: descriptor)
         descriptor.fragmentFunction = library.makeFunction(name: "lumen_scene_present_sharp_fragment")
         presentSharp = try device.makeRenderPipelineState(descriptor: descriptor)
+
+        let bloom = MTLRenderPipelineDescriptor()
+        bloom.vertexFunction = library.makeFunction(name: "lumen_bloom_vertex")
+        bloom.fragmentFunction = library.makeFunction(name: "lumen_bloom_extract_fragment")
+        bloom.colorAttachments[0].pixelFormat = .rgba16Float
+        bloomExtract = try device.makeRenderPipelineState(descriptor: bloom)
+        bloom.fragmentFunction = library.makeFunction(name: "lumen_bloom_blur_fragment")
+        bloomBlur = try device.makeRenderPipelineState(descriptor: bloom)
+        bloom.fragmentFunction = library.makeFunction(name: "lumen_bloom_composite_fragment")
+        bloom.colorAttachments[0].pixelFormat = .rgba8Unorm
+        bloom.colorAttachments[0].isBlendingEnabled = true
+        bloom.colorAttachments[0].sourceRGBBlendFactor = .one
+        bloom.colorAttachments[0].destinationRGBBlendFactor = .one
+        bloom.colorAttachments[0].sourceAlphaBlendFactor = .zero
+        bloom.colorAttachments[0].destinationAlphaBlendFactor = .one
+        bloomComposite = try device.makeRenderPipelineState(descriptor: bloom)
     }
 
     private static var cached: SceneUtilityPipelines?
@@ -1140,6 +1236,43 @@ final class SceneUtilityPipelines: @unchecked Sendable {
         c += t.sample(s, float2(uv3.x, uv3.y)).rgb * w3.x * w3.y;
         return float4(saturate(c), 1.0);
     }
+
+    vertex PresentOut lumen_bloom_vertex(uint vid [[vertex_id]]) {
+        float2 corner = float2(vid & 1, vid >> 1);
+        PresentOut o;
+        o.position = float4(corner.x * 2.0 - 1.0, 1.0 - corner.y * 2.0, 0, 1);
+        o.uv = corner;
+        return o;
+    }
+
+    fragment float4 lumen_bloom_extract_fragment(PresentOut in [[stage_in]], constant float4& params [[buffer(0)]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
+        float2 d = params.yz;
+        float3 c = 0.25 * (
+            t.sample(s, in.uv + float2(-d.x, -d.y)).rgb +
+            t.sample(s, in.uv + float2( d.x, -d.y)).rgb +
+            t.sample(s, in.uv + float2(-d.x,  d.y)).rgb +
+            t.sample(s, in.uv + float2( d.x,  d.y)).rgb
+        );
+        float luma = dot(c, float3(0.2126, 0.7152, 0.0722));
+        float knee = 0.15;
+        float soft = clamp(luma - params.x + knee, 0.0, 2.0 * knee);
+        float contrib = max(luma - params.x, (soft * soft) / (4.0 * knee + 1e-4)) / max(luma, 1e-4);
+        return float4(c * contrib, 1.0);
+    }
+
+    fragment float4 lumen_bloom_blur_fragment(PresentOut in [[stage_in]], constant float2& dir [[buffer(0)]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
+        const float w[5] = { 0.22702703, 0.19459459, 0.12162162, 0.05405405, 0.01621622 };
+        float3 sum = t.sample(s, in.uv).rgb * w[0];
+        for (int i = 1; i < 5; i++) {
+            float2 o = dir * float(i) * 1.5;
+            sum += (t.sample(s, in.uv + o).rgb + t.sample(s, in.uv - o).rgb) * w[i];
+        }
+        return float4(sum, 1.0);
+    }
+
+    fragment float4 lumen_bloom_composite_fragment(PresentOut in [[stage_in]], constant float4& tint [[buffer(0)]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
+        return float4(t.sample(s, in.uv).rgb * tint.rgb, 0.0);
+    }
     """
 }
 
@@ -1167,6 +1300,19 @@ enum SceneMath {
             SIMD4(0, sy, 0, 0),
             SIMD4(0, 0, -0.0001, 0),
             SIMD4(-1 - offset.x * sx, -1 - offset.y * sy, 0, 1)
+        ))
+    }
+
+    /// Local-space offscreen buffer projection (Pass 0 and composition groups): maps XY from
+    /// `center ± size/2` to `[-1, 1]` and scales local Z into `[-1, 1]` so puppet bones or 3D-tilted
+    /// layers with non-zero Z are never clipped by Metal's `[0, 1]` depth planes.
+    static func localOrthographic(center: SIMD2<Float>, size: SIMD2<Float>) -> simd_float4x4 {
+        let sx = 2 / max(size.x, 1), sy = 2 / max(size.y, 1)
+        return simd_float4x4(columns: (
+            SIMD4(sx, 0, 0, 0),
+            SIMD4(0, sy, 0, 0),
+            SIMD4(0, 0, -0.0001, 0),
+            SIMD4(-center.x * sx, -center.y * sy, 0, 1)
         ))
     }
 
