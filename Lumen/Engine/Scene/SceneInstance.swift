@@ -185,6 +185,13 @@ final class SceneInstance: @unchecked Sendable {
     private let puppetsByID: [Int: PuppetAnimator]
     let scripts: SceneScriptRuntime?
     private var scriptChanges: [Int: SceneScriptRuntime.Change] = [:]
+    private var cursorTracker = SceneCursorTracker()
+    private lazy var cursorLayers: [ImageLayer] = {
+        guard let ids = scripts?.cursorLayerIDs, !ids.isEmpty else { return [] }
+        // Some Workshop projects omit Solid for their scripted hit areas. An explicit false
+        // still opts out, and a transparent but visible layer can be a click target.
+        return layers.reversed().filter { ids.contains($0.object.id) && $0.object.raw["solid"] as? Bool != false }
+    }()
     private var frameStates: [Int: SceneDocument.State] = [:]
     private var frameWorlds: [Int: simd_float4x4] = [:]
     private var compositeTextures: [Int: MTLTexture] = [:]
@@ -294,6 +301,7 @@ final class SceneInstance: @unchecked Sendable {
         var parallax: SIMD2<Float>
         /// The system audio spectrum, for audio-reactive shaders, emitters and scripts.
         var audio: AudioBands = .silent
+        var cursorInput = SceneCursorInput()
     }
 
     /// Whether anything in the scene follows the music, so system audio capture is worth running.
@@ -367,6 +375,21 @@ final class SceneInstance: @unchecked Sendable {
         return state(of: parentID)?.visible ?? true
     }
 
+    private func cursorEvents(for frame: Frame) -> [SceneCursorEvent] {
+        let input = frame.cursorInput
+        guard input.reset || !input.samples.isEmpty, !cursorLayers.isEmpty else { return [] }
+        let targets: [SceneCursorTarget] = input.samples.contains(where: { $0.world != nil })
+            ? cursorLayers.compactMap { layer in
+                let object = layer.object
+                guard let state = self.state(of: object.id), state.visible else { return nil }
+                let offset = document.parallaxEnabled ? frame.cameraOffset * object.parallaxDepth : .zero
+                return SceneCursorTarget(layerID: object.id, size: layer.size,
+                                         model: layer.model(for: state, parent: world(of: object.parent)), cameraOffset: offset)
+            }
+            : []
+        return cursorTracker.events(for: input, targets: targets)
+    }
+
     /// Draws the whole scene into `outputTexture`.
     func encode(into buffer: MTLCommandBuffer, frame: Frame) {
         frameCopyValid = false
@@ -375,8 +398,15 @@ final class SceneInstance: @unchecked Sendable {
         frameWorlds.removeAll(keepingCapacity: true)
         compositeTextures.removeAll(keepingCapacity: true)
         if let scripts {
+            let events = cursorEvents(for: frame)
             scriptChanges = scripts.update(time: Double(frame.time), delta: Double(frame.delta), daytime: Double(frame.daytime),
-                                           cursor: frame.pointerCanvas, cursorDown: false, audio: frame.audio)
+                                           cursor: frame.pointerCanvas, cursorDown: frame.cursorInput.isDown,
+                                           cursorScreen: frame.cursorInput.screen, cursorEvents: events, audio: frame.audio)
+            if !frameStates.isEmpty {
+                // Hit testing used the last script state. Draw with changes from this frame's callbacks.
+                frameStates.removeAll(keepingCapacity: true)
+                frameWorlds.removeAll(keepingCapacity: true)
+            }
         }
         // Evaluate all puppet skeletons up front so bone attachments are ready in any layer order.
         for (_, puppet) in puppetsByID { puppet.evaluate(at: frame.time) }

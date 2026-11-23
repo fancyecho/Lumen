@@ -36,6 +36,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
 
     private let context: JSContext
     private var hasScripts = false
+    private(set) var cursorLayerIDs: Set<Int> = []
     private var failed = false
     private let lock = NSLock()
 
@@ -99,14 +100,19 @@ final class SceneScriptRuntime: @unchecked Sendable {
           cursorClick: typeof cursorClick === 'function' ? cursorClick : null,
           cursorDown: typeof cursorDown === 'function' ? cursorDown : null,
           cursorUp: typeof cursorUp === 'function' ? cursorUp : null,
-          cursorMove: typeof cursorMove === 'function' ? cursorMove : null
+          cursorMove: typeof cursorMove === 'function' ? cursorMove : null,
+          cursorEnter: typeof cursorEnter === 'function' ? cursorEnter : null,
+          cursorLeave: typeof cursorLeave === 'function' ? cursorLeave : null
         };
         })
         """
         lock.lock()
         defer { lock.unlock() }
         guard let factory = context.evaluateScript(wrapper), !factory.isUndefined else { return }
-        context.objectForKeyedSubscript("__addScript")?.call(withArguments: [id, property, factory, value ?? NSNull(), scriptProperties])
+        if context.objectForKeyedSubscript("__addScript")?
+            .call(withArguments: [id, property, factory, value ?? NSNull(), scriptProperties])?.toBool() == true {
+            cursorLayerIDs.insert(id)
+        }
         hasScripts = true
     }
 
@@ -139,13 +145,20 @@ final class SceneScriptRuntime: @unchecked Sendable {
 
     /// Runs one frame of every script and returns the layers they changed, keyed by id.
     func update(time: Double, delta: Double, daytime: Double, cursor: SIMD2<Float>?, cursorDown: Bool,
+                cursorScreen: SIMD2<Float>? = nil, cursorEvents: [SceneCursorEvent] = [],
                 audio: AudioBands = .silent) -> [Int: Change] {
         guard hasScripts, !failed else { return [:] }
         lock.lock()
         defer { lock.unlock() }
         let cursorArgument: Any = cursor.map { [$0.x, $0.y] as Any } ?? NSNull()
         let audioArgument: Any = wantsAudio ? (audio.left + audio.right) as Any : NSNull()
-        guard let result = context.objectForKeyedSubscript("__frame")?.call(withArguments: [time, delta, daytime, cursorArgument, cursorDown, audioArgument]),
+        let screenArgument: Any = cursorScreen.map { [$0.x, $0.y] as Any } ?? NSNull()
+        let eventArgument: Any = cursorEvents.isEmpty ? NSNull() : cursorEvents.map { event -> [Any] in
+            [event.kind.rawValue, event.layerID, event.world.x, event.world.y, event.local.x, event.local.y,
+             event.screen.x, event.screen.y, event.isDown]
+        }
+        guard let result = context.objectForKeyedSubscript("__frame")?
+            .call(withArguments: [time, delta, daytime, cursorArgument, cursorDown, screenArgument, eventArgument, audioArgument]),
               let text = result.toString(), let data = text.data(using: .utf8),
               let entries = try? JSONSerialization.jsonObject(with: data) as? [[Any]]
         else { return [:] }
@@ -326,16 +339,24 @@ final class SceneScriptRuntime: @unchecked Sendable {
       return value;
     }
 
+    var __cursorScripts = {};
+    var __cursorHandlers = ['cursorEnter', 'cursorLeave', 'cursorMove', 'cursorDown', 'cursorUp', 'cursorClick'];
+
     function __addScript(id, property, factory, value, scriptProperties) {
       var layer = __layers[id];
       if (!layer) return;
       __pendingScriptProperties = scriptProperties || {};
+      var hasCursorHandlers = false;
       try {
         var api = factory(layer, layer);
-        __scripts.push({ layer: layer, property: property, api: api, value: __convertIn(property, value), errors: 0 });
+        var script = { layer: layer, property: property, api: api, value: __convertIn(property, value), errors: 0 };
+        __scripts.push(script);
+        hasCursorHandlers = __cursorHandlers.some(function (name) { return typeof api[name] === 'function'; });
+        if (hasCursorHandlers) (__cursorScripts[id] || (__cursorScripts[id] = [])).push(script);
         __touch(layer);
       } catch (e) {}
       __pendingScriptProperties = {};
+      return hasCursorHandlers;
     }
 
     function __assign(s, value) {
@@ -376,10 +397,26 @@ final class SceneScriptRuntime: @unchecked Sendable {
       }
     }
 
-    function __frame(time, delta, daytime, cursor, down, audio) {
+    function __dispatchCursorEvents(events) {
+      for (var i = 0; i < events.length; i++) {
+        var e = events[i], scripts = __cursorScripts[e[1]];
+        if (!scripts) continue;
+        input.cursorWorldPosition = new Vec3(e[2], e[3], 0);
+        input.cursorScreenPosition = new Vec2(e[6], e[7]);
+        input.cursorLeftDown = e[8];
+        for (var j = 0; j < scripts.length; j++) {
+          __call(scripts[j], e[0], { worldPosition: new Vec3(e[2], e[3], 0), localPosition: new Vec3(e[4], e[5], 0) });
+        }
+      }
+    }
+
+    function __frame(time, delta, daytime, cursor, down, screen, cursorEvents, audio) {
       if (audio) __audio(audio);
       engine.runtime = time; engine.frametime = delta; engine.timeOfDay = daytime;
-      if (cursor) { input.cursorWorldPosition = new Vec3(cursor[0], cursor[1], 0); input.cursorScreenPosition = new Vec2(cursor[0] / __canvas.x, 1 - cursor[1] / __canvas.y); }
+      if (cursorEvents) __dispatchCursorEvents(cursorEvents);
+      if (cursor) input.cursorWorldPosition = new Vec3(cursor[0], cursor[1], 0);
+      if (screen) input.cursorScreenPosition = new Vec2(screen[0], screen[1]);
+      else if (cursor) input.cursorScreenPosition = new Vec2(cursor[0] / __canvas.x, 1 - cursor[1] / __canvas.y);
       input.cursorLeftDown = !!down;
       for (var i = 0; i < __scripts.length; i++) {
         var s = __scripts[i];
