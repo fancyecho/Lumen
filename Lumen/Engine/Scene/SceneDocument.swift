@@ -229,6 +229,10 @@ struct SceneDocument {
     var parallaxMouseInfluence: Float
     var ambientColor: SIMD3<Float>
     var skylightColor: SIMD3<Float>
+    var bloomEnabled: Bool
+    var bloomStrength: Float
+    var bloomThreshold: Float
+    var bloomTint: SIMD3<Float>
     var objects: [Object]
 
     init(json: [String: Any], values: SceneValues) {
@@ -249,6 +253,10 @@ struct SceneDocument {
         parallaxMouseInfluence = values.float(general["cameraparallaxmouseinfluence"], default: 0.5)
         ambientColor = values.vec3(general["ambientcolor"], default: SIMD3(repeating: 0.3))
         skylightColor = values.vec3(general["skylightcolor"], default: SIMD3(repeating: 0.3))
+        bloomEnabled = values.bool(general["bloom"], default: false)
+        bloomStrength = max(0, values.float(general["bloomstrength"], default: 2.0))
+        bloomThreshold = min(max(values.float(general["bloomthreshold"], default: 0.65), 0), 1)
+        bloomTint = values.vec3(general["bloomtint"], default: SIMD3(1, 1, 1))
 
         var objects: [Object] = []
         for case let raw as [String: Any] in json["objects"] as? [Any] ?? [] {
