@@ -40,7 +40,7 @@ AppModel (@MainActor, 全局状态)
 | `Lumen/Engine/Renderers` | 视频（AVPlayerLayer + AVPlayerLooper，多屏共享）、着色器（`BudgetedMetalView` 按像素预算渲染） |
 | `Lumen/Engine/Shaders` | 内置和用户 Metal 着色器，运行时编译 |
 | `Lumen/Engine/Policy` | 自动暂停（遮挡、锁屏、屏保、低电量、电池、高温）、桌面鼠标监听 |
-| `Lumen/Engine/LockScreen` | 锁屏视频生成与安装 |
+| `Lumen/Engine/LockScreen` | 锁屏视频生成与安装；场景离屏录制、网页快照录制（`RenderedLoopRecorder.swift`） |
 | `Lumen/Engine/Audio` | 系统音频采集（Core Audio process tap）与频谱分析，供音频响应壁纸使用 |
 | `Lumen/Engine/Web` | Web 渲染器、`lumen-web://` 本地协议、注入的桥接脚本 |
 | `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（见下节） |

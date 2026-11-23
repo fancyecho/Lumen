@@ -291,6 +291,25 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
         }
     }
 
+    // MARK: Recording
+
+    /// Keeps the page animating while its window is hidden or off-screen (for recording a
+    /// Lock Screen loop); WebKit otherwise throttles occluded pages to a stop.
+    func keepRenderingWhenOccluded() {
+        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard webView.responds(to: selector), let method = class_getInstanceMethod(WKWebView.self, selector) else { return }
+        typealias SetEnabled = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: SetEnabled.self)(webView, selector, false)
+    }
+
+    /// The page as currently drawn.
+    func snapshot() async -> CGImage? {
+        let configuration = WKSnapshotConfiguration()
+        configuration.afterScreenUpdates = false
+        guard let image = try? await webView.takeSnapshot(configuration: configuration) else { return nil }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
     private func applyMute() {
         // WebKit's page-level mute silences Web Audio too; fall back to the bridge's media volume.
         let selector = NSSelectorFromString("_setPageMuted:")

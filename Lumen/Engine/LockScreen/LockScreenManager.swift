@@ -9,7 +9,7 @@ enum LockScreenStatus: Equatable {
     case preparing(Double)
     case installing
     case active(title: String)
-    /// The followed wallpaper is a scene or web page; the previous Lock Screen stays.
+    /// The followed scene or web page can't be recorded (missing files or assets); the previous Lock Screen stays.
     case keepingPrevious(title: String?)
     case failed(String)
 }
@@ -122,14 +122,13 @@ final class LockScreenManager {
             status = .waitingForWallpaper
             return
         }
-        guard wallpaper.kind == .video || wallpaper.kind == .shader else {
-            // Live web pages and scenes can't be baked into a movie yet; leave whatever
-            // the Lock Screen shows now rather than tearing it down.
+        guard let request = makeRequest(for: wallpaper) else {
+            // A scene or page whose files are gone (or scenes without Wallpaper Engine's
+            // assets): leave whatever the Lock Screen shows now rather than tearing it down.
             job?.cancel()
             status = .keepingPrevious(title: state?.title)
             return
         }
-        let request = makeRequest(for: wallpaper)
         let title = wallpaper.title
 
         job?.cancel()
@@ -241,8 +240,29 @@ final class LockScreenManager {
 
     // MARK: Helpers
 
-    private func makeRequest(for wallpaper: Wallpaper) -> LockScreenVideoBuilder.Request {
+    private func makeRequest(for wallpaper: Wallpaper) -> LockScreenVideoBuilder.Request? {
         let display = NSScreen.screens.first?.pixelSize ?? CGSize(width: 3840, height: 2160)
+        var scene: SceneLoopRecorder.Source?
+        var web: LockScreenVideoBuilder.WebSource?
+        switch wallpaper.kind {
+        case .scene:
+            guard let package = wallpaper.package, let folder = library.packageFolder(for: wallpaper),
+                  let assets = settings.sceneAssets else { return nil }
+            scene = SceneLoopRecorder.Source(folder: folder, entry: package.entry, assets: assets, values: package.resolvedValues)
+        case .web:
+            guard let package = wallpaper.package else { return nil }
+            let source: WebRenderer.Source
+            if let remote = package.remoteURL.flatMap(URL.init(string:)) {
+                source = .remote(remote, id: wallpaper.id)
+            } else if let folder = library.packageFolder(for: wallpaper) {
+                source = .folder(folder, entry: package.entry, id: wallpaper.id)
+            } else {
+                return nil
+            }
+            web = LockScreenVideoBuilder.WebSource(source: source, properties: package.properties, values: package.resolvedValues)
+        case .video, .shader:
+            break
+        }
         return LockScreenVideoBuilder.Request(
             wallpaperID: wallpaper.id,
             kind: wallpaper.kind,
@@ -252,6 +272,8 @@ final class LockScreenManager {
                 video.optimized.map { CGSize(width: $0.width, height: $0.height) } ?? CGSize(width: video.width, height: video.height)
             } ?? .zero,
             shader: wallpaper.shader,
+            scene: scene,
+            web: web,
             framing: wallpaper.resolvedFraming,
             scaling: settings.videoScaling,
             displaySize: display

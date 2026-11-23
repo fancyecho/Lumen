@@ -43,6 +43,13 @@ Tools/test.sh shaders
 - `Tools/test.sh shaders dump:<名字片段>`：把翻译结果写到 `build/tools/dump.metal`，便于排查。
 
 ```bash
+Tools/test.sh lockloop scene "<项目文件夹>"
+Tools/test.sh lockloop web "<项目文件夹>"
+```
+
+把场景或网页壁纸录成锁屏用的循环视频（`build/tools/lockloop.mov`），**不安装到系统锁屏**。会编译整个 app 源码，第一次要几分钟。
+
+```bash
 Tools/test.sh steam
 ```
 

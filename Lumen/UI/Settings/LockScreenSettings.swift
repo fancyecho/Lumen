@@ -139,9 +139,9 @@ struct LockScreenStatusLabel: View {
         case .keepingPrevious(let title):
             Group {
                 if let title {
-                    Text("Scenes and web pages can't play here yet. Still showing “\(title)”.")
+                    Text("This wallpaper can't be recorded: its files or Wallpaper Engine's assets are missing. Still showing “\(title)”.")
                 } else {
-                    Text("Scenes and web pages can't play on the Lock Screen yet.")
+                    Text("This wallpaper can't be recorded: its files or Wallpaper Engine's assets are missing.")
                 }
             }
             .foregroundStyle(.secondary)

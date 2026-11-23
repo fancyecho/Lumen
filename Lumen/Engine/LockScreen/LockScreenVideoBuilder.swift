@@ -19,6 +19,10 @@ enum LockScreenVideoBuilder {
         let sourceCodec: String?
         let sourceSize: CGSize
         let shader: ShaderConfig?
+        /// Scene wallpapers: the package to record offscreen.
+        let scene: SceneLoopRecorder.Source?
+        /// Web wallpapers: the page and its properties.
+        let web: WebSource?
         let framing: WallpaperFraming
         let scaling: VideoScaling
         /// Pixel size of the main display; the movie is rendered at (or under) this size.
@@ -28,11 +32,23 @@ enum LockScreenVideoBuilder {
             let parts: [String] = [
                 wallpaperID.uuidString, kind.rawValue, sourceURL?.lastPathComponent ?? "",
                 shader.map { StableHash.hex(of: $0) } ?? "",
+                (scene?.values ?? web?.values).map(Self.valuesKey) ?? "",
                 "\(framing.horizontal),\(framing.vertical),\(framing.zoom)", scaling.rawValue,
                 "\(Int(displaySize.width))x\(Int(displaySize.height))",
             ]
             return StableHash.hex(Data(parts.joined(separator: "|").utf8))
         }
+
+        /// User property values, so customising a scene or page re-records its loop.
+        private static func valuesKey(_ values: [String: PropertyValue]) -> String {
+            values.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.jsonLiteral)" }.joined(separator: ",")
+        }
+    }
+
+    struct WebSource: Sendable {
+        let source: WebRenderer.Source
+        let properties: [WEProperty]
+        let values: [String: PropertyValue]
     }
 
     enum Failure: LocalizedError {
@@ -69,8 +85,18 @@ enum LockScreenVideoBuilder {
             } else {
                 loop = source
             }
-        case .web, .scene:
-            throw Failure.exportFailed(String(localized: "web and scene wallpapers can't play on the Lock Screen yet"))
+        case .scene:
+            guard let scene = request.scene else { throw Failure.noVideoTrack }
+            loop = workFolder.appending(path: "loop.mov")
+            let size = recordedSize(for: request.displaySize)
+            try await Task.detached(priority: .utility) {
+                try SceneLoopRecorder.record(scene, framing: request.framing, scaling: request.scaling, size: size, to: loop) { progress($0 * 0.9) }
+            }.value
+        case .web:
+            guard let web = request.web else { throw Failure.noVideoTrack }
+            loop = workFolder.appending(path: "loop.mov")
+            try await WebLoopRecorder.record(web.source, properties: web.properties, values: web.values,
+                                             size: recordedSize(for: request.displaySize), to: loop) { progress($0 * 0.9) }
         case .shader:
             guard let shader = request.shader else { throw Failure.noVideoTrack }
             loop = workFolder.appending(path: "loop.mov")
@@ -148,6 +174,11 @@ enum LockScreenVideoBuilder {
     private static let shaderLoopSeconds = 30.0
     private static let shaderFrameRate = 30
     private static let crossfadeSeconds = 1.5
+
+    /// Scenes and pages are recorded at the display's size, up to 4K.
+    private static func recordedSize(for display: CGSize) -> CGSize {
+        evenSize(fitting: display, max: CGSize(width: 3840, height: 2160))
+    }
 
     private static func shaderSize(for display: CGSize) -> CGSize {
         // About 4 MP is plenty for soft generative scenes and keeps rendering quick.

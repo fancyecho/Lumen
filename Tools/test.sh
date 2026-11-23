@@ -5,6 +5,7 @@
 #   Tools/test.sh scenes [ids] [time] [layers]  render scenes in the corpus to PNG
 #   Tools/test.sh shaders [v|<name>|dump:<name>] translate + compile every WE shader
 #   Tools/test.sh steam                         check SteamCMD prompt parsing with a fake steamcmd
+#   Tools/test.sh lockloop scene|web <folder> [entry] [WxH]  record a Lock Screen loop to build/tools (no install)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/Lumen"
@@ -49,6 +50,14 @@ case "${1:-}" in
     rm -rf "$OUT/steam-out"
     "$OUT/steamcmd-fake" "$ROOT/Tools/SteamCMDFake/fake-steamcmd.sh" "$OUT/steam-out"
     ;;
+  lockloop)
+    # Compiles the app's sources (minus its @main) into a tool that records without installing.
+    find "$SRC" -name '*.swift' ! -name LumenApp.swift > "$OUT/app-sources.txt"
+    xargs swiftc -O -D DEBUG -enable-bare-slash-regex -module-name Lumen -o "$OUT/loop-recorder" \
+      "$ROOT/Tools/LoopRecorderTest/main.swift" < "$OUT/app-sources.txt"
+    "$OUT/loop-recorder" "$2" "$3" "${4:-$([[ "$2" == web ]] && echo index.html || echo scene.json)}" "$OUT/lockloop.mov" "$ASSETS" "${5:-2560x1664}"
+    echo "movie: $OUT/lockloop.mov"
+    ;;
   *)
-    sed -n '2,8p' "$0"; exit 1 ;;
+    sed -n '2,9p' "$0"; exit 1 ;;
 esac
