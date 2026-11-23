@@ -31,9 +31,10 @@ enum SceneLoader {
         let values = SceneValues(properties: request.values)
         let document = SceneDocument(json: json, values: values)
         let renderSize = Self.renderSize(canvas: document.canvas, display: request.displaySize, budget: request.pixelBudget)
-        let maxDimension = min(8192, max(2048, Int(Float(max(renderSize.x, renderSize.y)) * 1.6)))
-
-        let textures = SceneTextureCache(device: request.device, files: files, maxDimension: maxDimension)
+        // Textures keep a little more detail than the render scale needs: layers are often
+        // scaled up, and parallax and framing zoom in further.
+        let renderScale = Float(renderSize.x) / max(document.canvas.x, 1)
+        let textures = SceneTextureCache(device: request.device, files: files, detail: min(1, max(0.25, renderScale * 1.3)))
         let shaders = SceneShaderLibrary(device: request.device, files: files)
         let textScale = min(3, Float(renderSize.x) / max(document.canvas.x, 1) * 1.5)
         // Layers whose rendered composite buffer is read by another layer (clipping masks, blend frames).
@@ -207,11 +208,13 @@ enum SceneLoader {
         return runtime
     }
 
-    /// The scene renders at the canvas aspect, at most as large as the part shown on the
-    /// display (fill), and within the pixel budget; the presenter scales it up.
+    /// The scene's offscreen size: what covers the display at native pixels, but no larger than
+    /// the canvas (its art has no more detail) unless that would need more than a 2× upscale,
+    /// then shrunk to the pixel budget. The renderer upscales the rest with a bicubic filter
+    /// (MetalFX was measured at 2–5 ms a frame on an M4, too much for an always-on wallpaper).
     static func renderSize(canvas: SIMD2<Float>, display: SIMD2<Float>, budget: Double) -> SIMD2<Int> {
-        let cover = max(display.x / max(canvas.x, 1), display.y / max(canvas.y, 1))
-        var scale = min(Double(cover), 1.5)
+        let cover = Double(max(display.x / max(canvas.x, 1), display.y / max(canvas.y, 1)))
+        var scale = max(min(cover, 1), cover / 2)
         let pixels = Double(canvas.x * canvas.y) * scale * scale
         if pixels > budget { scale *= (budget / pixels).squareRoot() }
         return SIMD2(max(16, Int((Double(canvas.x) * scale).rounded())), max(16, Int((Double(canvas.y) * scale).rounded())))

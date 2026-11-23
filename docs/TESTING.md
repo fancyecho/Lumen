@@ -29,6 +29,9 @@ Tools/test.sh scenes
 - 只跑部分场景：`Tools/test.sh scenes 3808922316,3615984066 2.5`。第 2 个参数是 id 列表，第 3 个是渲染时刻（秒），第 4 个可选，是只加载的对象 id 列表。
 - 设环境变量 `DUMPLAYERS=1` 会打印每层的纹理、uniform、特效步骤。
 - 设 `LUMEN_FAKE_AUDIO=1` 会注入一段假频谱（低音强、高音弱），用来检查音频响应的着色器、粒子和脚本。
+- 默认按 app 的 Balanced 场景预算（6MP）和 2560×1600 屏渲染；`LUMEN_DISPLAY=2560x1664`、`LUMEN_BUDGET=2000000` 可改。
+- `LUMEN_BENCH=1`：每个场景连续渲染 60 帧取 GPU 时间中位数（GPU 频率升上来后的数字，比默认的单帧数字稳定）。
+- `LUMEN_MEMORY=1`：打印每个场景加载后的 GPU 内存。
 
 ```bash
 Tools/test.sh shaders

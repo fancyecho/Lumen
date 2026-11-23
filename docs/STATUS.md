@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gpt
+> 最后更新：2026-11-23 · claude（合并）
 
 ## 1. 阶段进度
 
@@ -40,7 +40,7 @@
 | 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 18/18 通过（T15 工作树） |
+| 单元测试（`Tools/test.sh unit`） | 18/18 通过 |
 
 ## 3. 任务板
 
@@ -61,9 +61,9 @@
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
 | T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
-| T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 待认领 | | 「清风·兰亭」（库里 D198B112…/ WM 3420988161）背景字列应是 18%/36% 透明、模糊的，现在是清晰叠影；语料 3 个场景。改 `SceneLoader`/`SceneInstance`，与 T02 同文件，**等 T02 合并后再做** |
+| T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 分支 `gemini/T14-composelayer-grouping`（独立工作树 `build/worktrees/gemini-T14`，待提交）：组合层子图层分组渲染、`copybackground: false` 清零背景、`effects/opacity` 的 `g_UserAlpha` 常量修复；《清风·兰亭》18%/36% 模糊字列与 3479521040/3491865410/3610728777 均已验证 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | `gpt/T15-scene-property-bindings`。直接绑定到布尔字段时按非空、非零转换，显式条件按选项比较。《清风·兰亭》的浅色底图已恢复，75/75 场景与 18 项 XCTest 通过。待提交 |
-| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待认领 | | 现在 Balanced 只渲染约 2.9MP，再双线性拉伸到 2560×1664 屏（需约 4.9MP）；84 个场景里 68 个是 4K 画布。需实测 M4 上 GPU 时间/功耗。改 `SceneRenderer`、`SceneLoader.renderSize`、`AppSettings` |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | 分支 `claude/T16-scene-sharpness`：按屏幕原生像素渲染（上限画布尺寸）、纹理不再被砍半、放大时用 Catmull-Rom。MetalFX 实测每帧 2–5ms，未采用。待用户在 app 里看效果 |
 | T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
 | T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
 
@@ -87,6 +87,26 @@
 - `build` 通过，`unit` 18/18，`scenes` 75/75、0 洋红，`shaders` 300/316。三个跨类型绑定场景均做了离屏对照。
 - 转换只在解析和重建场景时执行。《清风·兰亭》会多绘制恢复的全屏底图。同机两轮离屏 GPU 读数原版为 6.69/5.51 ms，新版为 11.02/5.91 ms，单帧耗时波动较大。
 - 3436945972 的「关」选项编码为 `2`，没有显式条件，按非零规则仍为真。已记入 T07 的待认领备注。改动待提交。
+
+### 2026-11-23 · gemini · `gemini/T14-composelayer-grouping`（工作树 `build/worktrees/gemini-T14`，待提交）
+
+- **做了什么**：
+  - 完成 **T14（组合层 `composelayer` 分组）**：
+    - **子图层分组渲染（`SceneLoader.swift`、`SceneInstance.swift`）**：预扫描所有 `passthrough: true` 组合层，将所有可绘制后代（图片、文本、粒子、嵌套组合层）归入其最近组合层祖先的 `children` 列表，不再直接绘制到主场景；`SceneInstance.encodeChain` 在 Pass 0 之后、父特效链之前，以 `groupVP = scale(2/chainSize) * translation(-chainCenter) * model.inverse` 把子图层按原场景顺序画入父组合层的 `buffers[0]`，再统一执行父层特效并按父层混合模式/透明度合成回上层目标。保留 `drawables` 全量扁平列表，确保 `usesAudio`、木偶表、点击命中、目标分配与清理逻辑覆盖所有分组子层。
+    - **`copybackground` 支持（默认 `true`）**：当组合层显式设置 `copybackground: false`（如 `3491865410`、`3516294127`、`3610728777` 的 `Audio bar`）时，Pass 0 仅清零为透明黑，不再拷贝 `_rt_FullFrameBuffer`，避免后续 `scroll`/频谱特效涂抹背景；`copybackground: true`（默认）保持先拷贝背景再叠加子层与特效，保证 `3479521040` 中叠加混合（additive）粒子子层与 `3420988161` 模糊字列混合正确。
+    - **修复 `effects/opacity` 的 `g_UserAlpha` 覆盖问题（`SceneMaterials.swift`、`SceneLoader.swift`）**：为 `UniformBlock.init` 增加 `isEffect` 参数，特效 pass 中带有 `materialKey` 的 `g_UserAlpha`（`effects/opacity` 绑定到 `constantshadervalues["alpha"]`）不再被对象自身的 `object.alpha` 覆盖，使 `3420988161`（18%/36% 透明度）、`3479521040`（关键帧淡出）及 `3347416586`（35% 混合层）的透明度特效真正生效。
+    - **组合层透明度与防重复乘算**：`lumen_scene_composite_fragment` 支持传入组合层 `alpha`，`state(of:)` 对归入组合层分组的子图层不再把父组合层 `alpha` 重复乘入子层。
+  - **性能/能耗评估**：不增加任何额外离屏纹理（复用组合层现有 `buffers[0]`）；`copybackground: false` 跳过一次全帧 blit 和 Pass 0 绘制；分组绘制仅在组合层可见或被采样时运行，完全遵守现有自动暂停与像素预算策略。
+  - **验证**（全部在 `build/worktrees/gemini-T14` 中执行）：
+    - `Tools/test.sh build`：**BUILD SUCCEEDED**
+    - `Tools/test.sh unit`：**14/14** 通过
+    - `Tools/test.sh shaders`：**300/316** 通过（持平基线）
+    - `Tools/test.sh scenes`：**75/75 OK，0 FAIL，0 洋红块**（加载中位 0.62s、最大 2.02s；GPU 中位 3.70ms、p90 7.74ms）
+    - 视觉抽检：`3420988161`（清风·兰亭）背景 18 列兰亭集序字列已恢复为 18%/36% 透明水波模糊效果；`3479521040` 粒子遮罩与淡出正常；`LUMEN_FAKE_AUDIO=1` 下 `3491865410`/`3610728777` 的 `copybackground: false` 音频条清晰透明、无背景涂抹。
+- **没做完**：
+  - 改动在独立工作树 `build/worktrees/gemini-T14`（分支 `gemini/T14-composelayer-grouping`）尚未提交或合并（按规则等用户/协调者确认后提交合并；合并时与 T16 仅在 `SceneLoader.swift` 不同函数，预计无冲突）。
+- **建议下一步**：
+  - 合并 T14 与 GPT 的 T15 后，《清风·兰亭》（`3420988161`）的浅色宣纸底图 + 模糊透明字列将完整还原。下一批未认领中优先级任务为 **T05（场景/Web 锁屏循环视频）**、**T07（片头/时间线场景 `3436945972` 与 `3463692991` 布局）**、**T17（场景视觉回归感知打分）**。
 
 ### 2026-11-23 · claude · 合并到 `main`
 

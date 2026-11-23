@@ -60,6 +60,8 @@ final class SceneTextureCache: @unchecked Sendable {
     let device: MTLDevice
     let files: SceneFileSystem
     let maxDimension: Int
+    /// Share of full texture resolution worth keeping (see `WETexture.decode`).
+    let detail: Float
     let samplers: SceneSamplers
     private var cache: [String: SceneTexture?] = [:]
     private var pending: [String: DispatchGroup] = [:]
@@ -78,10 +80,11 @@ final class SceneTextureCache: @unchecked Sendable {
     lazy var black: SceneTexture = solid(SIMD4(0, 0, 0, 255))
     lazy var clear: SceneTexture = solid(SIMD4(0, 0, 0, 0))
 
-    init(device: MTLDevice, files: SceneFileSystem, maxDimension: Int) {
+    init(device: MTLDevice, files: SceneFileSystem, maxDimension: Int = 8192, detail: Float = 1) {
         self.device = device
         self.files = files
         self.maxDimension = maxDimension
+        self.detail = detail
         samplers = SceneSamplers(device: device)
     }
 
@@ -123,7 +126,7 @@ final class SceneTextureCache: @unchecked Sendable {
             }
         }
         do {
-            let decoded = try WETexture.decode(data, maxDimension: maxDimension)
+            let decoded = try WETexture.decode(data, maxDimension: maxDimension, detail: detail)
             if let movie = decoded.video {
                 let size = SIMD2(max(decoded.textureSize.x, 1), max(decoded.textureSize.y, 1))
                 guard let video = SceneVideoTexture(movie: movie, size: size, device: device) else { return nil }
