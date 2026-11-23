@@ -16,10 +16,22 @@ struct AddWebPageSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Add a Web Page").font(.system(size: 17, weight: .semibold))
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack(spacing: Theme.Space.sm) {
+                Image(systemName: "globe")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.accentSoft))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add a Web Page").font(Theme.TypeScale.sectionTitle)
+                    Text(verbatim: "HTML · URL")
+                        .font(Theme.TypeScale.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Text("Any page can be a wallpaper: a clock, a generative sketch, a dashboard. It runs in its own sandbox and pauses with your other wallpapers.")
-                .font(.system(size: 12.5))
+                .font(Theme.TypeScale.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Form {
@@ -27,19 +39,26 @@ struct AddWebPageSheet: View {
                 TextField("Name", text: $title, prompt: Text("Optional"))
             }
             .formStyle(.columns)
-            HStack {
+            .padding(Theme.Space.md)
+            .lumenSurface(radius: Theme.Radius.lg)
+            HStack(spacing: Theme.Space.xs) {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
                 Button("Add") {
                     if let url { model.addWebPage(url, title: title) }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
                 .disabled(url == nil)
             }
         }
-        .padding(22)
-        .frame(width: 440)
+        .padding(Theme.Space.xl)
+        .frame(width: 460)
+        .tint(Theme.accent)
     }
 }

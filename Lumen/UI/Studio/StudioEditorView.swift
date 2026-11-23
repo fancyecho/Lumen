@@ -15,8 +15,8 @@ struct StudioEditorView: View {
         Group {
             if let base = model.library.wallpaper(id: wallpaperID), let config {
                 ScrollView {
-                    HStack(alignment: .top, spacing: 26) {
-                        VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: Theme.Space.xl) {
+                        VStack(alignment: .leading, spacing: Theme.Space.md) {
                             preview(config: config, framing: base.resolvedFraming)
                             if showsCode { codeEditor }
                         }
@@ -25,10 +25,10 @@ struct StudioEditorView: View {
                         controls(base: base, config: config)
                             .frame(width: 320)
                     }
-                    .padding(.horizontal, Theme.pagePadding)
-                    .padding(.top, 22)
-                    .padding(.bottom, 32)
-                    .frame(maxWidth: 1480)
+                    .padding(.horizontal, Theme.Space.page)
+                    .padding(.top, Theme.Space.lg)
+                    .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+                    .frame(maxWidth: Theme.Layout.galleryMaxWidth)
                     .frame(maxWidth: .infinity)
                 }
             } else {
@@ -43,16 +43,19 @@ struct StudioEditorView: View {
     private func preview(config: ShaderConfig, framing: WallpaperFraming) -> some View {
         ShaderPreview(config: config, settings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000), framing: framing)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous).strokeBorder(Theme.Surface.stroke))
+            .overlay(alignment: .topLeading) {
+                ArtBadge(text: "Live", symbol: "sparkles").padding(Theme.Space.md)
+            }
             .shadow(color: .black.opacity(0.5), radius: 26, y: 14)
     }
 
     private var codeEditor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Fragment shader").font(.system(size: 13, weight: .semibold))
-                Text(verbatim: "Metal Shading Language").font(.system(size: 12)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+            HStack(spacing: Theme.Space.xs) {
+                Text("Fragment shader").font(Theme.TypeScale.cardTitle)
+                Text(verbatim: "Metal Shading Language").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset") { source = self.config?.resolvedSource ?? "" }
                     .buttonStyle(.glass)
@@ -66,18 +69,23 @@ struct StudioEditorView: View {
                 .font(.system(size: 12, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .autocorrectionDisabled()
-                .padding(12)
+                .padding(Theme.Space.sm)
                 .frame(minHeight: 320)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.45)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.surfaceStroke))
+                .background(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).fill(Color.black.opacity(0.45)))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.Surface.stroke))
             if let compileError {
-                Text(compileError)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(Color(red: 1, green: 0.5, blue: 0.5))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.red.opacity(0.12)))
+                Label {
+                    Text(compileError)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .foregroundStyle(Theme.danger)
+                .padding(Theme.Space.sm)
+                .background(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).fill(Theme.danger.opacity(0.12)))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.danger.opacity(0.3)))
             }
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -86,27 +94,29 @@ struct StudioEditorView: View {
     // MARK: Controls
 
     private func controls(base: Wallpaper, config: ShaderConfig) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 Text(verbatim: base.isBuiltin ? "PRESET" : "YOUR SHADER")
-                    .font(Theme.eyebrow).tracking(1.8).foregroundStyle(Theme.accent)
+                    .font(Theme.TypeScale.eyebrow)
+                    .tracking(1.8)
+                    .foregroundStyle(Theme.accent)
                 TextField("Name", text: $title)
                     .textFieldStyle(.plain)
-                    .font(Theme.display(28))
+                    .font(Theme.TypeScale.detailTitle)
                 if let preset = BuiltinShaders.preset(id: base.id) {
-                    Text(preset.tagline).font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(preset.tagline).font(Theme.TypeScale.body).foregroundStyle(.secondary)
                 }
             }
 
-            panel("Palette") {
-                HStack(spacing: 10) {
+            panel("Palette", symbol: "paintpalette") {
+                HStack(spacing: Theme.Space.sm - 2) {
                     ForEach(0..<4, id: \.self) { index in
                         ColorPicker("Colour \(index + 1)", selection: colorBinding(index), supportsOpacity: false)
                             .labelsHidden()
                             .frame(maxWidth: .infinity)
                     }
                 }
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.xs) {
                     Button { randomizePalette() } label: { Label("Shuffle", systemImage: "shuffle") }
                     Button { resetParams(base: base) } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
                 }
@@ -114,13 +124,13 @@ struct StudioEditorView: View {
                 .controlSize(.small)
             }
 
-            panel("Motion") {
+            panel("Motion", symbol: "waveform.path") {
                 slider("Speed", value: paramBinding(\.speed), range: 0.1...3, format: { Theme.rateLabel(($0 * 20).rounded() / 20) })
                 slider("Scale", value: paramBinding(\.scale), range: 0.4...2.5, format: { String(format: "%.2f", $0) })
                 slider("Intensity", value: paramBinding(\.intensity), range: 0...2, format: { String(format: "%.0f%%", $0 * 100) })
             }
 
-            panel("Position") {
+            panel("Position", symbol: "crop") {
                 FramingSliders(wallpaper: base)
                 HStack {
                     Spacer()
@@ -129,10 +139,10 @@ struct StudioEditorView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                 SetWallpaperButton { target in apply(base: base, target: target) }
                     .controlSize(.large)
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.xs) {
                     Button { save(base: base) } label: {
                         if base.isBuiltin {
                             Label("Save Copy", systemImage: "square.and.arrow.down")
@@ -160,29 +170,35 @@ struct StudioEditorView: View {
             }
 
             Text("Runs at \(model.settings.shaderFrameRate) fps on the desktop, rendered at \(model.settings.shaderQuality.title.lowercased()) quality. Change this in Settings → Performance.")
-                .font(.system(size: 11.5))
+                .font(Theme.TypeScale.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func panel<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+    private func panel<Content: View>(_ title: LocalizedStringKey, symbol: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            HStack(spacing: Theme.Space.sm - 2) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(Theme.accentSoft))
+                Text(title).font(Theme.TypeScale.cardTitle)
+            }
             content()
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.surfaceStroke))
+        .padding(Theme.Space.md)
+        .lumenSurface(radius: Theme.Radius.xl)
     }
 
     private func slider(_ label: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>, format: @escaping (Double) -> String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             HStack {
-                Text(label).font(.system(size: 13))
+                Text(label).font(Theme.TypeScale.body)
                 Spacer()
                 Text(format(value.wrappedValue))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Theme.TypeScale.caption.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }

@@ -129,8 +129,19 @@ struct DisplayCard: View {
     let display: WallpaperEngine.Display
     @State private var hovering = false
 
+    private var wallpaper: Wallpaper? {
+        display.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
+    }
+
+    private func openDisplayed() {
+        if let wallpaper {
+            model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
+        } else {
+            model.router.show(.library)
+        }
+    }
+
     var body: some View {
-        let wallpaper = display.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
         VStack(alignment: .leading, spacing: Theme.Space.sm) {
             ZStack {
                 if let wallpaper {
@@ -167,13 +178,10 @@ struct DisplayCard: View {
             )
             .shadow(color: .black.opacity(hovering ? 0.48 : 0.34), radius: hovering ? 24 : 16, y: hovering ? 12 : 8)
             .onHover { hovering = $0 }
-            .onTapGesture {
-                if let wallpaper {
-                    model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
-                } else {
-                    model.router.show(.library)
-                }
-            }
+            .onTapGesture(perform: openDisplayed)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { openDisplayed() }
 
             HStack(spacing: Theme.Space.sm) {
                 Image(systemName: display.isBuiltin ? "laptopcomputer" : "display")
