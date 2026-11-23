@@ -1,7 +1,6 @@
 import Foundation
 import Metal
 import ImageIO
-import UniformTypeIdentifiers
 
 let device = MTLCreateSystemDefaultDevice()!
 let queue = device.makeCommandQueue()!
@@ -26,7 +25,7 @@ let fakeAudio: AudioBands = {
 }()
 if args.count > 6 { SceneLoader.debugLayerFilter = Set(args[6].split(separator: ",").compactMap { Int($0) }) }
 
-func savePNG(_ texture: MTLTexture, to url: URL) {
+func savePNG(_ texture: MTLTexture, to url: URL) throws {
     let w = texture.width, h = texture.height
     let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: w, height: h, mipmapped: false)
     desc.storageMode = .shared
@@ -45,18 +44,18 @@ func savePNG(_ texture: MTLTexture, to url: URL) {
     print("magenta%", magenta * 100 / max(1, w * h))
     let provider = CGDataProvider(data: Data(bytes) as CFData)!
     let image = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
-    let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
-    CGImageDestinationAddImage(dest, image, nil); CGImageDestinationFinalize(dest)
+    try writePNG(image, to: url)
 }
 
 let items = ids.isEmpty ? ((try? FileManager.default.contentsOfDirectory(atPath: library.path)) ?? []).sorted() : ids
-var summary: [String] = []
+var visualScenes: [SceneVisualRun.Scene] = []
 for id in items {
     let folder = library.appending(path: id)
     guard let project = try? WEProject.load(folder: folder), project.kind == .scene else { continue }
     var values: [String: PropertyValue] = [:]
     for p in project.properties { values[p.id] = p.defaultValue }
     let start = Date()
+    var renderSaved = false
     do {
         let request = SceneLoader.Request(folder: folder, entry: project.entry, assets: assets, values: values, displaySize: harnessDisplay, pixelBudget: harnessBudget, device: device, queue: queue)
         let instance = try SceneLoader.load(request)
@@ -107,17 +106,31 @@ for id in items {
             Thread.sleep(forTimeInterval: 0.05)
             gpu = Array(times).sorted()[30]
         }
-        savePNG(instance.outputTexture, to: out.appending(path: "\(id).png"))
+        try savePNG(instance.outputTexture, to: out.appending(path: "\(id).png"))
+        renderSaved = true
         let line = String(format: "%@ OK load %.2fs gpu %.2fms particles %d layers %d size %dx%d skipped %@ — %@", id, loadTime, gpu * 1000, instance.particleLayers.reduce(0) { $0 + $1.systems.reduce(0) { $0 + $1.particles.count } }, instance.layers.count, instance.renderSize.x, instance.renderSize.y, instance.unsupported.joined(separator: ","), project.title)
-        print(line); summary.append(line)
+        print(line)
         print(String(format: "  translate %.2fs total(translate+compile) %.2fs compiles %d", SceneShaderLibrary.translateTime, SceneShaderLibrary.compileTime, SceneShaderLibrary.compileCount))
     } catch {
         let line = "\(id) FAIL \(error.localizedDescription) — \(project.title)"
-        print(line); summary.append(line)
+        print(line)
     }
-    // Reference preview for comparison
-    if let preview = project.previewURL, let src = CGImageSourceCreateWithURL(preview as CFURL, nil), let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
-        let dest = CGImageDestinationCreateWithURL(out.appending(path: "\(id)-ref.png") as CFURL, UTType.png.identifier as CFString, 1, nil)!
-        CGImageDestinationAddImage(dest, img, nil); CGImageDestinationFinalize(dest)
+    // Snapshot the author preview at index 0 so animated GIFs have a reproducible reference.
+    var outcome: SceneVisualRun.Scene.Outcome = renderSaved ? .previewUnavailable : .renderFailed
+    if let preview = project.previewURL,
+       let source = CGImageSourceCreateWithURL(preview as CFURL, nil),
+       let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+           kCGImageSourceCreateThumbnailFromImageAlways: true,
+           kCGImageSourceCreateThumbnailWithTransform: true,
+       ] as CFDictionary) {
+        do {
+            try writePNG(image, to: out.appending(path: "\(id)-ref.png"))
+            if renderSaved { outcome = .ready }
+        } catch {
+            print("  Could not save author preview for \(id): \(error.localizedDescription)")
+        }
     }
+    visualScenes.append(.init(id: id, title: project.title, outcome: outcome))
 }
+let run = SceneVisualRun(id: UUID(), time: time, scenes: visualScenes)
+try JSONEncoder().encode(run).write(to: out.appending(path: SceneVisualRun.filename), options: .atomic)
