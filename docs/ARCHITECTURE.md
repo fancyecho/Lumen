@@ -97,7 +97,8 @@ AppModel (@MainActor, 全局状态)
    - 脚本：`SceneScript.swift` 在 JavaScriptCore 里跑 WE 的 SceneScript，每帧返回被改动的图层。
    - `_rt_FullFrameBuffer`：需要时从场景纹理 blit 一份。
 3. **呈现**：`SceneRenderer`（MTKView）。
-   - 场景先按画布比例画到 rgba8 离屏纹理（受像素预算限制），再按 framing 缩放到屏幕。
+   - 场景先按画布比例画到 rgba8 离屏纹理：覆盖屏幕的原生像素，上限为画布尺寸，再受像素预算限制（`SceneLoader.renderSize`）。纹理按同样的比例选 mip，不会被砍到比显示还小。
+   - 再按 framing 缩放到屏幕；显示得比渲染大时用 Catmull-Rom 采样（`presentSharp`），否则双线性。
    - 窗口被遮挡时不绘制。
    - 支持鼠标视差，并把指针坐标换算到画布坐标。
 

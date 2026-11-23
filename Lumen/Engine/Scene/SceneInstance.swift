@@ -850,6 +850,8 @@ private struct SceneSession {
 final class SceneUtilityPipelines: @unchecked Sendable {
     let composite: [SceneBlend: MTLRenderPipelineState]
     let present: MTLRenderPipelineState
+    /// Catmull-Rom filtering for when the scene is shown larger than it was rendered.
+    let presentSharp: MTLRenderPipelineState
 
     init(device: MTLDevice) throws {
         let library = try device.makeLibrary(source: Self.source, options: nil)
@@ -868,6 +870,8 @@ final class SceneUtilityPipelines: @unchecked Sendable {
         descriptor.fragmentFunction = library.makeFunction(name: "lumen_scene_present_fragment")
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         present = try device.makeRenderPipelineState(descriptor: descriptor)
+        descriptor.fragmentFunction = library.makeFunction(name: "lumen_scene_present_sharp_fragment")
+        presentSharp = try device.makeRenderPipelineState(descriptor: descriptor)
     }
 
     private static var cached: SceneUtilityPipelines?
@@ -913,6 +917,35 @@ final class SceneUtilityPipelines: @unchecked Sendable {
 
     fragment float4 lumen_scene_present_fragment(PresentOut in [[stage_in]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
         return float4(t.sample(s, in.uv).rgb, 1.0);
+    }
+
+    // Catmull-Rom upscaling from nine bilinear taps: much crisper edges and line art than
+    // plain bilinear for about the same cost as a few texture reads.
+    fragment float4 lumen_scene_present_sharp_fragment(PresentOut in [[stage_in]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
+        float2 size = float2(t.get_width(), t.get_height());
+        float2 position = in.uv * size;
+        float2 center = floor(position - 0.5) + 0.5;
+        float2 f = position - center;
+        float2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+        float2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+        float2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+        float2 w3 = f * f * (-0.5 + 0.5 * f);
+        float2 w12 = w1 + w2;
+        float2 offset12 = w2 / w12;
+        float2 uv0 = (center - 1.0) / size;
+        float2 uv3 = (center + 2.0) / size;
+        float2 uv12 = (center + offset12) / size;
+        float3 c = float3(0);
+        c += t.sample(s, float2(uv0.x, uv0.y)).rgb * w0.x * w0.y;
+        c += t.sample(s, float2(uv12.x, uv0.y)).rgb * w12.x * w0.y;
+        c += t.sample(s, float2(uv3.x, uv0.y)).rgb * w3.x * w0.y;
+        c += t.sample(s, float2(uv0.x, uv12.y)).rgb * w0.x * w12.y;
+        c += t.sample(s, float2(uv12.x, uv12.y)).rgb * w12.x * w12.y;
+        c += t.sample(s, float2(uv3.x, uv12.y)).rgb * w3.x * w12.y;
+        c += t.sample(s, float2(uv0.x, uv3.y)).rgb * w0.x * w3.y;
+        c += t.sample(s, float2(uv12.x, uv3.y)).rgb * w12.x * w3.y;
+        c += t.sample(s, float2(uv3.x, uv3.y)).rgb * w3.x * w3.y;
+        return float4(saturate(c), 1.0);
     }
     """
 }

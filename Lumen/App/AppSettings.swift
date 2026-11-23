@@ -37,6 +37,18 @@ enum ShaderQuality: String, CaseIterable, Identifiable {
         case .full: .infinity
         }
     }
+
+    /// Scenes are mostly bitmaps that blur visibly when stretched, and much of their GPU cost
+    /// doesn't grow with resolution (native 4.8 MP costs ~20% more than 2.9 MP on an M4), so
+    /// they get larger budgets than shaders. Balanced covers a laptop or 4K-class screen at
+    /// native pixels; bigger screens are upscaled with a bicubic filter.
+    var scenePixelBudget: Double {
+        switch self {
+        case .efficient: 2_000_000
+        case .balanced: 6_000_000
+        case .full: 16_600_000
+        }
+    }
 }
 
 enum DockIconMode: String, CaseIterable, Identifiable {
@@ -102,7 +114,7 @@ final class AppSettings {
     }
 
     var sceneRenderSettings: SceneRenderSettings {
-        SceneRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.pixelBudget.isFinite ? shaderQuality.pixelBudget * 1.4 : 8_300_000,
+        SceneRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.scenePixelBudget,
                             scaling: videoScaling, muted: !audioEnabled, volume: volume, audioReactive: audioReactiveWallpapers)
     }
 

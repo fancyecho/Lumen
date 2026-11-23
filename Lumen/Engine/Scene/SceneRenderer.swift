@@ -12,7 +12,7 @@ struct SceneRenderSettings: Equatable {
     /// Follow the music the Mac is playing (needs the System Audio Recording permission).
     var audioReactive = false
 
-    static let preview = SceneRenderSettings(frameRate: 30, pixelBudget: 900_000, scaling: .fill)
+    static let preview = SceneRenderSettings(frameRate: 30, pixelBudget: 1_600_000, scaling: .fill)
 }
 
 /// Draws a Wallpaper Engine scene with Metal.
@@ -331,7 +331,8 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         pass.colorAttachments[0].storeAction = .store
         pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         if let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) {
-            encoder.setRenderPipelineState(instanceUtility(instance).present)
+            let utility = instanceUtility(instance)
+            encoder.setRenderPipelineState(isUpscaling(instance.outputTexture, drawableSize: view.drawableSize) ? utility.presentSharp : utility.present)
             var rect = presentRect
             encoder.setVertexBytes(&rect, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
             encoder.setFragmentTexture(instance.outputTexture, index: 0)
@@ -341,6 +342,14 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         }
         buffer.present(drawable)
         buffer.commit()
+    }
+
+    /// Whether the scene is shown noticeably larger than it was rendered (Efficient quality,
+    /// or a screen bigger than the scene's canvas); then the sharper bicubic filter pays off.
+    private func isUpscaling(_ texture: MTLTexture, drawableSize: CGSize) -> Bool {
+        let shownWidth = presentRect.z / 2 * Float(drawableSize.width)
+        let shownHeight = presentRect.w / 2 * Float(drawableSize.height)
+        return shownWidth > Float(texture.width) * 1.04 || shownHeight > Float(texture.height) * 1.04
     }
 
     private func instanceUtility(_ instance: SceneInstance) -> SceneUtilityPipelines {

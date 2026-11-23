@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（合并）
+> 最后更新：2026-11-23 · claude（T16）
 
 ## 1. 阶段进度
 
@@ -30,13 +30,13 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-23 合并后，`Tools/test.sh`，语料为 WallpaperMachine 库，75 个场景）
+**回归基线**（2026-11-23 T16 后，`Tools/test.sh`，默认按 Balanced 预算 6MP、2560×1600 屏渲染，语料为 WallpaperMachine 库，75 个场景）
 
 | 项目 | 基线 |
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
-| 加载耗时（着色器缓存命中） | 中位 0.39s，最大 1.5s |
-| GPU 帧时间（约 2MP） | 中位 3.6ms，p90 6.9ms，最大 15.5ms（含木偶、音频） |
+| 加载耗时（着色器缓存命中） | 中位 0.41s，最大 1.4s（全分辨率纹理，冷缓存时中位约 0.6s） |
+| GPU 帧时间（原生约 4.7MP） | 中位 4.9ms，p90 8.9ms，最大 22.5ms（3613963197）；连续 60 帧热身测：中位 4.9ms、均值 5.6ms（T16 前 2.9MP：4.0ms / 4.4ms） |
 | 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
@@ -63,7 +63,7 @@
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 待认领 | | 「清风·兰亭」（库里 D198B112…/ WM 3420988161）背景字列应是 18%/36% 透明、模糊的，现在是清晰叠影；语料 3 个场景。改 `SceneLoader`/`SceneInstance`，与 T02 同文件，**等 T02 合并后再做** |
 | T15 | 用户属性绑定的类型转换：`visible` 等布尔字段绑到颜色/滑块/下拉属性时按「非空、非 0 即真」处理（WE 行为），数值字段绑到布尔属性时 true=1 | 场景 | 高 | 待认领 | | 「清风」的白色底图因此被隐藏，露出 0.7 灰的清屏色；语料 3 个场景。只改 `SceneDocument.swift` 的 `SceneValues`，可独立并行 |
-| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待认领 | | 现在 Balanced 只渲染约 2.9MP，再双线性拉伸到 2560×1664 屏（需约 4.9MP）；84 个场景里 68 个是 4K 画布。需实测 M4 上 GPU 时间/功耗。改 `SceneRenderer`、`SceneLoader.renderSize`、`AppSettings` |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | 分支 `claude/T16-scene-sharpness`：按屏幕原生像素渲染（上限画布尺寸）、纹理不再被砍半、放大时用 Catmull-Rom。MetalFX 实测每帧 2–5ms，未采用。待用户在 app 里看效果 |
 | T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
 | T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
 
@@ -79,6 +79,23 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 分支 `claude/T16-scene-sharpness`（未合并）
+
+- **原因**：
+  1. 纹理被砍半：旧逻辑在纹理边长超过「渲染宽度 × 1.6」时直接丢掉最高一级 mip。app 默认渲染约 2286 宽，阈值约 3660，所以 4K/4096 纹理只剩 1920/2048，再被放大显示。这是发糊的主因。
+  2. 渲染分辨率偏低：Balanced 只渲染约 2.9MP，2560×1664 屏铺满需要约 4.9MP。
+- **改动**：
+  - `TexDecoder`/`SceneTextureCache`：按「细节比例」（渲染缩放 × 1.3）选 mip，只有下一级 mip 仍够用时才跳过；8192 硬上限保留。`decode(_:maxDimension:)` 旧签名仍可用。
+  - `SceneLoader.renderSize`：覆盖屏幕的原生像素，上限为画布尺寸（除非这样要放大超过 2 倍），再受预算限制。
+  - `ShaderQuality.scenePixelBudget`：Efficient 2MP / Balanced 6MP / Full 16.6MP（原来是着色器预算 × 1.4）；详情页预览 0.9MP → 1.6MP。
+  - 呈现：场景显示得比渲染大时（Efficient、或屏幕比画布大）用 Catmull-Rom 9 次采样（`presentSharp`），否则照旧双线性。
+  - MetalFX 空间放大实测 M4 上每帧 2.3ms（2286→2958）到 4.5ms（5K），比直接原生渲染贵得多，**没有采用**。
+  - 回归工具：`LUMEN_DISPLAY`、`LUMEN_BUDGET`（默认 6MP）、`LUMEN_BENCH`（连续 60 帧取中位）、`LUMEN_MEMORY`。
+- **代价**（2560×1664，75 场景）：GPU 中位 4.0→4.9ms、均值 4.4→5.6ms；最重的几个特效场景多 4–6ms。GPU 内存中位 241→400MB、最大 957→1373MB（8 个代表场景）。加载中位基本不变，冷缓存会慢一些。
+- **效果**：Laplacian 方差（越大越清晰）全图 114→185，Chisa 脸部 497→960。
+- **验证**：build、unit 14/14、scenes 75/75、0 洋红。**没有**在 app 桌面上实测，需要用户看一眼。
+- **建议下一步**：如果最重的几个场景耗电明显，可以加「按实测 GPU 时间自动降分辨率」（要先在 app 里校准阈值：桌面 30fps 下 GPU 不满载，频率低，测出的时间会比连续渲染偏高）。
 
 ### 2026-11-23 · claude · 合并到 `main`
 

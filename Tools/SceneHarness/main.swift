@@ -11,6 +11,13 @@ let assets = URL(fileURLWithPath: args[2])
 let out = URL(fileURLWithPath: args[3])
 let ids = args.count > 4 ? args[4].split(separator: ",").map(String.init) : []
 let time = Float(args.count > 5 ? args[5] : "2") ?? 2
+// LUMEN_DISPLAY=2560x1664 and LUMEN_BUDGET=4900000 match a specific screen and quality setting.
+let environment = ProcessInfo.processInfo.environment
+let harnessDisplay: SIMD2<Float> = {
+    let parts = (environment["LUMEN_DISPLAY"] ?? "2560x1600").split(separator: "x").compactMap { Float($0) }
+    return parts.count == 2 ? SIMD2(parts[0], parts[1]) : SIMD2(2560, 1600)
+}()
+let harnessBudget = Double(environment["LUMEN_BUDGET"] ?? "") ?? 6_000_000  // the app's Balanced scene budget
 // LUMEN_FAKE_AUDIO=1 feeds a synthetic spectrum (loud bass falling to quiet treble) to check audio-reactive paths.
 let fakeAudio: AudioBands = {
     guard ProcessInfo.processInfo.environment["LUMEN_FAKE_AUDIO"] != nil else { return .silent }
@@ -51,9 +58,10 @@ for id in items {
     for p in project.properties { values[p.id] = p.defaultValue }
     let start = Date()
     do {
-        let request = SceneLoader.Request(folder: folder, entry: project.entry, assets: assets, values: values, displaySize: SIMD2(2560, 1600), pixelBudget: 2_100_000, device: device, queue: queue)
+        let request = SceneLoader.Request(folder: folder, entry: project.entry, assets: assets, values: values, displaySize: harnessDisplay, pixelBudget: harnessBudget, device: device, queue: queue)
         let instance = try SceneLoader.load(request)
         let loadTime = Date().timeIntervalSince(start)
+        if environment["LUMEN_MEMORY"] != nil { print(String(format: "  memory %.0f MB", Double(device.currentAllocatedSize) / 1_048_576)) }
         if ProcessInfo.processInfo.environment["DUMPLAYERS"] != nil {
             for layer in instance.layers {
                 var tex = ""
@@ -82,6 +90,22 @@ for id in items {
             instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero, audio: fakeAudio))
             cb.commit(); cb.waitUntilCompleted()
             gpu = cb.gpuEndTime - cb.gpuStartTime
+        }
+        if environment["LUMEN_BENCH"] != nil {
+            let times = UnsafeMutableBufferPointer<Double>.allocate(capacity: 60)
+            times.initialize(repeating: 0)
+            defer { times.deallocate() }
+            var last: MTLCommandBuffer?
+            for i in 0..<60 {
+                let cb = queue.makeCommandBuffer()!
+                instance.encode(into: cb, frame: .init(time: time + Float(3 + i) / 30, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero, audio: fakeAudio))
+                cb.addCompletedHandler { times[i] = $0.gpuEndTime - $0.gpuStartTime }
+                cb.commit()
+                last = cb
+            }
+            last?.waitUntilCompleted()
+            Thread.sleep(forTimeInterval: 0.05)
+            gpu = Array(times).sorted()[30]
         }
         savePNG(instance.outputTexture, to: out.appending(path: "\(id).png"))
         let line = String(format: "%@ OK load %.2fs gpu %.2fms particles %d layers %d size %dx%d skipped %@ — %@", id, loadTime, gpu * 1000, instance.particleLayers.reduce(0) { $0 + $1.systems.reduce(0) { $0 + $1.particles.count } }, instance.layers.count, instance.renderSize.x, instance.renderSize.y, instance.unsupported.joined(separator: ","), project.title)

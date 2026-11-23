@@ -89,9 +89,12 @@ struct WETexture {
 
     enum DecodeError: Error { case unsupported(String) }
 
-    /// - Parameter maxDimension: larger images are decoded at a smaller mip (or scaled), so a
-    ///   4K-canvas scene rendered at 2 MP doesn't hold 8K textures in memory.
-    static func decode(_ data: Data, maxDimension: Int = 8192) throws -> WETexture {
+    /// - Parameters:
+    ///   - maxDimension: hard cap; larger images are decoded at a smaller mip (or scaled).
+    ///   - detail: share of the full resolution the scene can show (its render scale with some
+    ///     headroom). Mips are skipped only while the next one still has that much detail, so a
+    ///     scene rendered below its canvas size never magnifies a halved texture.
+    static func decode(_ data: Data, maxDimension: Int = 8192, detail: Float = 1) throws -> WETexture {
         var reader = ByteReader(data: data)
         let magic = try reader.cString(maxLength: 16)
         guard magic.hasPrefix("TEXV") else { throw DecodeError.unsupported(magic) }
@@ -157,7 +160,7 @@ struct WETexture {
                 // An ordinary image file (PNG, JPEG…) stored inside the texture.
                 guard let first = raw.first else { continue }
                 let bytes = first.3 ? try lz4(first.2, size: first.4) : first.2
-                let decoded = try decodeImage(bytes, maxDimension: maxDimension)
+                let decoded = try decodeImage(bytes, maxDimension: maxDimension, detail: detail)
                 format = .rgba8888
                 images.append([decoded.mip])
                 // The stored file has no padding; Wallpaper Engine's header still describes
@@ -176,7 +179,13 @@ struct WETexture {
 
             // Skip mips larger than needed; keep the rest of the chain.
             var startIndex = 0
-            while startIndex + 1 < raw.count, max(raw[startIndex].0, raw[startIndex].1) > maxDimension { startIndex += 1 }
+            let neededWidth = Int((Float(raw.first?.0 ?? 0) * min(detail, 1)).rounded(.up))
+            let neededHeight = Int((Float(raw.first?.1 ?? 0) * min(detail, 1)).rounded(.up))
+            while startIndex + 1 < raw.count,
+                  max(raw[startIndex].0, raw[startIndex].1) > maxDimension
+                    || (raw[startIndex + 1].0 >= neededWidth && raw[startIndex + 1].1 >= neededHeight) {
+                startIndex += 1
+            }
             var mips: [Mip] = []
             for (index, entry) in raw.enumerated() where index >= startIndex {
                 let bytes = entry.3 ? try lz4(entry.2, size: entry.4) : entry.2
@@ -254,12 +263,13 @@ struct WETexture {
         return output
     }
 
-    private static func decodeImage(_ data: Data, maxDimension: Int) throws -> (mip: Mip, Void) {
+    private static func decodeImage(_ data: Data, maxDimension cap: Int, detail: Float) throws -> (mip: Mip, Void) {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         else { throw DecodeError.unsupported("image") }
         let width = (properties[kCGImagePropertyPixelWidth] as? Int) ?? 0
         let height = (properties[kCGImagePropertyPixelHeight] as? Int) ?? 0
+        let maxDimension = min(cap, max(1, Int((Float(max(width, height)) * min(detail, 1)).rounded(.up))))
         let image: CGImage?
         if max(width, height) > maxDimension {
             image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
