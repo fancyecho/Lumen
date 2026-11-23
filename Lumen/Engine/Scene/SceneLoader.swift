@@ -279,27 +279,112 @@ enum SceneLoader {
             // `colorBlendMode` at final composite rather than baking the scene into Pass 0.
             let needsChain = !steps.isEmpty || isPassthrough || isCompositeSource || (isSolid && object.colorBlendMode != 0)
 
+            // Pre-resolve slot 0 texture so puppet mesh UVs can scale by its imageExtent.
+            let slot0Texture: SceneTexture? = {
+                guard let first = pass.textures.first, let name = first,
+                      !name.hasPrefix("_rt_"), !name.hasPrefix("_alias_")
+                else { return nil }
+                return textures.texture(named: name)
+            }()
+
+            var puppetModel: PuppetModel?
+            if let puppetPath = model["puppet"] as? String, let data = files.data(puppetPath) {
+                puppetModel = PuppetModel.parse(data, imageExtent: slot0Texture?.imageExtent ?? SIMD2(1, 1), device: textures.device)
+            }
+
+            var skinCombos: [String: Int] = [:]
+            if let puppetModel, puppetModel.isSkinned {
+                skinCombos["SKINNING"] = 1
+                skinCombos["BONECOUNT"] = puppetModel.boneCountBucket
+                if puppetModel.hasBoneAlpha { skinCombos["SKINNING_ALPHA"] = 1 }
+            }
+
             // The base pass: the object's own material.
-            var baseCombos: [String: Int] = [:]
+            var baseCombos = skinCombos
             if !needsChain, object.colorBlendMode != 0 { baseCombos["BLENDMODE"] = object.colorBlendMode }
             let base = try prepare(pass, overrides: nil, combos: baseCombos, base: nil, effect: false, ownerID: object.id)
             let compositePass = needsChain && object.colorBlendMode != 0 ? blendCompositePass(mode: object.colorBlendMode, ownerID: object.id) : nil
 
             let mainTexture: SceneTexture? = {
                 if case .texture(let texture)? = base.textures[0] { return texture }
-                return nil
+                return slot0Texture
             }()
             var size = object.size ?? mainTexture?.imageSize ?? SIMD2(Float(model["width"] as? Double ?? 0), Float(model["height"] as? Double ?? 0))
             if isFullscreen || size.x <= 0 || size.y <= 0 {
                 size = SIMD2(max(size.x, 1), max(size.y, 1))
             }
 
+            let puppet = puppetModel.map { PuppetAnimator(model: $0, rawLayers: object.raw["animationlayers"], values: values) }
+            let puppetClipping: PuppetClipping? = {
+                guard let puppetModel, !puppetModel.clippingMasks.isEmpty, !puppetModel.submeshes.isEmpty,
+                      let mainTexture
+                else { return nil }
+                return buildPuppetClipping(model: puppetModel, basePass: pass, baseCombos: baseCombos,
+                                           skinCombos: skinCombos, mainTexture: mainTexture, ownerID: object.id)
+            }()
+
+            var chainCenter = SIMD2<Float>.zero
+            var chainSize = size
+            if let puppetModel, !isPassthrough, !isFullscreen {
+                let bSize = puppetModel.boundsSize
+                let bCenter = puppetModel.boundsCenter
+                if bSize.x > 1, bSize.y > 1 {
+                    if abs(bCenter.x) < size.x * 0.1 && abs(bCenter.y) < size.y * 0.1 {
+                        let halfExtent = simd_max(simd_abs(puppetModel.boundsMin), simd_abs(puppetModel.boundsMax))
+                        chainSize = simd_max(size, halfExtent * 2)
+                    } else {
+                        // Off-center PSD-imported puppet: centre the chain buffer on the mesh with sway margin.
+                        chainCenter = bCenter
+                        chainSize = simd_max(bSize * 1.15, SIMD2(16, 16))
+                    }
+                }
+            }
+
             return ImageLayer(
                 object: object, size: size, base: base, steps: steps, blend: pass.blend,
                 isPassthrough: isPassthrough, isFullscreen: isFullscreen,
                 isCompositeSource: isCompositeSource, compositePass: compositePass,
-                imageExtent: mainTexture?.imageExtent ?? SIMD2(1, 1), targetScales: targetScales
+                imageExtent: mainTexture?.imageExtent ?? SIMD2(1, 1), targetScales: targetScales,
+                puppet: puppet, puppetClipping: puppetClipping, chainCenter: chainCenter, chainSize: chainSize
             )
+        }
+
+        /// Builds `clippingmaskimage4` mask passes and a `CLIPPINGTARGET` base pass for MDL clipping masks.
+        private func buildPuppetClipping(model: PuppetModel, basePass: MaterialPass, baseCombos: [String: Int],
+                                         skinCombos: [String: Int], mainTexture: SceneTexture, ownerID: Int) -> PuppetClipping? {
+            var clippedCombos = baseCombos
+            clippedCombos["CLIPPINGUVS"] = 1
+            clippedCombos["CLIPPINGTARGET"] = 1
+            guard let clippedBase = try? prepare(basePass, overrides: nil, combos: clippedCombos, base: nil,
+                                                 effect: false, binds: [8: "_clippingMask"], ownerID: ownerID)
+            else { return nil }
+
+            struct MaskKey: Hashable { let texture: String; let submeshes: [Int] }
+            var keyToIndex: [MaskKey: Int] = [:]
+            var entries: [PuppetClipping.Entry] = []
+            var submeshToEntry: [Int: Int] = [:]
+
+            for spec in model.clippingMasks {
+                let key = MaskKey(texture: spec.maskTextureName, submeshes: spec.maskSubmeshes)
+                let entryIndex: Int
+                if let existing = keyToIndex[key] {
+                    entryIndex = existing
+                } else {
+                    guard let maskTexture = textures.texture(named: spec.maskTextureName) else { continue }
+                    let maskMaterial = MaterialPass(shader: "clippingmaskimage4", blend: .max, textures: [], constants: [:], combos: [:])
+                    guard let maskPass = try? prepare(maskMaterial, overrides: nil, combos: skinCombos, base: nil,
+                                                      effect: false, textureOverrides: [0: mainTexture, 1: maskTexture], ownerID: ownerID)
+                    else { continue }
+                    entryIndex = entries.count
+                    entries.append(PuppetClipping.Entry(maskPass: maskPass, maskSubmeshes: spec.maskSubmeshes))
+                    keyToIndex[key] = entryIndex
+                }
+                for targetSubmesh in spec.targetSubmeshes {
+                    submeshToEntry[targetSubmesh] = entryIndex
+                }
+            }
+            guard !entries.isEmpty, !submeshToEntry.isEmpty else { return nil }
+            return PuppetClipping(clippedBase: clippedBase, submeshToEntry: submeshToEntry, entries: entries)
         }
 
         /// Final composite pass for chained layers that use Wallpaper Engine's `colorBlendMode`.
@@ -424,7 +509,9 @@ enum SceneLoader {
                 if let texture = textureOverrides[slot] {
                     resolved = .texture(texture)
                 } else if let bind = binds[slot] {
-                    resolved = bind == "previous" ? .previous : .named(bind)
+                    if bind == "previous" { resolved = .previous }
+                    else if bind == "_clippingMask" { resolved = .clippingMask }
+                    else { resolved = .named(bind) }
                 } else if let name = names[slot] {
                     resolved = textureSource(name, ownerID: ownerID)
                     if resolved != nil, let combo = samplerCombos[slot] { combos[combo] = 1 }

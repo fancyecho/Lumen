@@ -24,7 +24,7 @@
   - 支持 WE 属性监听 `wallpaperPropertyListener`，鼠标事件转发到页面。
   - 暂停时显示快照并挂起渲染。
 - **WE 场景**：
-  - 支持：图片层、大部分特效（WE 原版 GLSL 运行时翻译为 MSL）、粒子、精灵图动画、视频纹理、关键帧动画、文本层（时钟/日期）、SceneScript（JavaScriptCore）、音效、鼠标视差、用户属性面板。
+  - 支持：图片层、大部分特效（WE 原版 GLSL 运行时翻译为 MSL）、木偶变形（`.mdl` 网格/骨骼蒙皮/`animationlayers`/骨骼附着/内嵌裁剪蒙版）、跨层裁剪蒙版、粒子、精灵图动画、视频纹理、关键帧动画、文本层（时钟/日期）、SceneScript（JavaScriptCore）、音效、鼠标视差、用户属性面板。
   - 场景需要 WE 的共享 assets 文件夹，会自动从 WallpaperMachine 找到；也可在「设置 › Wallpaper Engine」里指定。
 - **创意工坊**：
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
@@ -35,8 +35,8 @@
 | 项目 | 基线 |
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
-| 加载耗时（着色器缓存命中） | 中位 0.35s，最大 1.43s |
-| GPU 帧时间（约 2MP） | 中位 4.4ms，p90 8.3ms（单测 3808922316 为 14.3ms） |
+| 加载耗时（着色器缓存命中） | 中位 0.42s，最大 1.44s |
+| GPU 帧时间（约 2MP） | 中位 3.02ms，p90 6.81ms（158 层含木偶+眼部裁剪的 3808922316 为 13.23ms） |
 | 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
@@ -48,17 +48,25 @@
 | ID | 任务 | 模块 | 优先级 | 状态 | 负责 | 备注 |
 |---|---|---|---|---|---|---|
 | T01 | 提交阶段 3/4 的改动 | 全局 | 高 | 完成 | claude | `23d33aa` |
-| T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 待认领 | | 语料中 139 处使用（含 6 个场景的 `*_puppet.mdl` 眼部/部件裁剪蒙版）；目前角色静止不动 |
+| T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 分支 `gemini/T02-puppet-warp`（待提交）：全语料 93/93 `.mdl` 解析、骨骼蒙皮/`SKINNING_ALPHA`、`animationlayers`（loop/mirror/single + additive/override）、`MDAT0001` 骨骼附着与 6 场景 MDL 眼部/部件裁剪蒙版均已完成验证 |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
-| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待认领 | | 需要系统音频采集（Core Audio tap 或 ScreenCaptureKit），注意权限和能耗 |
+| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 分支 `claude/T04-audio-reactive`。Core Audio process tap + FFT，接入着色器、粒子发射器、SceneScript、Web 监听器；需用户授权「录制系统音频」后用真实音乐验证手感 |
 | T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
-| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 待认领 | | |
+| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | `gpt/T06-scene-cursor-events` 支持 2D 图层六种鼠标事件，75/75 场景通过，待提交 |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
-| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 待认领 | | 目前只有 `Tools/` 下的命令行回归工具，没有 XCTest target |
+| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | `gpt/T09-parser-tests` 独立工作树中 14 项 XCTest 和 Debug 构建通过，待提交 |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
 | T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
+| T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | `gpt/T13-desktop-transition` Debug 构建通过，已提交为 `08045c9` |
+| T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 待认领 | | 「清风·兰亭」（库里 D198B112…/ WM 3420988161）背景字列应是 18%/36% 透明、模糊的，现在是清晰叠影；语料 3 个场景。改 `SceneLoader`/`SceneInstance`，与 T02 同文件，**等 T02 合并后再做** |
+| T15 | 用户属性绑定的类型转换：`visible` 等布尔字段绑到颜色/滑块/下拉属性时按「非空、非 0 即真」处理（WE 行为），数值字段绑到布尔属性时 true=1 | 场景 | 高 | 待认领 | | 「清风」的白色底图因此被隐藏，露出 0.7 灰的清屏色；语料 3 个场景。只改 `SceneDocument.swift` 的 `SceneValues`，可独立并行 |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待认领 | | 现在 Balanced 只渲染约 2.9MP，再双线性拉伸到 2560×1664 屏（需约 4.9MP）；84 个场景里 68 个是 4K 画布。需实测 M4 上 GPU 时间/功耗。改 `SceneRenderer`、`SceneLoader.renderSize`、`AppSettings` |
+| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
+| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
+
+**2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
 不做：WE 的 application 类型（只能在 Windows 上运行）。
 
@@ -70,6 +78,27 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · gemini · `gemini/T02-puppet-warp`（待提交）
+
+- **做了什么**：
+  - 完成 **T02（木偶变形 puppet warp）**：
+    - **`.mdl` 二进制解析（新增 `Lumen/Engine/Scene/ScenePuppet.swift`）**：完整支持 `MDLV0016/19/21/23`（顶点格式 `0x00000009`/`0x0000000f`/`0x01800009`/`0x0180000f`、UInt16 索引、子网格表与内嵌裁剪蒙版表）、`MDLS0002/03/04`（骨骼树与 bind pose 逆矩阵）、`MDAT0001`（骨骼附着点）、`MDLA0003/05/06`（骨骼 TRS 动画与可选 `alphaTracks`）。实测全语料 93/93 个 `.mdl` 零失败解析；UV 自动按主贴图 `imageExtent` 缩放以适配块对齐 `.tex`。
+    - **骨骼动画与附着点（`PuppetAnimator` + `SceneInstance.parentWorld(of:)`）**：每帧按 `animationlayers` 的 `rate`/`blend`/`additive`/`visible` 与 `loop`/`mirror`/`single` 模式求值骨骼矩阵（最短欧拉角差值插值），通过 `g_Bones`（`mat4x3`）和 `g_BonesAlpha`（`SKINNING_ALPHA`）传入着色器；子图层及嵌套子级通过 `attachment` 自动跟随父木偶骨骼运动（如 `3808922316` 角色眼睛/头发/光环/耳坠、`3367836416` 初音草帽）。
+    - **MDL 内嵌裁剪蒙版（`clippingmaskimage4` + `CLIPPINGUVS`/`CLIPPINGTARGET`）**：`SceneBlend` 新增 `.max` 混合模式，对带内嵌裁剪蒙版的子网格按需先将遮罩子网格渲染至图层 `clippingMaskTarget`，再绑定到 `g_Texture8` 绘制被裁剪子网格（同一帧连续共享遮罩的子网格复用结果），修复 6 个场景的眼部/部件裁剪。
+    - **偏心 PSD 木偶特效链适配**：`SceneLoader` 按木偶网格包围盒计算 `chainCenter`/`chainSize`（居中木偶保持原心以对齐特效遮罩，偏心 PSD 木偶居中到网格并留 15% 摆动余量），防止带特效的拆分部件在 Pass 0 被裁切。
+  - **性能/能耗评估**：
+    - `BONECOUNT` 按 `[16, 32, 64, 96, 128]` 分桶，避免为不同骨骼数编译数十份重复着色器变体；超过 Metal 4 KB 内联上限的骨骼 Uniform（如 95 骨模型 `3495507502`）改为每 pass 复用 6 槽共享 `MTLBuffer` 环形缓冲，消除逐帧分配。
+    - 静止（无活跃 `animationlayers`）的木偶只求值一次；自动遵守现有遮挡/锁屏/低电量暂停与像素预算策略。
+    - 全库 75 场景实测：加载中位 0.42s（最大 1.44s），GPU 帧时间中位 3.02ms、p90 6.81ms（158 层 Elisa `3808922316` 仅 13.23ms，95 骨 `3495507502` 仅 4.41ms）。
+  - **验证**：
+    - `Tools/test.sh build`（含 `xcodegen generate`）通过；`Tools/test.sh shaders` 300/316（持平基线）；`Tools/test.sh scenes` 75/75 OK、0 FAIL、0 洋红块。
+    - 肉眼抽检 9 个代表性木偶场景（`3808922316`、`2862513197`、`3367836416`、`3463692991`、`3479521040`、`3491865410`、`3610728777`、`3675289919`、`3495507502`），骨骼装配与眼部裁剪均正确；跨时间帧对比（`t=0.5` vs `t=2.5`）确认顶点实时变形（`3808922316` 60.0% 像素变化、`3367836416` 36.9%、`3495507502` 1.7%）。
+- **没做完**：
+  - 改动尚在 `gemini/T02-puppet-warp` 工作区未提交（等用户确认后 commit/合并）。
+  - 尚未实现木偶 `MORPHING`（形态变形目标，语料中无依赖此项的坏图，如需后续可单列）。
+- **建议下一步**：
+  - 用户确认提交并合并 `gemini/T02-puppet-warp` 到 `main` 后，可继续认领尚未被占用的高/中优先级任务：**T05（场景/Web 壁纸锁屏循环视频）** 或 **T07（片头/时间线类场景 3436945972 与 3463692991 布局）**。
 
 ### 2026-11-23 · gemini · `gemini/T03-clipping-masks`（已合并 `main`）
 

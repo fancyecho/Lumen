@@ -58,6 +58,7 @@ for id in items {
                     case .named(let n): tex += " \(slot):\(n)"
                     case .frameBuffer: tex += " \(slot):fb"
                     case .layerComposite(let id): tex += " \(slot):layer(\(id))"
+                    case .clippingMask: tex += " \(slot):clipmask"
                     }
                 }
                 print("  layer", layer.object.id, layer.object.name, "vis", layer.object.visible, "size", layer.size, "alpha", layer.object.alpha, "pass", layer.isPassthrough, "steps", layer.steps.count, "origin", layer.object.origin, tex, "uniforms", layer.base.program.info.uniforms.map(\.name))

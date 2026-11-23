@@ -3,7 +3,7 @@ import Metal
 import simd
 
 enum SceneBlend: Hashable {
-    case translucent, additive, opaque, multiply
+    case translucent, additive, opaque, multiply, max
 
     init(_ name: String?) {
         switch name?.lowercased() {
@@ -35,6 +35,14 @@ enum SceneBlend: Hashable {
             attachment.sourceRGBBlendFactor = .destinationColor
             attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
             attachment.sourceAlphaBlendFactor = .zero
+            attachment.destinationAlphaBlendFactor = .one
+        case .max:
+            attachment.isBlendingEnabled = true
+            attachment.rgbBlendOperation = .max
+            attachment.alphaBlendOperation = .max
+            attachment.sourceRGBBlendFactor = .one
+            attachment.destinationRGBBlendFactor = .one
+            attachment.sourceAlphaBlendFactor = .one
             attachment.destinationAlphaBlendFactor = .one
         }
     }
@@ -224,6 +232,7 @@ enum EngineUniform {
     case lightAmbient, lightSkylight
     case orientationUp, orientationRight, orientationForward, viewUp, viewRight
     case renderVar0, renderVar1
+    case bones, bonesAlpha
     case audio
     case zero
 
@@ -260,6 +269,8 @@ enum EngineUniform {
         case "g_ViewRight": return .viewRight
         case "g_RenderVar0": return .renderVar0
         case "g_RenderVar1": return .renderVar1
+        case "g_Bones": return .bones
+        case "g_BonesAlpha": return .bonesAlpha
         default: break
         }
         if name.hasPrefix("g_AudioSpectrum") { return .audio }
@@ -296,6 +307,8 @@ struct DrawState {
     var eye = SIMD3<Float>(960, 540, 2000)
     var renderVar0 = SIMD4<Float>.zero
     var renderVar1 = SIMD4<Float>.zero
+    var bones: [simd_float4x4] = []
+    var bonesAlpha: [Float] = []
 }
 
 /// A compiled pass with its static uniform values filled in; dynamic engine values are
@@ -400,6 +413,16 @@ struct UniformBlock {
             case .orientationForward: slots[s] = SIMD4(0, 0, 1, 0)
             case .renderVar0: slots[s] = state.renderVar0
             case .renderVar1: slots[s] = state.renderVar1
+            case .bones:
+                let stride = uniform.kind.slots
+                for index in 0..<uniform.count {
+                    let matrix = index < state.bones.count ? state.bones[index] : matrix_identity_float4x4
+                    setMatrix(matrix, at: s + index * stride, kind: uniform.kind)
+                }
+            case .bonesAlpha:
+                for index in 0..<uniform.count where s + index < slots.count {
+                    slots[s + index].x = index < state.bonesAlpha.count ? state.bonesAlpha[index] : 1
+                }
             case .audio, .zero:
                 for index in 0..<(uniform.count * uniform.kind.slots) where s + index < slots.count { slots[s + index] = .zero }
             }
@@ -408,12 +431,17 @@ struct UniformBlock {
 
     private mutating func setMatrix(_ matrix: simd_float4x4, at slot: Int, kind: WEUniform.Kind) {
         switch kind {
-        case .mat4:
+        case .mat4, .mat4x3:
             guard slot + 3 < slots.count else { return }
             slots[slot] = matrix.columns.0
             slots[slot + 1] = matrix.columns.1
             slots[slot + 2] = matrix.columns.2
             slots[slot + 3] = matrix.columns.3
+        case .mat3x4:
+            guard slot + 2 < slots.count else { return }
+            slots[slot] = SIMD4(matrix.columns.0.x, matrix.columns.1.x, matrix.columns.2.x, matrix.columns.3.x)
+            slots[slot + 1] = SIMD4(matrix.columns.0.y, matrix.columns.1.y, matrix.columns.2.y, matrix.columns.3.y)
+            slots[slot + 2] = SIMD4(matrix.columns.0.z, matrix.columns.1.z, matrix.columns.2.z, matrix.columns.3.z)
         case .mat3:
             guard slot + 2 < slots.count else { return }
             slots[slot] = matrix.columns.0

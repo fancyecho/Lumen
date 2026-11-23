@@ -15,12 +15,12 @@ struct SceneVertex {
     var weights = SIMD4<Float>(1, 0, 0, 0)
 
     /// A quad as a 4-vertex triangle strip: top-left, bottom-left, top-right, bottom-right.
-    static func quad(halfSize: SIMD2<Float>, uv: SIMD2<Float> = SIMD2(1, 1)) -> [SceneVertex] {
+    static func quad(halfSize: SIMD2<Float>, center: SIMD2<Float> = .zero, uv: SIMD2<Float> = SIMD2(1, 1)) -> [SceneVertex] {
         [
-            SceneVertex(position: SIMD4(-halfSize.x, halfSize.y, 0, 1), texcoord: SIMD4(0, 0, 0, 0)),
-            SceneVertex(position: SIMD4(-halfSize.x, -halfSize.y, 0, 1), texcoord: SIMD4(0, uv.y, 0, 0)),
-            SceneVertex(position: SIMD4(halfSize.x, halfSize.y, 0, 1), texcoord: SIMD4(uv.x, 0, 0, 0)),
-            SceneVertex(position: SIMD4(halfSize.x, -halfSize.y, 0, 1), texcoord: SIMD4(uv.x, uv.y, 0, 0)),
+            SceneVertex(position: SIMD4(center.x - halfSize.x, center.y + halfSize.y, 0, 1), texcoord: SIMD4(0, 0, 0, 0)),
+            SceneVertex(position: SIMD4(center.x - halfSize.x, center.y - halfSize.y, 0, 1), texcoord: SIMD4(0, uv.y, 0, 0)),
+            SceneVertex(position: SIMD4(center.x + halfSize.x, center.y + halfSize.y, 0, 1), texcoord: SIMD4(uv.x, 0, 0, 0)),
+            SceneVertex(position: SIMD4(center.x + halfSize.x, center.y - halfSize.y, 0, 1), texcoord: SIMD4(uv.x, uv.y, 0, 0)),
         ]
     }
 }
@@ -36,6 +36,8 @@ enum TextureSource {
     case frameBuffer
     /// Another layer's offscreen composite buffer (`_rt_imageLayerComposite_<id>_a/b`).
     case layerComposite(Int)
+    /// Per-layer MDL clipping mask buffer (`g_Texture8`).
+    case clippingMask
 }
 
 /// A material pass, compiled, with its textures and constants resolved. A class, so the
@@ -48,6 +50,9 @@ final class PreparedPass {
     /// The texture whose sprite-sheet frame drives `g_Texture0Translation`/`Rotation`.
     let spriteSheet: SceneTexture?
     let usesFrameBuffer: Bool
+    /// Reusable shared buffers for uniform blocks exceeding Metal's 4 KB inline limit (e.g. skeletal `g_Bones`).
+    private var uniformBuffers: [MTLBuffer] = []
+    private var uniformRing = 0
 
     init(program: CompiledProgram, pipeline: MTLRenderPipelineState, uniforms: UniformBlock,
          textures: [Int: TextureSource], spriteSheet: SceneTexture?) {
@@ -63,6 +68,19 @@ final class PreparedPass {
             if case .frameBuffer = source { return true }
             return false
         }
+    }
+
+    func uniformBuffer(device: MTLDevice, bytes: UnsafeRawBufferPointer) -> MTLBuffer? {
+        guard let base = bytes.baseAddress, bytes.count > 0 else { return nil }
+        let ringSize = 6
+        if uniformBuffers.count < ringSize {
+            guard let buf = device.makeBuffer(length: bytes.count, options: .storageModeShared) else { return nil }
+            uniformBuffers.append(buf)
+        }
+        let buf = uniformBuffers[uniformRing % uniformBuffers.count]
+        uniformRing &+= 1
+        memcpy(buf.contents(), base, bytes.count)
+        return buf
     }
 }
 
@@ -93,6 +111,12 @@ final class ImageLayer {
     /// Optional `BLENDMODE` composite pass used when a chained layer has `colorBlendMode != 0`.
     let compositePass: PreparedPass?
     let imageExtent: SIMD2<Float>
+    let puppet: PuppetAnimator?
+    let puppetClipping: PuppetClipping?
+    var clippingMaskTarget: MTLTexture?
+    /// Local-space centre and extent of Pass 0's offscreen buffer (equals `.zero`/`size` for normal layers).
+    let chainCenter: SIMD2<Float>
+    let chainSize: SIMD2<Float>
     var bufferSize = SIMD2<Int>(1, 1)
     var buffers: [MTLTexture] = []
     var targets: [String: MTLTexture] = [:]
@@ -100,7 +124,8 @@ final class ImageLayer {
 
     init(object: SceneDocument.Object, size: SIMD2<Float>, base: PreparedPass, steps: [EffectStep], blend: SceneBlend,
          isPassthrough: Bool, isFullscreen: Bool, isCompositeSource: Bool = false, compositePass: PreparedPass? = nil,
-         imageExtent: SIMD2<Float>, targetScales: [String: Float]) {
+         imageExtent: SIMD2<Float>, targetScales: [String: Float], puppet: PuppetAnimator? = nil,
+         puppetClipping: PuppetClipping? = nil, chainCenter: SIMD2<Float> = .zero, chainSize: SIMD2<Float>? = nil) {
         self.object = object
         self.size = size
         self.base = base
@@ -112,6 +137,10 @@ final class ImageLayer {
         self.compositePass = compositePass
         self.imageExtent = imageExtent
         self.targetScales = targetScales
+        self.puppet = puppet
+        self.puppetClipping = puppetClipping
+        self.chainCenter = chainCenter
+        self.chainSize = chainSize ?? size
         anchor = SceneMath.translation(SceneMath.anchorOffset(object.raw["alignment"] as? String, size: size))
         localModel = SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale) * anchor
     }
@@ -153,6 +182,7 @@ final class SceneInstance: @unchecked Sendable {
     private var placeholder: SceneTexture { textures.clear }
     private var indices: MTLBuffer?
     private let objects: [Int: SceneDocument.Object]
+    private let puppetsByID: [Int: PuppetAnimator]
     let scripts: SceneScriptRuntime?
     private var scriptChanges: [Int: SceneScriptRuntime.Change] = [:]
     private var frameStates: [Int: SceneDocument.State] = [:]
@@ -173,6 +203,13 @@ final class SceneInstance: @unchecked Sendable {
         var objects: [Int: SceneDocument.Object] = [:]
         for object in document.objects where objects[object.id] == nil { objects[object.id] = object }
         self.objects = objects
+        var puppets: [Int: PuppetAnimator] = [:]
+        for drawable in drawables {
+            if case .image(let layer) = drawable, let puppet = layer.puppet {
+                puppets[layer.object.id] = puppet
+            }
+        }
+        self.puppetsByID = puppets
         canvas = document.canvas
         self.renderSize = renderSize
         self.drawables = drawables
@@ -184,13 +221,19 @@ final class SceneInstance: @unchecked Sendable {
         frameCopy = try Self.makeTarget(device, renderSize)
         let scale = Float(renderSize.x) / max(canvas.x, 1)
         indices = ParticleLayer.sharedIndices(device: device)
-        for layer in layers where layer.needsChain {
-            let pixels = SIMD2<Int>(max(1, Int((layer.size.x * scale).rounded())), max(1, Int((layer.size.y * scale).rounded())))
-            layer.bufferSize = SIMD2(min(pixels.x, 8192), min(pixels.y, 8192))
-            layer.buffers = [try Self.makeTarget(device, layer.bufferSize), try Self.makeTarget(device, layer.bufferSize)]
-            for (name, divisor) in layer.targetScales {
-                let size = SIMD2(max(1, Int(Float(layer.bufferSize.x) / divisor)), max(1, Int(Float(layer.bufferSize.y) / divisor)))
-                layer.targets[name] = try Self.makeTarget(device, size)
+        for layer in layers {
+            if layer.needsChain {
+                let pixels = SIMD2<Int>(max(1, Int((layer.chainSize.x * scale).rounded())), max(1, Int((layer.chainSize.y * scale).rounded())))
+                layer.bufferSize = SIMD2(min(pixels.x, 8192), min(pixels.y, 8192))
+                layer.buffers = [try Self.makeTarget(device, layer.bufferSize), try Self.makeTarget(device, layer.bufferSize)]
+                for (name, divisor) in layer.targetScales {
+                    let size = SIMD2(max(1, Int(Float(layer.bufferSize.x) / divisor)), max(1, Int(Float(layer.bufferSize.y) / divisor)))
+                    layer.targets[name] = try Self.makeTarget(device, size)
+                }
+            }
+            if layer.puppetClipping != nil {
+                let maskSize = layer.needsChain ? layer.bufferSize : renderSize
+                layer.clippingMaskTarget = try Self.makeTarget(device, maskSize)
             }
         }
         clearTargets(on: queue)
@@ -203,6 +246,7 @@ final class SceneInstance: @unchecked Sendable {
         for layer in layers {
             targets += layer.buffers
             targets += Array(layer.targets.values)
+            if let mask = layer.clippingMaskTarget { targets.append(mask) }
         }
         guard let queue = queue ?? SceneQueues.queue(for: device), let buffer = queue.makeCommandBuffer() else { return }
         for texture in targets {
@@ -274,13 +318,24 @@ final class SceneInstance: @unchecked Sendable {
         return state
     }
 
+    /// Parent world transform for `object`, including any puppet bone attachment (`MDAT0001`).
+    private func parentWorld(of object: SceneDocument.Object) -> simd_float4x4 {
+        guard let parentID = object.parent, parentID != object.id else { return matrix_identity_float4x4 }
+        var parent = world(of: parentID)
+        if let attName = object.raw["attachment"] as? String,
+           let attMatrix = puppetsByID[parentID]?.attachmentTransform(named: attName) {
+            parent = parent * attMatrix
+        }
+        return parent
+    }
+
     /// World transform of an object (without its alignment offset), for its children.
     func world(of id: Int?) -> simd_float4x4 {
         guard let id else { return matrix_identity_float4x4 }
         if let cached = frameWorlds[id] { return cached }
         guard let object = objects[id], let state = state(of: id) else { return matrix_identity_float4x4 }
         frameWorlds[id] = matrix_identity_float4x4
-        let parent = object.parent == id ? matrix_identity_float4x4 : world(of: object.parent)
+        let parent = parentWorld(of: object)
         let result = parent * SceneMath.model(origin: state.origin, angles: state.angles, scale: state.scale)
         frameWorlds[id] = result
         return result
@@ -305,6 +360,8 @@ final class SceneInstance: @unchecked Sendable {
             scriptChanges = scripts.update(time: Double(frame.time), delta: Double(frame.delta), daytime: Double(frame.daytime),
                                            cursor: frame.pointerCanvas, cursorDown: false)
         }
+        // Evaluate all puppet skeletons up front so bone attachments are ready in any layer order.
+        for (_, puppet) in puppetsByID { puppet.evaluate(at: frame.time) }
         var session = SceneSession(target: sceneTexture, clear: document.clearColor)
         // Clear up front: a layer may copy the background before anything has drawn.
         _ = session.encoder(buffer)
@@ -316,7 +373,7 @@ final class SceneInstance: @unchecked Sendable {
                 layer = image
             case .particles(let particles):
                 guard let particleState = state(of: particles.object.id) else { continue }
-                particles.parentModel = world(of: particles.object.parent)
+                particles.parentModel = parentWorld(of: particles.object)
                 particles.localModel = SceneMath.model(origin: particleState.origin, angles: particleState.angles, scale: particleState.scale)
                 particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas)
                 guard particleState.visible else { continue }
@@ -331,7 +388,7 @@ final class SceneInstance: @unchecked Sendable {
             let drawsToScene = objectState.visible && objectState.alpha > 0.001 && (!layer.isPassthrough || !layer.steps.isEmpty)
             let capturesForOthers = layer.isCompositeSource && parentVisible(of: layer.object.id)
             guard drawsToScene || capturesForOthers else { continue }
-            let parentWorld = world(of: layer.object.parent)
+            let parentWorld = parentWorld(of: layer.object)
             // Parallax moves each layer by its depth (background layers usually less than 1).
             let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
             let layerVP = SceneMath.orthographic(canvas: canvas, offset: offset)
@@ -339,19 +396,90 @@ final class SceneInstance: @unchecked Sendable {
                 encodeChain(layer, state: objectState, parent: parentWorld, buffer: buffer, session: &session,
                             viewProjection: layerVP, frame: frame, compositeToScene: drawsToScene)
             } else {
-                let pass = layer.base
-                if pass.usesFrameBuffer { session.end(); copyFrame(buffer) }
-                guard let encoder = session.encoder(buffer) else { continue }
-                frameCopyValid = false
+                let needsFB = layer.base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true)
+                if needsFB { session.end(); copyFrame(buffer) }
                 var state = drawState(frame: frame, object: objectState)
                 state.model = layer.model(for: objectState, parent: parentWorld)
                 state.viewProjection = layerVP
                 state.targetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
-                draw(pass, encoder: encoder, vertices: SceneVertex.quad(halfSize: layer.size / 2, uv: pass.spriteSheet != nil ? SIMD2(1, 1) : layer.imageExtent),
-                     state: state, previous: nil, layer: layer)
+                encodeImageBase(
+                    layer: layer, state: state, buffer: buffer,
+                    openEncoder: {
+                        frameCopyValid = false
+                        return session.encoder(buffer)
+                    },
+                    closeEncoder: { session.end() }
+                )
             }
         }
         session.end(clearIfUnused: buffer)
+    }
+
+    private struct MeshRange {
+        let vertexBuffer: MTLBuffer
+        let indexBuffer: MTLBuffer
+        let indexStart: Int
+        let indexCount: Int
+    }
+
+    /// Draws an image layer's base geometry (quad or puppet mesh, with optional MDL clipping masks).
+    private func encodeImageBase(layer: ImageLayer, state: DrawState, buffer: MTLCommandBuffer,
+                                 openEncoder: () -> MTLRenderCommandEncoder?, closeEncoder: () -> Void) {
+        guard let puppet = layer.puppet else {
+            guard let encoder = openEncoder() else { return }
+            let uv = layer.base.spriteSheet != nil || layer.isPassthrough ? SIMD2<Float>(1, 1) : layer.imageExtent
+            draw(layer.base, encoder: encoder, vertices: SceneVertex.quad(halfSize: layer.size / 2, uv: uv),
+                 state: state, previous: nil, layer: layer)
+            return
+        }
+        let model = puppet.model
+        guard let clipping = layer.puppetClipping, let maskTarget = layer.clippingMaskTarget else {
+            guard let encoder = openEncoder() else { return }
+            let range = MeshRange(vertexBuffer: model.vertexBuffer, indexBuffer: model.indexBuffer,
+                                  indexStart: 0, indexCount: model.indexCount)
+            draw(layer.base, encoder: encoder, vertices: [], state: state, previous: nil, layer: layer, mesh: range)
+            return
+        }
+
+        var renderedMaskEntry: Int?
+        var encoder: MTLRenderCommandEncoder?
+        for (submeshIndex, submesh) in model.submeshes.enumerated() where submesh.indexCount > 0 {
+            let pass: PreparedPass
+            if let entryIndex = clipping.submeshToEntry[submeshIndex] {
+                if renderedMaskEntry != entryIndex {
+                    if encoder != nil {
+                        closeEncoder()
+                        encoder = nil
+                    }
+                    let entry = clipping.entries[entryIndex]
+                    if let maskEncoder = beginPass(buffer, target: maskTarget) {
+                        var maskState = state
+                        maskState.color = SIMD3(1, 1, 1)
+                        maskState.alpha = 1
+                        maskState.brightness = 1
+                        maskState.renderVar0 = .zero
+                        for maskSubIdx in entry.maskSubmeshes where maskSubIdx >= 0 && maskSubIdx < model.submeshes.count {
+                            let maskSub = model.submeshes[maskSubIdx]
+                            guard maskSub.indexCount > 0 else { continue }
+                            let maskRange = MeshRange(vertexBuffer: model.vertexBuffer, indexBuffer: model.indexBuffer,
+                                                      indexStart: maskSub.indexStart, indexCount: maskSub.indexCount)
+                            draw(entry.maskPass, encoder: maskEncoder, vertices: [], state: maskState,
+                                 previous: nil, layer: layer, mesh: maskRange)
+                        }
+                        maskEncoder.endEncoding()
+                    }
+                    renderedMaskEntry = entryIndex
+                }
+                pass = clipping.clippedBase
+            } else {
+                pass = layer.base
+            }
+            if encoder == nil { encoder = openEncoder() }
+            guard let activeEncoder = encoder else { continue }
+            let range = MeshRange(vertexBuffer: model.vertexBuffer, indexBuffer: model.indexBuffer,
+                                  indexStart: submesh.indexStart, indexCount: submesh.indexCount)
+            draw(pass, encoder: activeEncoder, vertices: [], state: state, previous: nil, layer: layer, mesh: range)
+        }
     }
 
     private func encodeChain(_ layer: ImageLayer, state objectState: SceneDocument.State, parent: simd_float4x4, buffer: MTLCommandBuffer,
@@ -361,7 +489,9 @@ final class SceneInstance: @unchecked Sendable {
         let base = layer.base
         // The chain renders into its own buffers, so the scene's encoder has to close first.
         session.end()
-        if base.usesFrameBuffer || layer.isPassthrough { copyFrame(buffer) }
+        if base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true) || layer.isPassthrough {
+            copyFrame(buffer)
+        }
         // Pass 0: the object's own material into the first buffer.
         var state = drawState(frame: frame, object: objectState)
         state.targetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
@@ -370,13 +500,30 @@ final class SceneInstance: @unchecked Sendable {
             state.viewProjection = viewProjection
         } else {
             state.model = matrix_identity_float4x4
-            state.viewProjection = SceneMath.scale(SIMD2(2 / max(layer.size.x, 1), 2 / max(layer.size.y, 1)))
+            state.viewProjection = SceneMath.scale(SIMD2(2 / max(layer.chainSize.x, 1), 2 / max(layer.chainSize.y, 1)))
+                * SceneMath.translation(-layer.chainCenter)
         }
         var current = 0
-        if let encoder = beginPass(buffer, target: layer.buffers[0]) {
-            let uv = base.spriteSheet != nil || layer.isPassthrough ? SIMD2<Float>(1, 1) : layer.imageExtent
-            draw(base, encoder: encoder, vertices: SceneVertex.quad(halfSize: layer.size / 2, uv: uv), state: state, previous: nil, layer: layer)
-            encoder.endEncoding()
+        var pass0Encoder: MTLRenderCommandEncoder?
+        var pass0Cleared = false
+        encodeImageBase(
+            layer: layer, state: state, buffer: buffer,
+            openEncoder: {
+                if let existing = pass0Encoder { return existing }
+                let enc = beginPass(buffer, target: layer.buffers[0], clear: !pass0Cleared)
+                pass0Cleared = true
+                pass0Encoder = enc
+                return enc
+            },
+            closeEncoder: {
+                pass0Encoder?.endEncoding()
+                pass0Encoder = nil
+            }
+        )
+        if !pass0Cleared, let enc = beginPass(buffer, target: layer.buffers[0], clear: true) {
+            enc.endEncoding()
+        } else {
+            pass0Encoder?.endEncoding()
         }
 
         // Effects, ping-ponging between the two buffers.
@@ -416,6 +563,7 @@ final class SceneInstance: @unchecked Sendable {
         guard compositeToScene else { return }
 
         // Composite the result onto the scene with the object's transform.
+        let compositeQuad = SceneVertex.quad(halfSize: layer.chainSize / 2, center: layer.chainCenter)
         if let composite = layer.compositePass {
             if composite.usesFrameBuffer, !frameCopyValid { copyFrame(buffer) }
             guard let encoder = session.encoder(buffer) else { return }
@@ -428,16 +576,15 @@ final class SceneInstance: @unchecked Sendable {
             compState.model = model
             compState.viewProjection = viewProjection
             compState.targetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
-            draw(composite, encoder: encoder, vertices: SceneVertex.quad(halfSize: layer.size / 2),
+            draw(composite, encoder: encoder, vertices: compositeQuad,
                  state: compState, previous: layer.buffers[current], layer: layer)
             return
         }
         guard let encoder = session.encoder(buffer), let pipeline = utility.composite[layer.blend] ?? utility.composite[.translucent] else { return }
         frameCopyValid = false
         var mvp = viewProjection * model
-        let vertices = SceneVertex.quad(halfSize: layer.size / 2)
         encoder.setRenderPipelineState(pipeline)
-        vertices.withUnsafeBytes { encoder.setVertexBytes($0.baseAddress!, length: $0.count, index: 1) }
+        compositeQuad.withUnsafeBytes { encoder.setVertexBytes($0.baseAddress!, length: $0.count, index: 1) }
         encoder.setVertexBytes(&mvp, length: MemoryLayout<simd_float4x4>.size, index: 0)
         encoder.setFragmentTexture(layer.buffers[current], index: 0)
         encoder.setFragmentSamplerState(textures.samplers.state(nearest: false, clamp: true), index: 0)
@@ -461,10 +608,10 @@ final class SceneInstance: @unchecked Sendable {
         return state
     }
 
-    private func beginPass(_ buffer: MTLCommandBuffer, target: MTLTexture) -> MTLRenderCommandEncoder? {
+    private func beginPass(_ buffer: MTLCommandBuffer, target: MTLTexture, clear: Bool = true) -> MTLRenderCommandEncoder? {
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
-        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].loadAction = clear ? .clear : .load
         descriptor.colorAttachments[0].storeAction = .store
         descriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         return buffer.makeRenderCommandEncoder(descriptor: descriptor)
@@ -478,8 +625,13 @@ final class SceneInstance: @unchecked Sendable {
     }
 
     private func draw(_ pass: PreparedPass, encoder: MTLRenderCommandEncoder, vertices: [SceneVertex],
-                      state: DrawState, previous: MTLTexture?, layer: ImageLayer?, particleBuffer: (MTLBuffer, Int)? = nil) {
+                      state: DrawState, previous: MTLTexture?, layer: ImageLayer?,
+                      particleBuffer: (MTLBuffer, Int)? = nil, mesh: MeshRange? = nil) {
         var state = state
+        if mesh != nil, let puppet = layer?.puppet {
+            state.bones = puppet.skinMatrices
+            state.bonesAlpha = puppet.boneAlphas
+        }
         // Texture sizes for g_TextureNResolution, and the current sprite frame.
         for (index, source) in pass.textures {
             switch source {
@@ -494,6 +646,10 @@ final class SceneInstance: @unchecked Sendable {
             case .layerComposite(let sourceID):
                 if let source = compositeTextures[sourceID] {
                     state.resolutions[index] = SIMD4(Float(source.width), Float(source.height), Float(source.width), Float(source.height))
+                }
+            case .clippingMask:
+                if let mask = layer?.clippingMaskTarget {
+                    state.resolutions[index] = SIMD4(Float(mask.width), Float(mask.height), Float(mask.width), Float(mask.height))
                 }
             }
         }
@@ -510,12 +666,14 @@ final class SceneInstance: @unchecked Sendable {
             if bytes.count <= 4096 {
                 encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 0)
                 encoder.setFragmentBytes(bytes.baseAddress!, length: bytes.count, index: 0)
-            } else if let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared) {
+            } else if let buffer = pass.uniformBuffer(device: device, bytes: bytes) {
                 encoder.setVertexBuffer(buffer, offset: 0, index: 0)
                 encoder.setFragmentBuffer(buffer, offset: 0, index: 0)
             }
         }
-        if let (vertexBuffer, _) = particleBuffer {
+        if let mesh {
+            encoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 1)
+        } else if let (vertexBuffer, _) = particleBuffer {
             encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 1)
         } else {
             vertices.withUnsafeBytes { encoder.setVertexBytes($0.baseAddress!, length: $0.count, index: 1) }
@@ -540,6 +698,9 @@ final class SceneInstance: @unchecked Sendable {
             case .layerComposite(let sourceID)?:
                 if let source = compositeTextures[sourceID] { texture = source }
                 samplerState = textures.samplers.state(nearest: false, clamp: true)
+            case .clippingMask?:
+                if let mask = layer?.clippingMaskTarget { texture = mask }
+                samplerState = textures.samplers.state(nearest: false, clamp: true)
             case nil:
                 break
             }
@@ -552,7 +713,12 @@ final class SceneInstance: @unchecked Sendable {
                 encoder.setFragmentSamplerState(samplerState, index: sampler.index)
             }
         }
-        if let (_, quads) = particleBuffer {
+        if let mesh {
+            encoder.drawIndexedPrimitives(
+                type: .triangle, indexCount: mesh.indexCount, indexType: .uint16,
+                indexBuffer: mesh.indexBuffer, indexBufferOffset: mesh.indexStart * MemoryLayout<UInt16>.stride
+            )
+        } else if let (_, quads) = particleBuffer {
             guard let indices, quads > 0 else { return }
             encoder.drawIndexedPrimitives(type: .triangle, indexCount: quads * 6, indexType: .uint32, indexBuffer: indices, indexBufferOffset: 0)
         } else {
