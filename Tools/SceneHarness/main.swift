@@ -23,6 +23,29 @@ let fakeAudio: AudioBands = {
     let bands = (0..<AudioBands.bandCount).map { 0.95 - Float($0) / Float(AudioBands.bandCount) * 0.8 }
     return AudioBands(left: bands, right: bands)
 }()
+// LUMEN_POINTER=0.3,0.6 or LUMEN_POINTER=0.2,0.7;0.8,0.3 injects a simulated pointer (normalized top-left 0..1)
+// or polyline path interpolated across frames. LUMEN_FRAMES overrides the 30fps step count (default 3, or 30 with LUMEN_POINTER).
+let pointerPath: [SIMD2<Float>] = {
+    guard let raw = environment["LUMEN_POINTER"], !raw.isEmpty else { return [] }
+    return raw.split(separator: ";").compactMap { segment in
+        let parts = segment.split(separator: ",").compactMap { Float($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count == 2 else { return nil }
+        return SIMD2(parts[0], parts[1])
+    }
+}()
+let harnessFrames: Int = {
+    if let raw = environment["LUMEN_FRAMES"], let n = Int(raw), n > 0 { return n }
+    return pointerPath.isEmpty ? 3 : 30
+}()
+func samplePointer(at progress: Float) -> SIMD2<Float>? {
+    guard !pointerPath.isEmpty else { return nil }
+    guard pointerPath.count > 1 else { return pointerPath[0] }
+    let clamped = min(max(progress, 0), 1)
+    let scaled = clamped * Float(pointerPath.count - 1)
+    let idx = min(Int(scaled), pointerPath.count - 2)
+    let frac = scaled - Float(idx)
+    return pointerPath[idx] + (pointerPath[idx + 1] - pointerPath[idx]) * frac
+}
 if args.count > 6 { SceneLoader.debugLayerFilter = Set(args[6].split(separator: ",").compactMap { Int($0) }) }
 
 func savePNG(_ texture: MTLTexture, to url: URL) throws {
@@ -79,25 +102,34 @@ for id in items {
         }
         let videoWait = !instance.textures.videoTextures.isEmpty
         if videoWait { RunLoop.main.run(until: Date().addingTimeInterval(1.5)) }
-        // Warm up a few frames (effects with feedback), then capture.
+        // Warm up a few frames (effects with feedback, or simulated pointer motion), then capture.
         var t: Float = 0
-        let frames = 3
+        let frames = harnessFrames
         var gpu: Double = 0
+        var lastPointer = samplePointer(at: 0) ?? SIMD2<Float>(0.5, 0.5)
         for i in 0..<frames {
             t = time + Float(i) / 30
+            let progress = frames > 1 ? Float(i) / Float(frames - 1) : 1
+            let simulated = samplePointer(at: progress)
+            let pointer = simulated ?? SIMD2<Float>(0.5, 0.5)
+            let pointerCanvas = simulated.map { SIMD2($0.x * instance.canvas.x, (1 - $0.y) * instance.canvas.y) }
             let cb = queue.makeCommandBuffer()!
-            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: SIMD2(0.5, 0.5), audio: fakeAudio))
+            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: pointerCanvas, daytime: 0.5, pointer: pointer, pointerLast: lastPointer, cameraOffset: .zero, parallax: pointer, audio: fakeAudio))
             cb.commit(); cb.waitUntilCompleted()
             gpu = cb.gpuEndTime - cb.gpuStartTime
+            lastPointer = pointer
         }
         if environment["LUMEN_BENCH"] != nil {
             let times = UnsafeMutableBufferPointer<Double>.allocate(capacity: 60)
             times.initialize(repeating: 0)
             defer { times.deallocate() }
             var last: MTLCommandBuffer?
+            let benchPointer = samplePointer(at: 1)
+            let benchNorm = benchPointer ?? SIMD2<Float>(0.5, 0.5)
+            let benchCanvas = benchPointer.map { SIMD2($0.x * instance.canvas.x, (1 - $0.y) * instance.canvas.y) }
             for i in 0..<60 {
                 let cb = queue.makeCommandBuffer()!
-                instance.encode(into: cb, frame: .init(time: time + Float(3 + i) / 30, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: SIMD2(0.5, 0.5), audio: fakeAudio))
+                instance.encode(into: cb, frame: .init(time: time + Float(frames + i) / 30, delta: 1.0 / 30, pointerCanvas: benchCanvas, daytime: 0.5, pointer: benchNorm, pointerLast: benchNorm, cameraOffset: .zero, parallax: benchNorm, audio: fakeAudio))
                 cb.addCompletedHandler { times[i] = $0.gpuEndTime - $0.gpuStartTime }
                 cb.commit()
                 last = cb
