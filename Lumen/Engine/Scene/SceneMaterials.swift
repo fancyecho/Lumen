@@ -55,6 +55,10 @@ struct MaterialPass {
     var textures: [String?]
     var constants: [String: Any]
     var combos: [String: Int]
+    // These raster states are applied only to 3D model passes; 2D uses scene order.
+    var depthTest = true
+    var depthWrite = true
+    var cullMode: MTLCullMode = .back
 
     /// Reads `materials/….json`. `base` is the effect folder its paths may be relative to.
     static func load(_ path: String, near base: String?, files: SceneFileSystem, values: SceneValues) -> [MaterialPass]? {
@@ -68,7 +72,10 @@ struct MaterialPass {
                 blend: SceneBlend(pass["blending"] as? String),
                 textures: (pass["textures"] as? [Any] ?? []).map { $0 as? String },
                 constants: pass["constantshadervalues"] as? [String: Any] ?? [:],
-                combos: combos
+                combos: combos,
+                depthTest: pass["depthtest"] as? String != "disabled",
+                depthWrite: pass["depthwrite"] as? String != "disabled",
+                cullMode: pass["cullmode"] as? String == "nocull" ? .none : .back
             )
         }
     }
@@ -93,8 +100,9 @@ final class CompiledProgram: @unchecked Sendable {
         self.device = device
     }
 
-    func pipeline(blend: SceneBlend, format: MTLPixelFormat = .rgba8Unorm) throws -> MTLRenderPipelineState {
-        let key = "\(blend)-\(format.rawValue)"
+    func pipeline(blend: SceneBlend, format: MTLPixelFormat = .rgba8Unorm,
+                  depth: MTLPixelFormat = .invalid) throws -> MTLRenderPipelineState {
+        let key = "\(blend)-\(format.rawValue)-\(depth.rawValue)"
         lock.lock()
         defer { lock.unlock() }
         if let existing = pipelines[key] { return existing }
@@ -102,6 +110,7 @@ final class CompiledProgram: @unchecked Sendable {
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
         descriptor.colorAttachments[0].pixelFormat = format
+        descriptor.depthAttachmentPixelFormat = depth
         blend.configure(descriptor.colorAttachments[0])
         let state = try device.makeRenderPipelineState(descriptor: descriptor)
         pipelines[key] = state
@@ -184,7 +193,7 @@ final class SceneShaderLibrary: @unchecked Sendable {
             Self.lock.unlock()
             group.leave()
         }
-        let info = WEShaderTranslator.translate(
+        let info = WESceneShader.translate(
             vertex: source.vertex, fragment: source.fragment, combos: combos, resolveInclude: include(near: source.base)
         )
         Self.translateTime += CFAbsoluteTimeGetCurrent() - t0
@@ -229,7 +238,7 @@ enum EngineUniform {
     case textureResolution(Int), textureRotation(Int), textureTranslation(Int), textureMipInfo(Int)
     case pointer, pointerLast, parallax
     case color4, color, alpha, userAlpha, brightness
-    case lightAmbient, lightSkylight
+    case lightAmbient, lightSkylight, normalModelMatrix, pointLightPositions, pointLightColors
     case orientationUp, orientationRight, orientationForward, viewUp, viewRight
     case renderVar0, renderVar1
     case bones, bonesAlpha
@@ -263,6 +272,9 @@ enum EngineUniform {
         case "g_Brightness": return .brightness
         case "g_LightAmbientColor": return .lightAmbient
         case "g_LightSkylightColor": return .lightSkylight
+        case "g_NormalModelMatrix": return .normalModelMatrix
+        case "g_LumenPointLightPositionRadius": return .pointLightPositions
+        case "g_LumenPointLightColorFalloff": return .pointLightColors
         case "g_OrientationUp": return .orientationUp
         case "g_OrientationRight": return .orientationRight
         case "g_OrientationForward": return .orientationForward
@@ -290,6 +302,8 @@ struct DrawState {
     var time: Float = 0
     var daytime: Float = 0
     var model = matrix_identity_float4x4
+    /// Lit offscreen passes rasterize in local space but still shade in the scene's world space.
+    var worldModel: simd_float4x4?
     var viewProjection = matrix_identity_float4x4
     var targetSize = SIMD2<Float>(1, 1)
     var screen = SIMD2<Float>(1, 1)
@@ -301,6 +315,7 @@ struct DrawState {
     var brightness: Float = 1
     var ambient = SIMD3<Float>(repeating: 0.3)
     var skylight = SIMD3<Float>(repeating: 0.3)
+    var pointLights: [ScenePointLightSample] = []
     /// Per texture slot: (texture width, height, image width, height).
     var resolutions: [Int: SIMD4<Float>] = [:]
     /// Sprite-sheet frame for slot 0: rotation (x axis, y axis) and translation.
@@ -383,6 +398,13 @@ struct UniformBlock {
 
     var hasDynamicValues: Bool { !dynamic.isEmpty || !animated.isEmpty }
 
+    var usesPointLighting: Bool {
+        dynamic.contains { engine, _ in
+            if case .pointLightPositions = engine { return true }
+            return false
+        }
+    }
+
     /// Whether the shader reads the audio spectrum (so capture should run).
     var usesAudio: Bool {
         dynamic.contains { engine, _ in
@@ -399,8 +421,13 @@ struct UniformBlock {
             switch engine {
             case .time: slots[s].x = state.time
             case .daytime: slots[s].x = state.daytime
-            case .modelMatrix: setMatrix(state.model, at: s, kind: uniform.kind)
-            case .modelMatrixInverse: setMatrix(state.model.inverse, at: s, kind: uniform.kind)
+            case .modelMatrix: setMatrix(state.worldModel ?? state.model, at: s, kind: uniform.kind)
+            case .modelMatrixInverse: setMatrix((state.worldModel ?? state.model).inverse, at: s, kind: uniform.kind)
+            case .normalModelMatrix:
+                let model = state.worldModel ?? state.model
+                let determinant = simd_determinant(model)
+                let normal = determinant.isFinite && determinant != 0 ? model.inverse.transpose : matrix_identity_float4x4
+                setMatrix(normal, at: s, kind: uniform.kind)
             case .viewProjection: setMatrix(state.viewProjection, at: s, kind: uniform.kind)
             case .modelViewProjection, .effectModelViewProjection: setMatrix(state.viewProjection * state.model, at: s, kind: uniform.kind)
             case .modelViewProjectionInverse: setMatrix((state.viewProjection * state.model).inverse, at: s, kind: uniform.kind)
@@ -422,6 +449,14 @@ struct UniformBlock {
             case .brightness: slots[s].x = state.brightness
             case .lightAmbient: slots[s] = SIMD4(state.ambient, 1)
             case .lightSkylight: slots[s] = SIMD4(state.skylight, 1)
+            case .pointLightPositions:
+                for index in 0..<uniform.count where s + index < slots.count {
+                    slots[s + index] = index < state.pointLights.count ? state.pointLights[index].positionRadius : .zero
+                }
+            case .pointLightColors:
+                for index in 0..<uniform.count where s + index < slots.count {
+                    slots[s + index] = index < state.pointLights.count ? state.pointLights[index].colorFalloff : .zero
+                }
             case .orientationUp, .viewUp: slots[s] = SIMD4(0, 1, 0, 0)
             case .orientationRight, .viewRight: slots[s] = SIMD4(1, 0, 0, 0)
             case .orientationForward: slots[s] = SIMD4(0, 0, 1, 0)

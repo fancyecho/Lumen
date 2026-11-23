@@ -64,7 +64,7 @@ enum SceneLoader {
         if !passthroughIDs.isEmpty {
             for object in document.objects {
                 switch object.kind {
-                case .image, .particle, .text: break
+                case .image, .particle, .text, .model: break
                 default: continue
                 }
                 var cursor = object.parent
@@ -96,9 +96,11 @@ enum SceneLoader {
             models[object.id] = parentModel * local
             parents[object.id] = parentModel
             switch object.kind {
-            case .image, .particle, .text: objects.append(object)
-            case .model: unsupported.append("3D models")
+            case .image, .particle, .text, .model: objects.append(object)
             default: break
+            }
+            if object.kind == .model, object.effects.contains(where: \.visible) {
+                unsupported.append("3D model effects")
             }
         }
 
@@ -106,6 +108,7 @@ enum SceneLoader {
         // a 40-layer scene load in a couple of seconds instead of ten.
         var built = [SceneDrawable?](repeating: nil, count: objects.count)
         var missingFiles = 0
+        var failedModel = false
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: objects.count) { index in
             let object = objects[index]
@@ -122,6 +125,8 @@ enum SceneLoader {
                         layer.parentModel = parent
                         drawable = .image(layer)
                     }
+                } else if object.kind == .model {
+                    drawable = .model(try builder.modelLayer(object))
                 } else if let layer = try builder.imageLayer(object) {
                     layer.parentModel = parent
                     drawable = .image(layer)
@@ -131,13 +136,13 @@ enum SceneLoader {
                 lock.unlock()
             } catch {
                 Log.engine.info("Scene layer “\(object.name, privacy: .public)” skipped: \(error.localizedDescription, privacy: .public)")
-                if (error as? SceneLoadError).map({ if case .missingFile = $0 { return true } else { return false } }) == true {
-                    lock.lock()
-                    missingFiles += 1
-                    lock.unlock()
-                }
+                lock.lock()
+                if object.kind == .model { failedModel = true }
+                if let error = error as? SceneLoadError, case .missingFile = error { missingFiles += 1 }
+                lock.unlock()
             }
         }
+        if failedModel { unsupported.append("3D models") }
         let drawables = built.compactMap { $0 }
         if missingFiles > 0, request.assets == nil, drawables.count < objects.count / 2 { throw SceneLoadError.noAssets }
         if drawables.isEmpty, request.assets == nil { throw SceneLoadError.noAssets }
@@ -151,6 +156,7 @@ enum SceneLoader {
             let id: Int = switch drawable {
             case .image(let layer): layer.object.id
             case .particles(let layer): layer.object.id
+            case .model(let layer): layer.object.id
             }
             if let ownerID = groupOwner[id], let owner = imageByID[ownerID] {
                 owner.children.append(drawable)
@@ -163,11 +169,14 @@ enum SceneLoader {
         let scripts = Self.scripts(for: document, json: json, values: values, userProperties: request.values,
                                    storageKey: request.folder.lastPathComponent)
         let sounds = SceneSoundPlayer(document: document, files: files, values: values)
+        let pointLights = Array(document.objects.lazy.compactMap { ScenePointLight(object: $0, values: values) }
+            .prefix(WESceneShader.pointLightLimit))
+        let modelCamera = document.isOrthographic ? nil : SceneModelCamera(json: json, values: values, canvas: document.canvas)
         return try SceneInstance(
             document: document, renderSize: renderSize, drawables: drawables, rootDrawables: rootDrawables,
             textures: textures, utility: utility, queue: request.queue,
             unsupported: Array(Set(unsupported)).sorted(), scripts: scripts,
-            sounds: sounds.isEmpty ? nil : sounds
+            sounds: sounds.isEmpty ? nil : sounds, modelCamera: modelCamera, pointLights: pointLights
         )
     }
 
@@ -292,6 +301,42 @@ enum SceneLoader {
 
         /// Wallpaper Engine lays text out at 300 dpi: one point is 300/72 canvas units.
         static let pointScale: Float = 300.0 / 72.0
+
+        func modelLayer(_ object: SceneDocument.Object) throws -> ModelLayer {
+            guard let path = object.raw["model"] as? String, let data = files.data(path) else {
+                throw SceneLoadError.missingFile(object.raw["model"] as? String ?? "model")
+            }
+            guard let materialPath = PuppetModel.materialPath(in: data),
+                  let materials = MaterialPass.load(materialPath, near: nil, files: files, values: values),
+                  !materials.isEmpty
+            else { throw SceneLoadError.unsupported("a 3D model without a material") }
+
+            let passes = try materials.map { material in
+                let needsDepth = material.depthTest || material.depthWrite
+                let depth: MTLDepthStencilState?
+                if needsDepth {
+                    let descriptor = MTLDepthStencilDescriptor()
+                    descriptor.depthCompareFunction = material.depthTest ? .lessEqual : .always
+                    descriptor.isDepthWriteEnabled = material.depthWrite
+                    guard let state = textures.device.makeDepthStencilState(descriptor: descriptor)
+                    else { throw SceneLoadError.unsupported("3D depth testing") }
+                    depth = state
+                } else {
+                    depth = nil
+                }
+                let draw = try prepare(material, overrides: nil, combos: [:], base: nil, effect: false,
+                                       ownerID: object.id, depth: needsDepth ? .depth32Float : .invalid)
+                return ModelLayer.Pass(draw: draw, depth: depth, cull: material.cullMode)
+            }
+            let extent: SIMD2<Float>
+            if case .texture(let texture)? = passes.first?.draw.textures[0] { extent = texture.imageExtent }
+            else { extent = SIMD2(1, 1) }
+            guard let mesh = PuppetModel.parse(data, imageExtent: extent, device: textures.device),
+                  mesh.meshCount == 1, !mesh.isSkinned else {
+                throw SceneLoadError.unsupported("a skinned or multi-mesh 3D model")
+            }
+            return ModelLayer(object: object, mesh: mesh, passes: passes)
+        }
 
         func imageLayer(_ object: SceneDocument.Object) throws -> ImageLayer? {
             guard let modelPath = object.image, let model = files.json(modelPath) else {
@@ -541,7 +586,7 @@ enum SceneLoader {
         /// Resolves textures and combos for a material pass and compiles it.
         func prepare(_ material: MaterialPass, overrides: SceneDocument.PassOverride?, combos extra: [String: Int],
                      base: String?, effect: Bool, binds: [Int: String] = [:], textureOverrides: [Int: SceneTexture] = [:],
-                     ownerID: Int = -1) throws -> PreparedPass {
+                     ownerID: Int = -1, depth: MTLPixelFormat = .invalid) throws -> PreparedPass {
             let source = try shaders.source(for: material.shader, near: base)
             let samplerDefaults = WEShaderTranslator.textureDefaults(in: source.flattened)
             let samplerCombos = WEShaderTranslator.textureCombos(in: source.flattened)
@@ -589,7 +634,7 @@ enum SceneLoader {
 
             let program = try shaders.program(source, combos: combos)
             // Effect passes write a whole buffer; only the base and final draws blend.
-            let pipeline = try program.pipeline(blend: effect ? .opaque : material.blend)
+            let pipeline = try program.pipeline(blend: effect ? .opaque : material.blend, depth: depth)
             let constants = [overrides?.constants ?? [:], material.constants]
             let uniforms = UniformBlock(program: program.info, constants: constants, values: values, isEffect: effect)
             return PreparedPass(program: program, pipeline: pipeline, uniforms: uniforms, textures: sources, spriteSheet: sheet)

@@ -58,9 +58,11 @@
 		80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */; };
 		8416156A9FB7F4F76B0076BF /* PlaylistStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE68D1D450207C3D5BD48E5 /* PlaylistStore.swift */; };
 		85CD160709AE05B072BBC67B /* SceneSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40FAD20AD6D740C31FF87167 /* SceneSound.swift */; };
+		86F5D8B6F5D84E2980501C2D /* SceneModelCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1867B46652CB381C804EC68D /* SceneModelCamera.swift */; };
 		876903FE7BFE88EC2651B345 /* HEVCTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */; };
 		88A8740A7CB2B09CD3C8A152 /* OcclusionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77634FB81764312077A0248D /* OcclusionMonitor.swift */; };
 		8C8D624ECF831DC0E516E073 /* SceneRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CC1C825DB34072D9717DC7 /* SceneRenderer.swift */; };
+		901D547B061F9E405A5A1DBC /* WESceneShader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B930FAE153266BF7B0C5F21 /* WESceneShader.swift */; };
 		920F1E1EBC68259000312A97 /* AssignmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91FFC02803C3734E6C033D4 /* AssignmentStore.swift */; };
 		9759F3CEFD065C9F2DB7833D /* ParserFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458923F6348C7E22B0926E6C /* ParserFixtures.swift */; };
 		98B2D937BB60D7DD18413A74 /* AddWebPageSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C496F5B621D9D90208BB740 /* AddWebPageSheet.swift */; };
@@ -86,11 +88,13 @@
 		CBC6B78079BAFAEF5F157F38 /* ShaderSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F9E5B437570F9233341812 /* ShaderSources.swift */; };
 		CCAD73FF2BA8D40BAD248724 /* WEShaderTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA791F722E3F354A9DBD992 /* WEShaderTranslator.swift */; };
 		CF6FE635506FF68236EABAF4 /* ShaderUniforms.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44D0C5EDF2A38646BB048D5 /* ShaderUniforms.swift */; };
+		D02E41A22B84C4DAB1296BAB /* ScenePointLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F04135342AFE926DE366351 /* ScenePointLight.swift */; };
 		D1947C2634CCE180A7B98F58 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82F8F2F06698872283B45F55 /* Theme.swift */; };
 		D2DCE31CE32DDC35D600E83A /* PropertiesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00306F245817BC0D3C857F30 /* PropertiesPanel.swift */; };
 		D6EFA3292F0833F23374BA36 /* WorkshopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029A06C41E41D605B173EDA3 /* WorkshopView.swift */; };
 		DA75B20F8A14483597390D50 /* SceneCursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412C249E27C5A37ECA710FCB /* SceneCursor.swift */; };
 		DF67661AA845F059C11693C7 /* SceneMaterials.swift in Sources */ = {isa = PBXBuildFile; fileRef = C825817C6CEE7EE71AE14A76 /* SceneMaterials.swift */; };
+		E16EBF982E5A6920C8E600C7 /* ScenePointVolume.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B6B3E218D521CC6DBB20E /* ScenePointVolume.swift */; };
 		E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E435D49B649CBC8FED581694 /* StudioEditorView.swift */; };
 		E466DCC80511F72DC8089EE7 /* ScenePuppet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3A6CF2142522C342D3CEC /* ScenePuppet.swift */; };
 		E76531935F953C819542FCF7 /* TexDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */; };
@@ -118,12 +122,14 @@
 		0EE68D1D450207C3D5BD48E5 /* PlaylistStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistStore.swift; sourceTree = "<group>"; };
 		0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperRenderer.swift; sourceTree = "<group>"; };
 		10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TexDecoderTests.swift; sourceTree = "<group>"; };
+		1867B46652CB381C804EC68D /* SceneModelCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneModelCamera.swift; sourceTree = "<group>"; };
 		1C8B284BC7A52178D617C09B /* PlaylistsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistsView.swift; sourceTree = "<group>"; };
 		1D43F0A4B7CC87F9254857C3 /* LockScreenSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenSettings.swift; sourceTree = "<group>"; };
 		202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenManager.swift; sourceTree = "<group>"; };
 		260EDEBFB0FCA65EBDFB3C30 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		278957CFDFFB2E28ADEF41FD /* TexDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TexDecoder.swift; sourceTree = "<group>"; };
 		28F1B121E24A55D9A9616617 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		2B930FAE153266BF7B0C5F21 /* WESceneShader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WESceneShader.swift; sourceTree = "<group>"; };
 		337A3269E47126DC851115EE /* Lumen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lumen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		35A6A1FE4907B4DE10F11315 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		39DB38C40FFF27490AAC894D /* WallpaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCard.swift; sourceTree = "<group>"; };
@@ -163,6 +169,7 @@
 		88EB151D6599A946A5916EAD /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		8A386460131D1C0DDF521B11 /* SteamWorkshop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshop.swift; sourceTree = "<group>"; };
 		8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageArchiveTests.swift; sourceTree = "<group>"; };
+		8F04135342AFE926DE366351 /* ScenePointLight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePointLight.swift; sourceTree = "<group>"; };
 		9BF2D45011297ED2AEBCFD8D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		9C496F5B621D9D90208BB740 /* AddWebPageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddWebPageSheet.swift; sourceTree = "<group>"; };
 		A1925E15F5611478F76DDCD5 /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
@@ -184,6 +191,7 @@
 		BF80FEA1BD104EEFFA747879 /* WallpaperDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperDetailView.swift; sourceTree = "<group>"; };
 		BFF816B14AA073CA5F3EC601 /* MediaInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaInspector.swift; sourceTree = "<group>"; };
 		C44D0C5EDF2A38646BB048D5 /* ShaderUniforms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderUniforms.swift; sourceTree = "<group>"; };
+		C67B6B3E218D521CC6DBB20E /* ScenePointVolume.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePointVolume.swift; sourceTree = "<group>"; };
 		C6F9E5B437570F9233341812 /* ShaderSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderSources.swift; sourceTree = "<group>"; };
 		C825817C6CEE7EE71AE14A76 /* SceneMaterials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneMaterials.swift; sourceTree = "<group>"; };
 		C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WEShaderPreprocessor.swift; sourceTree = "<group>"; };
@@ -450,6 +458,7 @@
 		D2C4FC0AC50D714B7F697127 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
+				2B930FAE153266BF7B0C5F21 /* WESceneShader.swift */,
 				C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */,
 				5BA791F722E3F354A9DBD992 /* WEShaderTranslator.swift */,
 			);
@@ -478,7 +487,10 @@
 				B6E0048C98CCE52FEE49F10C /* SceneInstance.swift */,
 				A64F66DEDB721B20229DBD2B /* SceneLoader.swift */,
 				C825817C6CEE7EE71AE14A76 /* SceneMaterials.swift */,
+				1867B46652CB381C804EC68D /* SceneModelCamera.swift */,
 				7AA846667F3CFACF39D18E8E /* SceneParticles.swift */,
+				8F04135342AFE926DE366351 /* ScenePointLight.swift */,
+				C67B6B3E218D521CC6DBB20E /* ScenePointVolume.swift */,
 				88D3A6CF2142522C342D3CEC /* ScenePuppet.swift */,
 				B7CC1C825DB34072D9717DC7 /* SceneRenderer.swift */,
 				0BAE6B222A45E9B85E7049C8 /* SceneScript.swift */,
@@ -662,7 +674,10 @@
 				4818E3709751A3250D167DFE /* SceneInstance.swift in Sources */,
 				3F92F9DAF542F231663CAD17 /* SceneLoader.swift in Sources */,
 				DF67661AA845F059C11693C7 /* SceneMaterials.swift in Sources */,
+				86F5D8B6F5D84E2980501C2D /* SceneModelCamera.swift in Sources */,
 				A1EDED739ADB6B57C815DA11 /* SceneParticles.swift in Sources */,
+				D02E41A22B84C4DAB1296BAB /* ScenePointLight.swift in Sources */,
+				E16EBF982E5A6920C8E600C7 /* ScenePointVolume.swift in Sources */,
 				E466DCC80511F72DC8089EE7 /* ScenePuppet.swift in Sources */,
 				8C8D624ECF831DC0E516E073 /* SceneRenderer.swift in Sources */,
 				64E35083EB6146B4B365E15A /* SceneScript.swift in Sources */,
@@ -687,6 +702,7 @@
 				D1947C2634CCE180A7B98F58 /* Theme.swift in Sources */,
 				80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */,
 				3651977132089F9C22DA8DCF /* VideoRenderer.swift in Sources */,
+				901D547B061F9E405A5A1DBC /* WESceneShader.swift in Sources */,
 				C384EEBFF3705571B5385B8D /* WEShaderPreprocessor.swift in Sources */,
 				CCAD73FF2BA8D40BAD248724 /* WEShaderTranslator.swift in Sources */,
 				EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */,

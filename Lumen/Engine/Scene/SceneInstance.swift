@@ -163,10 +163,29 @@ final class ImageLayer {
     var text: SceneTextTexture?
 }
 
+/// An indexed 3D mesh with its own surface material and depth state.
+struct ModelLayer {
+    struct Pass {
+        let draw: PreparedPass
+        let depth: MTLDepthStencilState?
+        let cull: MTLCullMode
+    }
+
+    let object: SceneDocument.Object
+    let mesh: PuppetModel
+    let passes: [Pass]
+}
+
 /// Something the scene draws, in scene order.
 enum SceneDrawable {
     case image(ImageLayer)
     case particles(ParticleLayer)
+    case model(ModelLayer)
+
+    var usesModelDepth: Bool {
+        guard case .model(let model) = self else { return false }
+        return model.passes.contains { $0.depth != nil }
+    }
 }
 
 /// Everything needed to draw a scene frame: layers, render targets, shared pipelines.
@@ -184,10 +203,17 @@ final class SceneInstance: @unchecked Sendable {
     let device: MTLDevice
     let unsupported: [String]
 
+    private let modelCamera: SceneModelCamera?
+    private let pointLights: [ScenePointLight]
+    private let pointVolume: ScenePointVolume?
+    private var framePointLights: [ScenePointLightSample] = []
+    private var eyePosition: SIMD3<Float> { SIMD3(canvas.x / 2, canvas.y / 2, 2000) }
+
     private let sceneTexture: MTLTexture
     private let frameCopy: MTLTexture
     private let utility: SceneUtilityPipelines
     private var frameCopyValid = false
+    private var modelDepthTargets: [ObjectIdentifier: MTLTexture] = [:]
     private var placeholder: SceneTexture { textures.clear }
     private var indices: MTLBuffer?
     private let objects: [Int: SceneDocument.Object]
@@ -212,7 +238,8 @@ final class SceneInstance: @unchecked Sendable {
 
     init(document: SceneDocument, renderSize: SIMD2<Int>, drawables: [SceneDrawable], rootDrawables: [SceneDrawable]? = nil,
          textures: SceneTextureCache, utility: SceneUtilityPipelines, queue: MTLCommandQueue? = nil, unsupported: [String],
-         scripts: SceneScriptRuntime? = nil, sounds: SceneSoundPlayer? = nil) throws {
+         scripts: SceneScriptRuntime? = nil, sounds: SceneSoundPlayer? = nil,
+         modelCamera: SceneModelCamera? = nil, pointLights: [ScenePointLight] = []) throws {
         self.document = document
         self.sounds = sounds
         self.scripts = scripts
@@ -235,10 +262,17 @@ final class SceneInstance: @unchecked Sendable {
         self.rootDrawables = rootDrawables ?? drawables
         self.textures = textures
         self.utility = utility
-        self.unsupported = unsupported
+        self.modelCamera = modelCamera
+        self.pointLights = pointLights
         device = textures.device
+        let hasPointVolume = pointLights.contains { $0.density > 0 }
+        pointVolume = hasPointVolume && document.isOrthographic ? try? ScenePointVolume(device: device) : nil
+        self.unsupported = hasPointVolume && pointVolume == nil ? unsupported + ["point-light volumes"] : unsupported
         sceneTexture = try Self.makeTarget(device, renderSize)
         frameCopy = try Self.makeTarget(device, renderSize)
+        if self.rootDrawables.contains(where: \.usesModelDepth) {
+            modelDepthTargets[ObjectIdentifier(sceneTexture)] = try Self.makeModelDepthTarget(device, matching: sceneTexture)
+        }
         let scale = Float(renderSize.x) / max(canvas.x, 1)
         indices = ParticleLayer.sharedIndices(device: device)
         for layer in layers {
@@ -246,6 +280,10 @@ final class SceneInstance: @unchecked Sendable {
                 let pixels = SIMD2<Int>(max(1, Int((layer.chainSize.x * scale).rounded())), max(1, Int((layer.chainSize.y * scale).rounded())))
                 layer.bufferSize = SIMD2(min(pixels.x, 8192), min(pixels.y, 8192))
                 layer.buffers = [try Self.makeTarget(device, layer.bufferSize), try Self.makeTarget(device, layer.bufferSize)]
+                if layer.children.contains(where: \.usesModelDepth) {
+                    let target = layer.buffers[0]
+                    modelDepthTargets[ObjectIdentifier(target)] = try Self.makeModelDepthTarget(device, matching: target)
+                }
                 for (name, divisor) in layer.targetScales {
                     let size = SIMD2(max(1, Int(Float(layer.bufferSize.x) / divisor)), max(1, Int(Float(layer.bufferSize.y) / divisor)))
                     layer.targets[name] = try Self.makeTarget(device, size)
@@ -290,6 +328,17 @@ final class SceneInstance: @unchecked Sendable {
         return texture
     }
 
+    private static func makeModelDepthTarget(_ device: MTLDevice, matching target: MTLTexture) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float, width: target.width,
+                                                                   height: target.height, mipmapped: false)
+        descriptor.usage = .renderTarget
+        descriptor.storageMode = .private
+        guard let depth = device.makeTexture(descriptor: descriptor) else {
+            throw SceneLoadError.unsupported("a 3D depth target this large")
+        }
+        return depth
+    }
+
     var outputTexture: MTLTexture { sceneTexture }
 
     /// Video textures play only while the scene does.
@@ -328,6 +377,8 @@ final class SceneInstance: @unchecked Sendable {
                 for step in layer.steps { if case .draw(let pass) = step.kind, passUses(pass) { return true } }
             case .particles(let layer):
                 if layer.systems.contains(where: { $0.usesAudio || $0.pass.uniforms.usesAudio }) { return true }
+            case .model(let layer):
+                if layer.passes.contains(where: { passUses($0.draw) }) { return true }
             }
         }
         return false
@@ -426,7 +477,9 @@ final class SceneInstance: @unchecked Sendable {
         }
         // Evaluate all puppet skeletons up front so bone attachments are ready in any layer order.
         for (_, puppet) in puppetsByID { puppet.evaluate(at: frame.time) }
-        var session = SceneSession(target: sceneTexture, clear: document.clearColor)
+        samplePointLights()
+        var session = SceneSession(target: sceneTexture, clear: document.clearColor,
+                                   modelDepth: modelDepthTargets[ObjectIdentifier(sceneTexture)])
         // Clear up front: a layer may copy the background before anything has drawn.
         _ = session.encoder(buffer)
         let sceneTargetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
@@ -435,7 +488,34 @@ final class SceneInstance: @unchecked Sendable {
             encodeDrawable(drawable, into: buffer, session: &session, viewProjectionOverride: nil,
                            targetSize: sceneTargetSize, frame: frame)
         }
+        if let pointVolume {
+            for light in framePointLights where light.density > 0 {
+                guard let encoder = session.encoder(buffer) else { break }
+                let offset = document.parallaxEnabled ? frame.cameraOffset * light.parallaxDepth : .zero
+                pointVolume.draw(encoder: encoder, viewProjection: SceneMath.orthographic(canvas: canvas, offset: offset),
+                                 positionRadius: light.positionRadius, radiance: SIMD3(light.colorFalloff.x, light.colorFalloff.y, light.colorFalloff.z),
+                                 density: light.density, falloff: light.volumeFalloff, eyeZ: eyePosition.z)
+            }
+        }
         session.end(clearIfUnused: buffer)
+    }
+
+    private func samplePointLights() {
+        framePointLights.removeAll(keepingCapacity: true)
+        for light in pointLights {
+            guard let state = state(of: light.id), state.visible, state.alpha > 0, state.brightness > 0 else { continue }
+            let radiance = state.color * (state.alpha * state.brightness * light.intensity)
+            let position = world(of: light.id).columns.3
+            guard radiance.x.isFinite, radiance.y.isFinite, radiance.z.isFinite,
+                  position.x.isFinite, position.y.isFinite, position.z.isFinite else { continue }
+            let color = simd_max(radiance, .zero)
+            guard simd_reduce_max(color) > 0 else { continue }
+            framePointLights.append(ScenePointLightSample(
+                positionRadius: SIMD4(position.x, position.y, position.z, light.radius),
+                colorFalloff: SIMD4(color.x, color.y, color.z, light.falloff),
+                density: light.density, volumeFalloff: light.volumeFalloff, parallaxDepth: light.parallaxDepth
+            ))
+        }
     }
 
     private func encodeDrawable(_ drawable: SceneDrawable, into buffer: MTLCommandBuffer, session: inout SceneSession,
@@ -445,6 +525,10 @@ final class SceneInstance: @unchecked Sendable {
         switch drawable {
         case .image(let image):
             layer = image
+        case .model(let model):
+            encodeModel(model, into: buffer, session: &session, viewProjectionOverride: viewProjectionOverride,
+                        targetSize: targetSize, frame: frame)
+            return
         case .particles(let particles):
             guard let particleState = state(of: particles.object.id) else { return }
             particles.parentModel = parentWorld(of: particles.object)
@@ -487,6 +571,39 @@ final class SceneInstance: @unchecked Sendable {
                 },
                 closeEncoder: { session.end() }
             )
+        }
+    }
+
+    private func encodeModel(_ layer: ModelLayer, into buffer: MTLCommandBuffer, session: inout SceneSession,
+                             viewProjectionOverride: simd_float4x4?, targetSize: SIMD2<Float>, frame: Frame) {
+        guard let object = state(of: layer.object.id), object.visible, object.alpha > 0.001 else { return }
+        var state = drawState(frame: frame, object: object)
+        state.model = parentWorld(of: layer.object) * SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale)
+        if let viewProjectionOverride {
+            // Composition-group projection keeps local Z in pixels, not clip-space units.
+            state.viewProjection = simd_float4x4(diagonal: SIMD4(1, 1, -0.0001, 1)) * viewProjectionOverride
+        } else if let modelCamera {
+            state.eye = modelCamera.eye
+            state.viewProjection = modelCamera.viewProjection
+        } else {
+            let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
+            state.viewProjection = SceneMath.orthographic(canvas: canvas, offset: offset)
+        }
+        state.targetSize = targetSize
+        let mesh = MeshRange(vertexBuffer: layer.mesh.vertexBuffer, indexBuffer: layer.mesh.indexBuffer,
+                             indexStart: 0, indexCount: layer.mesh.indexCount)
+        for pass in layer.passes {
+            if pass.draw.usesFrameBuffer {
+                session.end()
+                copyFrame(buffer)
+            }
+            guard let encoder = session.encoder(buffer, withModelDepth: pass.depth != nil) else { continue }
+            if session.target === sceneTexture { frameCopyValid = false }
+            if let depth = pass.depth { encoder.setDepthStencilState(depth) }
+            encoder.setFrontFacing(.counterClockwise)
+            encoder.setCullMode(pass.cull)
+            draw(pass.draw, encoder: encoder, vertices: [], state: state, previous: nil, layer: nil, mesh: mesh)
+            encoder.setCullMode(.none)
         }
     }
 
@@ -573,6 +690,7 @@ final class SceneInstance: @unchecked Sendable {
         // Pass 0: the object's own material into the first buffer (or transparent black when
         // a composition layer opts out of `copybackground`).
         var state = drawState(frame: frame, object: objectState)
+        if base.uniforms.usesPointLighting { state.worldModel = model }
         state.targetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
         if layer.isPassthrough {
             state.model = model
@@ -615,7 +733,9 @@ final class SceneInstance: @unchecked Sendable {
                 * SceneMath.translation(-layer.chainCenter)
                 * model.inverse
             let groupTargetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
-            var groupSession = SceneSession(target: layer.buffers[0], clear: .zero, cleared: true)
+            let groupTarget = layer.buffers[0]
+            var groupSession = SceneSession(target: groupTarget, clear: .zero, cleared: true,
+                                            modelDepth: modelDepthTargets[ObjectIdentifier(groupTarget)])
             for child in layer.children {
                 encodeDrawable(child, into: buffer, session: &groupSession, viewProjectionOverride: groupVP,
                                targetSize: groupTargetSize, frame: frame)
@@ -692,7 +812,8 @@ final class SceneInstance: @unchecked Sendable {
 
     private func drawState(frame: Frame, object: SceneDocument.State) -> DrawState {
         var state = DrawState()
-        state.eye = SIMD3(canvas.x / 2, canvas.y / 2, 2000)
+        state.eye = eyePosition
+        state.pointLights = framePointLights
         state.time = frame.time
         state.daytime = frame.daytime
         state.screen = SIMD2(Float(renderSize.x), Float(renderSize.y))
@@ -862,25 +983,43 @@ final class SceneInstance: @unchecked Sendable {
 private struct SceneSession {
     let target: MTLTexture
     let clear: SIMD3<Float>
+    private let modelDepth: MTLTexture?
     private var encoder: MTLRenderCommandEncoder?
     private var cleared = false
+    private var depthCleared = false
+    private var encodingModelDepth = false
 
-    init(target: MTLTexture, clear: SIMD3<Float>, cleared: Bool = false) {
+    init(target: MTLTexture, clear: SIMD3<Float>, cleared: Bool = false, modelDepth: MTLTexture? = nil) {
         self.target = target
         self.clear = clear
         self.cleared = cleared
+        self.modelDepth = modelDepth
     }
 
-    mutating func encoder(_ buffer: MTLCommandBuffer) -> MTLRenderCommandEncoder? {
-        if let encoder { return encoder }
+    mutating func encoder(_ buffer: MTLCommandBuffer, withModelDepth: Bool = false) -> MTLRenderCommandEncoder? {
+        if let encoder {
+            if encodingModelDepth == withModelDepth { return encoder }
+            end()
+        }
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
         descriptor.colorAttachments[0].loadAction = cleared ? .load : .clear
         descriptor.colorAttachments[0].storeAction = .store
         descriptor.colorAttachments[0].clearColor = MTLClearColor(red: Double(clear.x), green: Double(clear.y), blue: Double(clear.z), alpha: 1)
+        if withModelDepth {
+            guard let modelDepth else { return nil }
+            descriptor.depthAttachment.texture = modelDepth
+            descriptor.depthAttachment.clearDepth = 1
+            descriptor.depthAttachment.loadAction = depthCleared ? .load : .clear
+            // A 2D layer or framebuffer copy may interrupt a series of 3D draws.
+            descriptor.depthAttachment.storeAction = .store
+        }
+        guard let next = buffer.makeRenderCommandEncoder(descriptor: descriptor) else { return nil }
         cleared = true
-        encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor)
-        return encoder
+        encodingModelDepth = withModelDepth
+        if withModelDepth { depthCleared = true }
+        encoder = next
+        return next
     }
 
     mutating func end() {

@@ -47,7 +47,7 @@ var errorKinds: [String: Int] = [:]
 let started = Date()
 for pair in pairs {
     let combos = WEShaderTranslator.comboDefaults(in: pair.vert + "\n" + pair.frag)
-    let program = WEShaderTranslator.translate(vertex: pair.vert, fragment: pair.frag, combos: combos, resolveInclude: pair.include)
+    let program = WESceneShader.translate(vertex: pair.vert, fragment: pair.frag, combos: combos, resolveInclude: pair.include)
     do {
         let options = MTLCompileOptions(); options.languageVersion = .version3_2; options.mathMode = .fast
         let lib = try device.makeLibrary(source: program.source, options: options)
