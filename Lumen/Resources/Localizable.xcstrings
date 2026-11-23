@@ -1,12 +1,69 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "": {},
     " · %lld skipped": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": " · 跳过 %lld 个"
+          }
+        }
+      }
+    },
+    "“%@” is already compact, so Lumen kept the original": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」已经足够精简，Lumen 保留了原文件"
+          }
+        }
+      }
+    },
+    "“%@” is already in your library.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」已经在资源库里了。"
+          }
+        }
+      }
+    },
+    "“%@” is on %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在%2$@上播放「%1$@」"
+          }
+        }
+      }
+    },
+    "“%@” wallpapers are Windows programs and can't run on a Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」类壁纸是 Windows 程序，无法在 Mac 上运行。"
+          }
+        }
+      }
+    },
+    "%@ — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ — %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — %2$@"
           }
         }
       }
@@ -20,9 +77,6 @@
           }
         }
       }
-    },
-    "%lld": {
-      "shouldTranslate": false
     },
     "%lld fps": {
       "shouldTranslate": false
@@ -47,6 +101,32 @@
         }
       }
     },
+    "%lld options · applied live": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个选项 · 实时生效"
+          }
+        }
+      }
+    },
+    "%lld projects in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld projects in %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ 中有 %1$lld 个项目"
+          }
+        }
+      }
+    },
     "%lld selected · click to add or remove. Order follows selection.": {
       "localizations": {
         "zh-Hans": {
@@ -59,12 +139,6 @@
     },
     "%lld videos in your library": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "资源库中有 %lld 个视频"
-          }
-        },
         "en": {
           "variations": {
             "plural": {
@@ -82,17 +156,17 @@
               }
             }
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资源库中有 %lld 个视频"
+          }
         }
       }
     },
     "%lld wallpapers": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 张壁纸"
-          }
-        },
         "en": {
           "variations": {
             "plural": {
@@ -110,11 +184,14 @@
               }
             }
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 张壁纸"
+          }
         }
       }
-    },
-    "%lld%%": {
-      "shouldTranslate": false
     },
     "%lld%% covered": {
       "localizations": {
@@ -136,10 +213,10 @@
         }
       }
     },
-    "100%": {
+    "50%": {
       "shouldTranslate": false
     },
-    "50%": {
+    "100%": {
       "shouldTranslate": false
     },
     "A living topographic map": {
@@ -162,6 +239,56 @@
         }
       }
     },
+    "Add": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加"
+          }
+        }
+      }
+    },
+    "Add %lld to Library": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将 %lld 个添加到资源库"
+          }
+        }
+      }
+    },
+    "Add a Web Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加网页"
+          }
+        }
+      }
+    },
+    "Add Folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加文件夹"
+          }
+        }
+      }
+    },
+    "Add Folder…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加文件夹…"
+          }
+        }
+      }
+    },
     "Add to Favorites": {
       "localizations": {
         "zh-Hans": {
@@ -173,11 +300,22 @@
       }
     },
     "Add videos to your library (⌘O)": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "将视频添加到资源库（⌘O）"
+          }
+        }
+      }
+    },
+    "Add videos, Wallpaper Engine projects or web pages (⌘O)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加视频、Wallpaper Engine 项目或网页（⌘O）"
           }
         }
       }
@@ -202,14 +340,18 @@
         }
       }
     },
-    "Added %lld wallpapers": {
+    "Added “%@”": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已添加 %lld 张壁纸"
+            "value": "已添加「%@」"
           }
-        },
+        }
+      }
+    },
+    "Added %lld wallpapers": {
+      "localizations": {
         "en": {
           "variations": {
             "plural": {
@@ -227,15 +369,71 @@
               }
             }
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已添加 %lld 张壁纸"
+          }
         }
       }
     },
-    "Added “%@”": {
+    "Added 1 wallpaper": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已添加「%@」"
+            "value": "已添加 1 张壁纸"
+          }
+        }
+      }
+    },
+    "Added to Downloads": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加入下载列表"
+          }
+        }
+      }
+    },
+    "Adding to library…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在添加到资源库…"
+          }
+        }
+      }
+    },
+    "Address": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地址"
+          }
+        }
+      }
+    },
+    "Advanced: Sign In with SteamCMD": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级：用 SteamCMD 登录"
+          }
+        }
+      }
+    },
+    "Alignment": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对齐"
           }
         }
       }
@@ -280,6 +478,16 @@
         }
       }
     },
+    "Also use as screen saver": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同时用作屏幕保护程序"
+          }
+        }
+      }
+    },
     "Always": {
       "localizations": {
         "zh-Hans": {
@@ -320,12 +528,72 @@
         }
       }
     },
+    "Any page can be a wallpaper: a clock, a generative sketch, a dashboard. It runs in its own sandbox and pauses with your other wallpapers.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任何网页都可以当壁纸：时钟、生成艺术、仪表盘都行。它在独立的沙盒中运行，并和其他壁纸一起自动暂停。"
+          }
+        }
+      }
+    },
+    "App": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用"
+          }
+        }
+      }
+    },
+    "Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用程序"
+          }
+        }
+      }
+    },
+    "Approve in Login Items Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在“登录项”设置中批准"
+          }
+        }
+      }
+    },
+    "Assets folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "assets 文件夹"
+          }
+        }
+      }
+    },
     "Audio": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "有声音"
+          }
+        }
+      }
+    },
+    "Audio-reactive wallpapers follow the music": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频响应壁纸会跟着音乐动"
           }
         }
       }
@@ -370,12 +638,42 @@
         }
       }
     },
+    "Browse the Steam Workshop…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览 Steam 创意工坊…"
+          }
+        }
+      }
+    },
     "Browse your library": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "浏览资源库"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Cancelled.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消。"
           }
         }
       }
@@ -420,12 +718,62 @@
         }
       }
     },
+    "Check for Updates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新"
+          }
+        }
+      }
+    },
+    "Checking for Updates…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查更新…"
+          }
+        }
+      }
+    },
+    "Choose a folder of Wallpaper Engine projects (each with a project.json).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择存放 Wallpaper Engine 项目的文件夹（每个项目都带有 project.json）。"
+          }
+        }
+      }
+    },
+    "Choose a folder of Wallpaper Engine projects.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择存放 Wallpaper Engine 项目的文件夹。"
+          }
+        }
+      }
+    },
     "Choose display": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "选择显示器"
+          }
+        }
+      }
+    },
+    "Choose Folder…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择文件夹…"
           }
         }
       }
@@ -450,6 +798,16 @@
         }
       }
     },
+    "Choose Wallpaper Engine's “assets” folder.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 Wallpaper Engine 的「assets」文件夹。"
+          }
+        }
+      }
+    },
     "City": {
       "localizations": {
         "zh-Hans": {
@@ -460,12 +818,62 @@
         }
       }
     },
+    "Clear Finished": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除已完成"
+          }
+        }
+      }
+    },
+    "Code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "验证码"
+          }
+        }
+      }
+    },
     "Colour %lld": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "颜色 %lld"
+          }
+        }
+      }
+    },
+    "Connected to Steam": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接 Steam"
+          }
+        }
+      }
+    },
+    "Connected via SteamCMD": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已通过 SteamCMD 连接"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
           }
         }
       }
@@ -486,6 +894,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在降温"
+          }
+        }
+      }
+    },
+    "Couldn't add it to the library.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法添加到资源库。"
           }
         }
       }
@@ -550,6 +968,16 @@
         }
       }
     },
+    "Customize": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义"
+          }
+        }
+      }
+    },
     "Cycle through wallpapers on a schedule, across every display.": {
       "localizations": {
         "zh-Hans": {
@@ -566,6 +994,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "删除"
+          }
+        }
+      }
+    },
+    "Delete “%@”?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除「%@」？"
           }
         }
       }
@@ -590,12 +1028,12 @@
         }
       }
     },
-    "Delete “%@”?": {
+    "Delete…": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "删除「%@」？"
+            "value": "删除…"
           }
         }
       }
@@ -606,16 +1044,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已删除「%@」"
-          }
-        }
-      }
-    },
-    "Delete…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "删除…"
           }
         }
       }
@@ -636,6 +1064,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示器"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载"
+          }
+        }
+      }
+    },
+    "Download by Link or ID": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按链接或 ID 下载"
+          }
+        }
+      }
+    },
+    "Download from Steam": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 Steam 下载"
+          }
+        }
+      }
+    },
+    "Download from Steam Workshop…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 Steam 创意工坊下载…"
+          }
+        }
+      }
+    },
+    "Download to Lumen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载到 Lumen"
+          }
+        }
+      }
+    },
+    "Downloading…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载…"
+          }
+        }
+      }
+    },
+    "Downloads": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载"
           }
         }
       }
@@ -730,6 +1238,26 @@
         }
       }
     },
+    "Enter the code from the Steam Mobile app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入 Steam 手机应用中的验证码。"
+          }
+        }
+      }
+    },
+    "Enter the Steam Guard code Steam emailed you.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入 Steam 通过邮件发给你的 Steam 令牌验证码。"
+          }
+        }
+      }
+    },
     "every %lld hours": {
       "localizations": {
         "zh-Hans": {
@@ -786,6 +1314,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "填满屏幕"
+          }
+        }
+      }
+    },
+    "Find Automatically": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动查找"
           }
         }
       }
@@ -940,12 +1478,32 @@
         }
       }
     },
+    "Image": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        }
+      }
+    },
     "Importing %@…": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "正在导入 %@…"
+          }
+        }
+      }
+    },
+    "In Library": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在资源库"
           }
         }
       }
@@ -966,6 +1524,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用中"
+          }
+        }
+      }
+    },
+    "In your library": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在资源库中"
+          }
+        }
+      }
+    },
+    "Installing SteamCMD…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在安装 SteamCMD…"
           }
         }
       }
@@ -996,6 +1574,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "语言"
+          }
+        }
+      }
+    },
+    "Later": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稍后"
           }
         }
       }
@@ -1073,6 +1661,22 @@
     "Lumen": {
       "shouldTranslate": false
     },
+    "Lumen %@ is available.\n\n%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Lumen %1$@ is available.\n\n%2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen %1$@ 已发布。\n\n%2$@"
+          }
+        }
+      }
+    },
     "Lumen adds the wallpaper to macOS's Aerial collection, under “Lumen”, and selects it for the Lock Screen and screen saver. It keeps playing even when Lumen isn't running. Turning this off restores your previous choice.": {
       "localizations": {
         "zh-Hans": {
@@ -1083,12 +1687,82 @@
         }
       }
     },
+    "Lumen could not allocate the scene’s render targets.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 无法为场景分配渲染目标。"
+          }
+        }
+      }
+    },
+    "Lumen could not read the update information.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 无法读取更新信息。"
+          }
+        }
+      }
+    },
+    "Lumen couldn't access its Steam sign-in in Keychain.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 无法读取钥匙串中的 Steam 登录信息。"
+          }
+        }
+      }
+    },
+    "Lumen finds Steam's Wallpaper Engine downloads and other apps' libraries automatically. Adding a wallpaper copies it into Lumen's library; on the same disk the copy takes no extra space.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 会自动找到 Steam 下载的 Wallpaper Engine 内容和其他应用的壁纸库。添加时会复制到 Lumen 的资源库；在同一块磁盘上，复制不额外占用空间。"
+          }
+        }
+      }
+    },
+    "Lumen is up to date.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 已是最新版本。"
+          }
+        }
+      }
+    },
+    "Lumen looks in Steam's Wallpaper Engine Workshop folder and other apps' libraries. You can also add a folder of projects, for example one copied from a Windows PC.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 会查找 Steam 的 Wallpaper Engine 创意工坊文件夹和其他应用的壁纸库。你也可以添加一个项目文件夹，比如从 Windows 电脑上拷过来的。"
+          }
+        }
+      }
+    },
     "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "没人看得到壁纸、或者 Mac 更需要电量时，Lumen 会自动停止解码。"
+          }
+        }
+      }
+    },
+    "Lumen Update Available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 有新版本"
           }
         }
       }
@@ -1163,9 +1837,6 @@
         }
       }
     },
-    "Menu Bar Preview": {
-      "shouldTranslate": false
-    },
     "Minimal": {
       "localizations": {
         "zh-Hans": {
@@ -1197,6 +1868,7 @@
       }
     },
     "MP4 or MOV · HEVC, H.264, ProRes · AV1 on M3 and later": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1316,6 +1988,26 @@
         }
       }
     },
+    "No rotations yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有播放列表"
+          }
+        }
+      }
+    },
+    "No Wallpaper Engine folders found on this Mac yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 上还没有找到 Wallpaper Engine 文件夹。"
+          }
+        }
+      }
+    },
     "Normal": {
       "localizations": {
         "zh-Hans": {
@@ -1337,11 +2029,42 @@
       }
     },
     "Not a video file.": {
+      "extractionState": "stale",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "不是视频文件。"
+          }
+        }
+      }
+    },
+    "Not a video, web page or Wallpaper Engine project.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不是视频、网页或 Wallpaper Engine 项目。"
+          }
+        }
+      }
+    },
+    "Not found": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到"
+          }
+        }
+      }
+    },
+    "Not in Library": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不在资源库"
           }
         }
       }
@@ -1356,12 +2079,32 @@
         }
       }
     },
+    "Nothing here yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这里还什么都没有"
+          }
+        }
+      }
+    },
     "Nothing on your desktop yet": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "桌面还没有动态壁纸"
+          }
+        }
+      }
+    },
+    "Nothing to customize with the current options.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前选项下没有可调整的内容。"
           }
         }
       }
@@ -1486,6 +2229,26 @@
         }
       }
     },
+    "Open Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
+          }
+        }
+      }
+    },
+    "Open Steam Guard in the Steam Mobile app, choose Steam Client, and approve the sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Steam 手机应用中打开 Steam 令牌，选择「Steam 客户端」并批准登录。"
+          }
+        }
+      }
+    },
     "Open Studio": {
       "localizations": {
         "zh-Hans": {
@@ -1526,6 +2289,16 @@
         }
       }
     },
+    "Optimized “%@” · saved %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已优化「%1$@」· 节省 %2$@"
+          }
+        }
+      }
+    },
     "Optimized for this Mac": {
       "localizations": {
         "zh-Hans": {
@@ -1536,12 +2309,12 @@
         }
       }
     },
-    "Optimized “%@” · saved %@": {
+    "Optional": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已优化「%1$@」· 节省 %2$@"
+            "value": "可选"
           }
         }
       }
@@ -1572,6 +2345,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "配色"
+          }
+        }
+      }
+    },
+    "Password": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码"
           }
         }
       }
@@ -1648,12 +2431,6 @@
     },
     "Paused on %lld displays": {
       "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已在 %lld 台显示器上暂停"
-          }
-        },
         "en": {
           "variations": {
             "plural": {
@@ -1671,6 +2448,12 @@
               }
             }
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在 %lld 台显示器上暂停"
+          }
         }
       }
     },
@@ -1680,6 +2463,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "性能"
+          }
+        }
+      }
+    },
+    "Pick a few wallpapers and an interval. Lumen swaps them on every display and keeps pausing when nobody can see the desktop.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选几张壁纸，设好间隔。Lumen 会在所有显示器上轮换它们，没人看得到桌面时照样自动暂停。"
           }
         }
       }
@@ -1874,12 +2667,42 @@
         }
       }
     },
+    "Preparing download…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备下载…"
+          }
+        }
+      }
+    },
+    "Preset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预设"
+          }
+        }
+      }
+    },
     "Previous in Playlist": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "播放列表上一张"
+          }
+        }
+      }
+    },
+    "project.json couldn't be read.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 project.json。"
           }
         }
       }
@@ -1924,6 +2747,26 @@
         }
       }
     },
+    "Refresh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        }
+      }
+    },
     "Remove from Favorites": {
       "localizations": {
         "zh-Hans": {
@@ -1954,26 +2797,6 @@
         }
       }
     },
-    "Rendered live on the GPU within a fixed pixel budget. Tune colours and motion, or write your own Metal shader.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "由 GPU 在固定像素预算内实时渲染。可以调整配色和动效，也可以自己写 Metal 着色器。"
-          }
-        }
-      }
-    },
-    "Rendered live on the GPU. Tune colours and motion in Studio.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "由 GPU 实时渲染，可以在“创作”里调整配色和动效。"
-          }
-        }
-      }
-    },
     "Rendered live · %@": {
       "localizations": {
         "zh-Hans": {
@@ -1990,6 +2813,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "实时渲染 · %lld fps"
+          }
+        }
+      }
+    },
+    "Rendered live on the GPU within a fixed pixel budget. Tune colours and motion, or write your own Metal shader.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 GPU 在固定像素预算内实时渲染。可以调整配色和动效，也可以自己写 Metal 着色器。"
+          }
+        }
+      }
+    },
+    "Rendered live on the GPU. Tune colours and motion in Studio.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 GPU 实时渲染，可以在“创作”里调整配色和动效。"
           }
         }
       }
@@ -2030,6 +2873,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "按显示器原生像素渲染，GPU 占用最高。"
+          }
+        }
+      }
+    },
+    "Requesting a Steam QR code…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在获取 Steam 二维码…"
           }
         }
       }
@@ -2234,6 +3087,136 @@
         }
       }
     },
+    "Scan with Steam Guard in the Steam Mobile app, then approve the sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Steam 手机应用里的 Steam 令牌扫码，然后批准登录。"
+          }
+        }
+      }
+    },
+    "Scene": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景"
+          }
+        }
+      }
+    },
+    "Scene · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景 · %@"
+          }
+        }
+      }
+    },
+    "Scene assets": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景资源"
+          }
+        }
+      }
+    },
+    "Scene resolution reduced after a render target could not be allocated.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "渲染目标分配失败，已降低场景分辨率。"
+          }
+        }
+      }
+    },
+    "Scene resolution reduced due to memory pressure.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内存紧张，已降低场景分辨率。"
+          }
+        }
+      }
+    },
+    "Scene resolution reduced to keep playback smooth.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为保持流畅播放，已降低场景分辨率。"
+          }
+        }
+      }
+    },
+    "Scenes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景"
+          }
+        }
+      }
+    },
+    "Scenes need Wallpaper Engine's shared assets": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景需要 Wallpaper Engine 的共享资源"
+          }
+        }
+      }
+    },
+    "Scenes need Wallpaper Engine's shared assets. Choose them in Settings › Wallpaper Engine.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景需要 Wallpaper Engine 的共享资源，请在“设置 › Wallpaper Engine”中选择。"
+          }
+        }
+      }
+    },
+    "Scenes use shaders and effects that ship with Wallpaper Engine, not with each Workshop item. Point Lumen at an assets folder in Settings › Wallpaper Engine.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景用到的着色器和特效随 Wallpaper Engine 本体提供，不包含在各个创意工坊项目里。请在“设置 › Wallpaper Engine”中为 Lumen 指定 assets 文件夹。"
+          }
+        }
+      }
+    },
+    "Scenes use shaders, materials and effects that ship with Wallpaper Engine itself. Choose the “assets” folder of a Wallpaper Engine installation you own (for example copied from a Windows PC), or one another app downloaded. Lumen only reads it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景用到的着色器、材质和特效随 Wallpaper Engine 本体提供。请选择你自己拥有的 Wallpaper Engine 安装中的「assets」文件夹（比如从 Windows 电脑拷来的），或其他应用下载的那份。Lumen 只读取，不会修改。"
+          }
+        }
+      }
+    },
+    "Scheme color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方案颜色"
+          }
+        }
+      }
+    },
     "Sci-Fi": {
       "localizations": {
         "zh-Hans": {
@@ -2364,6 +3347,16 @@
         }
       }
     },
+    "Show": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示"
+          }
+        }
+      }
+    },
     "Show Dock icon": {
       "localizations": {
         "zh-Hans": {
@@ -2394,22 +3387,32 @@
         }
       }
     },
-    "Showing the system wallpaper": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在显示系统壁纸"
-          }
-        }
-      }
-    },
     "Showing “%@”": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "正在显示「%@」"
+          }
+        }
+      }
+    },
+    "Showing the preview image. %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在显示预览图。%@"
+          }
+        }
+      }
+    },
+    "Showing the system wallpaper": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在显示系统壁纸"
           }
         }
       }
@@ -2430,6 +3433,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "随机顺序"
+          }
+        }
+      }
+    },
+    "Sign In": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录"
+          }
+        }
+      }
+    },
+    "Sign in to Steam first.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先登录 Steam。"
+          }
+        }
+      }
+    },
+    "Sign In with Steam QR Code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Steam 二维码登录"
+          }
+        }
+      }
+    },
+    "Sign Out": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出登录"
+          }
+        }
+      }
+    },
+    "Signed in as %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已登录：%@"
+          }
+        }
+      }
+    },
+    "Signing in…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在登录…"
           }
         }
       }
@@ -2474,6 +3537,16 @@
         }
       }
     },
+    "Spectrum bars, pulsing effects and beat-driven particles listen to what your Mac is playing. macOS asks once for permission to record system audio. Lumen only measures loudness per frequency, in memory, and listens only while such a wallpaper is on screen.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "频谱条、脉动效果和随节拍跳动的粒子会跟着 Mac 正在播放的声音变化。macOS 会询问一次录制系统音频的权限。Lumen 只在内存中测量各频段的响度，并且只在这类壁纸显示时才监听。"
+          }
+        }
+      }
+    },
     "Speed": {
       "localizations": {
         "zh-Hans": {
@@ -2500,6 +3573,196 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态"
+          }
+        }
+      }
+    },
+    "Steam account name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 账户名"
+          }
+        }
+      }
+    },
+    "Steam couldn't connect. Check your network and system HTTP/HTTPS proxy, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接 Steam。请检查网络和系统的 HTTP/HTTPS 代理后重试。"
+          }
+        }
+      }
+    },
+    "Steam couldn't connect. Check your network and system proxy.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接 Steam。请检查网络和系统代理。"
+          }
+        }
+      }
+    },
+    "Steam denied access. Check that this account owns Wallpaper Engine and can access the item.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 拒绝访问。请确认这个账户拥有 Wallpaper Engine，并且可以访问该项目。"
+          }
+        }
+      }
+    },
+    "Steam didn't accept the password.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 未接受该密码。"
+          }
+        }
+      }
+    },
+    "Steam didn't accept the Steam Guard code.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 未接受该 Steam 令牌验证码。"
+          }
+        }
+      }
+    },
+    "Steam is limiting requests. Wait a while and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 正在限制请求，请稍后再试。"
+          }
+        }
+      }
+    },
+    "Steam is limiting sign-in attempts. Wait a while and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 正在限制登录尝试，请稍后再试。"
+          }
+        }
+      }
+    },
+    "Steam requires Steam Guard verification. Finish the approval or enter a current code and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 要求 Steam 令牌验证。请完成批准，或输入当前的验证码后重试。"
+          }
+        }
+      }
+    },
+    "Steam returned an unexpected response.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 返回了意外的响应。"
+          }
+        }
+      }
+    },
+    "Steam returned error %llu.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 返回错误 %llu。"
+          }
+        }
+      }
+    },
+    "Steam sign-in didn't finish.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 登录未完成。"
+          }
+        }
+      }
+    },
+    "Steam sign-in has expired. Sign in again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 登录已过期，请重新登录。"
+          }
+        }
+      }
+    },
+    "Steam sign-in QR code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 登录二维码"
+          }
+        }
+      }
+    },
+    "Steam Workshop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 创意工坊"
+          }
+        }
+      }
+    },
+    "SteamCMD couldn't be installed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安装 SteamCMD：%@"
+          }
+        }
+      }
+    },
+    "SteamCMD did not confirm the download.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SteamCMD 没有确认下载完成。"
+          }
+        }
+      }
+    },
+    "SteamCMD did not return a Wallpaper Engine project.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SteamCMD 没有返回 Wallpaper Engine 项目。"
+          }
+        }
+      }
+    },
+    "SteamCMD reported a Workshop download error.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SteamCMD 报告了创意工坊下载错误。"
           }
         }
       }
@@ -2584,12 +3847,102 @@
         }
       }
     },
+    "That folder doesn't look like Wallpaper Engine's assets.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个文件夹看起来不是 Wallpaper Engine 的 assets。"
+          }
+        }
+      }
+    },
+    "The download failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载失败：%@"
+          }
+        }
+      }
+    },
     "The file has no video track.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "文件中没有视频轨道。"
+          }
+        }
+      }
+    },
+    "The file is missing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件不见了。"
+          }
+        }
+      }
+    },
+    "The folder has no project.json or index.html.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹里没有 project.json 或 index.html。"
+          }
+        }
+      }
+    },
+    "The project names “%@”, but the file isn't in the folder.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "项目指定了「%@」，但文件夹里没有这个文件。"
+          }
+        }
+      }
+    },
+    "The scene needs “%@”, which isn't in the package or Wallpaper Engine's assets.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景需要「%@」，但它不在场景包或 Wallpaper Engine 的 assets 里。"
+          }
+        }
+      }
+    },
+    "The scene needs more memory than is available.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景需要的内存超出了可用内存。"
+          }
+        }
+      }
+    },
+    "The scene package is damaged.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "场景包已损坏。"
+          }
+        }
+      }
+    },
+    "The shader “%@” is missing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺少着色器「%@」。"
           }
         }
       }
@@ -2634,6 +3987,16 @@
         }
       }
     },
+    "The Workshop download did not pass verification.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊下载未通过校验。"
+          }
+        }
+      }
+    },
     "Thermal state": {
       "localizations": {
         "zh-Hans": {
@@ -2664,12 +4027,72 @@
         }
       }
     },
+    "This scene uses %@, which Lumen can't draw yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个场景用到了 %@，Lumen 暂时还不支持绘制。"
+          }
+        }
+      }
+    },
+    "This Steam account can't download it. Workshop downloads need an account that owns Wallpaper Engine.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Steam 账户无法下载它。下载创意工坊内容需要拥有 Wallpaper Engine 的账户。"
+          }
+        }
+      }
+    },
+    "This Steam QR code expired. Create a new code to try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Steam 二维码已过期，请重新生成后再试。"
+          }
+        }
+      }
+    },
+    "This wallpaper can't be recorded: its files or Wallpaper Engine's assets are missing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法录制这张壁纸：它的文件或 Wallpaper Engine 的 assets 缺失。"
+          }
+        }
+      }
+    },
+    "This wallpaper can't be recorded: its files or Wallpaper Engine's assets are missing. Still showing “%@”.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法录制这张壁纸：它的文件或 Wallpaper Engine 的 assets 缺失。仍在显示「%@」。"
+          }
+        }
+      }
+    },
     "This wallpaper has no shader source.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "这张壁纸没有着色器代码。"
+          }
+        }
+      }
+    },
+    "This Workshop item uses an unsupported download format.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个创意工坊项目使用了不支持的下载格式。"
           }
         }
       }
@@ -2704,6 +4127,16 @@
         }
       }
     },
+    "Tuned shaders that cost a fraction of a video. Open one to change colours and motion.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调校好的着色器，开销只有视频的零头。打开一个即可调整配色和动效。"
+          }
+        }
+      }
+    },
     "Unknown": {
       "localizations": {
         "zh-Hans": {
@@ -2730,6 +4163,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "未命名视频"
+          }
+        }
+      }
+    },
+    "Use Folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用此文件夹"
           }
         }
       }
@@ -2794,6 +4237,26 @@
         }
       }
     },
+    "Videos · Wallpaper Engine projects · HTML folders": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频 · Wallpaper Engine 项目 · HTML 文件夹"
+          }
+        }
+      }
+    },
+    "Videos, Projects or Folders…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频、项目或文件夹…"
+          }
+        }
+      }
+    },
     "Volume": {
       "localizations": {
         "zh-Hans": {
@@ -2804,12 +4267,42 @@
         }
       }
     },
+    "Waiting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中"
+          }
+        }
+      }
+    },
     "Wallpaper": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "壁纸"
+          }
+        }
+      }
+    },
+    "Wallpaper Engine": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpaper Engine"
+          }
+        }
+      }
+    },
+    "Wallpaper Engine Projects on This Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 上的 Wallpaper Engine 项目"
           }
         }
       }
@@ -2894,6 +4387,46 @@
         }
       }
     },
+    "Web": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页"
+          }
+        }
+      }
+    },
+    "Web and scene wallpapers follow the pointer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页和场景壁纸会跟随鼠标"
+          }
+        }
+      }
+    },
+    "Web page · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页 · %@"
+          }
+        }
+      }
+    },
+    "Web Page…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页…"
+          }
+        }
+      }
+    },
     "WebM isn't supported by macOS's video engine. Convert it to MP4 (HEVC or H.264).": {
       "localizations": {
         "zh-Hans": {
@@ -2964,6 +4497,76 @@
         }
       }
     },
+    "When the pointer rests on the desktop, web wallpapers receive mouse moves and clicks and scenes can react with parallax and ripples. Nothing is sent while you work in other windows.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标停在桌面上时，网页壁纸会收到鼠标移动和点击，场景可以做出视差和涟漪效果。你在其他窗口里操作时不会发送任何内容。"
+          }
+        }
+      }
+    },
+    "Windows only": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅限 Windows"
+          }
+        }
+      }
+    },
+    "Workshop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊"
+          }
+        }
+      }
+    },
+    "Workshop downloads need a Steam account that owns Wallpaper Engine.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载创意工坊内容需要拥有 Wallpaper Engine 的 Steam 账户。"
+          }
+        }
+      }
+    },
+    "Workshop folders": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊文件夹"
+          }
+        }
+      }
+    },
+    "Workshop item %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊项目 %@"
+          }
+        }
+      }
+    },
+    "Workshop link or item ID": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊链接或项目 ID"
+          }
+        }
+      }
+    },
     "your desktop": {
       "localizations": {
         "zh-Hans": {
@@ -2990,26 +4593,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "缩放"
-          }
-        }
-      }
-    },
-    "“%@” is already compact, so Lumen kept the original": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "「%@」已经足够精简，Lumen 保留了原文件"
-          }
-        }
-      }
-    },
-    "“%@” is on %@": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已在%2$@上播放「%1$@」"
           }
         }
       }

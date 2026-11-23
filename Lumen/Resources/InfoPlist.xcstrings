@@ -1,0 +1,24 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAudioCaptureUsageDescription": {
+      "comment": "Shown by macOS when Lumen first asks to measure system audio.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio-reactive wallpapers follow the music your Mac plays. Lumen only measures loudness per frequency and never records or stores audio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频响应壁纸会跟着 Mac 播放的音乐变化。Lumen 只测量各频段的响度，不会录制或保存任何音频。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
