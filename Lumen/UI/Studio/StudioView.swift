@@ -3,11 +3,11 @@ import SwiftUI
 struct StudioView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 270, maximum: 440), spacing: 24, alignment: .top)]
+    private let columns = [GridItem(.adaptive(minimum: 264, maximum: 420), spacing: Theme.Space.lg, alignment: .top)]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 36) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxl) {
                 PageHeader(
                     eyebrow: "Studio",
                     title: "Generative wallpapers",
@@ -16,30 +16,30 @@ struct StudioView: View {
                     Button(action: createShader) {
                         Label("New Shader", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glassProminent)
                     .controlSize(.large)
                 }
 
-                VStack(alignment: .leading, spacing: 16) {
-                    SectionTitle("Presets")
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
+                VStack(alignment: .leading, spacing: Theme.Space.md) {
+                    SectionTitle("Presets", subtitle: String(localized: "Tuned shaders that cost a fraction of a video. Open one to change colours and motion."))
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
                         ForEach(model.library.builtins) { WallpaperCard(wallpaper: $0) }
                     }
                 }
 
                 if !model.library.customShaders.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: Theme.Space.md) {
                         SectionTitle("Your creations")
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
                             ForEach(model.library.customShaders) { WallpaperCard(wallpaper: $0) }
                         }
                     }
                 }
             }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, 26)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 1480, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
     }

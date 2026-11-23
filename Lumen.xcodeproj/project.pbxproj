@@ -28,6 +28,7 @@
 		1F568EE5112920614A49657B /* SteamCMDOutputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A876A698B804682C4154BDBE /* SteamCMDOutputTests.swift */; };
 		1F665F06C76FA56F87A13A72 /* LockScreenSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D43F0A4B7CC87F9254857C3 /* LockScreenSettings.swift */; };
 		223FCBCCE3D6B1E6AC0D8FCF /* WallpaperEngineProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */; };
+		22E67B350509A487E63D89CE /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = EC8C92BB33CB07341BE34F69 /* InfoPlist.xcstrings */; };
 		237B0B35B21004BBBCE20581 /* WallpaperEngineProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */; };
 		23E8C11AF978A92A76C3798A /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = 86C71501F442C3AB00ADE840 /* libzstd */; };
 		257FC9A803A2F08EC2596739 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 260EDEBFB0FCA65EBDFB3C30 /* Models.swift */; };
@@ -238,6 +239,7 @@
 		E6FCA434F6FC3932345749F8 /* HEVCTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HEVCTranscoder.swift; sourceTree = "<group>"; };
 		E718A2F48FEE71E42778E713 /* AudioSpectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSpectrum.swift; sourceTree = "<group>"; };
 		EB190E6A2FEBDAF2CCB08258 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		EC8C92BB33CB07341BE34F69 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
 		F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseUpdate.swift; sourceTree = "<group>"; };
@@ -381,6 +383,7 @@
 			isa = PBXGroup;
 			children = (
 				A344EC8028FF1FF31AA92DBD /* Assets.xcassets */,
+				EC8C92BB33CB07341BE34F69 /* InfoPlist.xcstrings */,
 				4244B249389139ABF718F32A /* Localizable.xcstrings */,
 			);
 			path = Resources;
@@ -710,6 +713,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				994F782287920E4097852C07 /* Assets.xcassets in Resources */,
+				22E67B350509A487E63D89CE /* InfoPlist.xcstrings in Resources */,
 				1B78E317145F48829FBA41B5 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

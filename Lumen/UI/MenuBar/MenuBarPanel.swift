@@ -7,6 +7,7 @@ import SwiftUI
 struct MenuBarPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var focusedDisplayID: String?
 
     private var displays: [WallpaperEngine.Display] { model.engine.displays }
@@ -25,16 +26,16 @@ struct MenuBarPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             MenuArtwork(wallpaper: wallpaper, display: display, onOpen: openCurrent, onQuit: quit)
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 titleBlock
                 if displays.count > 1 { displayPicker }
                 transport
                 quickSettings
                 footer
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 4)
-            .padding(.bottom, 16)
+            .padding(.horizontal, Theme.Space.lg)
+            .padding(.top, Theme.Space.xxs)
+            .padding(.bottom, Theme.Space.md)
         }
         .frame(width: 340)
         .background { MenuBackdrop(wallpaper: wallpaper) }
@@ -45,24 +46,25 @@ struct MenuBarPanel: View {
     // MARK: Sections
 
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs + 2) {
             if let wallpaper {
                 Text(WallpaperCategories.displayName(wallpaper.category).uppercased())
-                    .font(Theme.eyebrow)
-                    .tracking(1.6)
+                    .font(Theme.TypeScale.eyebrow)
+                    .tracking(1.8)
                     .foregroundStyle(Theme.accent)
                 Text(wallpaper.title)
-                    .font(Theme.display(22))
+                    .font(Theme.TypeScale.panelTitle)
                     .lineLimit(2)
                 Text(detailLine(for: wallpaper))
-                    .font(.system(size: 12))
+                    .font(Theme.TypeScale.caption)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             } else {
                 Text("Nothing on your desktop yet")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(Theme.TypeScale.sectionTitle)
                 Text("Pick one from the library, or let Lumen choose for you.")
-                    .font(.system(size: 12))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -71,22 +73,23 @@ struct MenuBarPanel: View {
     }
 
     private var displayPicker: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Space.xxs + 2) {
             ForEach(displays) { item in
                 let selected = item.id == display?.id
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { focusedDisplayID = item.id }
+                    withAnimation(reduceMotion ? nil : Theme.Motion.snappy) { focusedDisplayID = item.id }
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: Theme.Space.xxs + 1) {
                         Image(systemName: item.isBuiltin ? "laptopcomputer" : "display")
                         Text(item.name).lineLimit(1)
                     }
-                    .font(.system(size: 11.5, weight: .medium))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .font(Theme.TypeScale.caption.weight(.medium))
+                    .padding(.horizontal, Theme.Space.sm - 2)
+                    .padding(.vertical, Theme.Space.xxs + 2)
                     .frame(maxWidth: .infinity)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
-                    .background(Capsule().fill(selected ? Color.white.opacity(0.16) : Color.white.opacity(0.05)))
+                    .background(Capsule().fill(selected ? Theme.Surface.pressed : Theme.Surface.base))
+                    .overlay(Capsule().strokeBorder(selected ? Theme.Surface.strokeHover : Theme.Surface.stroke))
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -97,14 +100,14 @@ struct MenuBarPanel: View {
     private var transport: some View {
         let engine = model.engine
         let playlistActive = model.playlists.active != nil
-        return GlassEffectContainer(spacing: 24) {
-            HStack(spacing: 26) {
+        return GlassEffectContainer(spacing: Theme.Space.xl) {
+            HStack(spacing: Theme.Space.xl) {
                 Button {
                     if let wallpaper { model.library.toggleFavorite(wallpaper.id) }
                 } label: {
                     Image(systemName: wallpaper?.isFavorite == true ? "heart.fill" : "heart")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(wallpaper?.isFavorite == true ? Color.pink : Color.primary)
+                        .foregroundStyle(wallpaper?.isFavorite == true ? Theme.favorite : Color.primary)
                         .frame(width: 26, height: 26)
                         .contentTransition(.symbolEffect(.replace))
                 }
@@ -148,14 +151,14 @@ struct MenuBarPanel: View {
         @Bindable var settings = model.settings
         return VStack(spacing: 0) {
             QuickToggleRow(symbol: "macwindow", title: "Pause when covered", isOn: $settings.pauseWhenCovered)
-            Divider().opacity(0.4).padding(.leading, 42)
+            QuickDivider()
             QuickToggleRow(symbol: "battery.50percent", title: "Pause on battery", isOn: $settings.pauseOnBattery)
-            Divider().opacity(0.4).padding(.leading, 42)
+            QuickDivider()
             QuickToggleRow(symbol: "speaker.wave.2.fill", title: "Wallpaper sound", isOn: $settings.audioEnabled)
-            Divider().opacity(0.4).padding(.leading, 42)
-            HStack(spacing: 10) {
+            QuickDivider()
+            HStack(spacing: Theme.Space.sm - 2) {
                 QuickRowIcon(symbol: "gauge.with.dots.needle.50percent")
-                Text("Playback speed").font(.system(size: 13))
+                Text("Playback speed").font(Theme.TypeScale.bodyMedium)
                 Spacer()
                 Picker("Playback speed", selection: $settings.playbackRate) {
                     ForEach(Theme.playbackRates, id: \.self) { rate in
@@ -167,16 +170,16 @@ struct MenuBarPanel: View {
                 .fixedSize()
                 .controlSize(.small)
             }
-            .padding(.vertical, 7)
+            .padding(.vertical, Theme.Space.xs - 1)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.28)))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.08)))
+        .padding(.horizontal, Theme.Space.sm)
+        .padding(.vertical, Theme.Space.xxs)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).fill(Theme.Surface.recessed))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.Surface.stroke))
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.sm - 2) {
             Button(action: openMainWindow) {
                 Label("Open Lumen", systemImage: "macwindow")
                     .frame(maxWidth: .infinity)
@@ -249,7 +252,7 @@ private struct MenuArtwork: View {
                     ThumbnailView(wallpaper: wallpaper)
                 } else {
                     LinearGradient(
-                        colors: [Theme.accent.opacity(0.55), Color(red: 0.08, green: 0.05, blue: 0.2)],
+                        colors: [Theme.accent.opacity(0.55), Theme.Surface.canvas],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                     .overlay(
@@ -279,15 +282,16 @@ private struct MenuArtwork: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: "LUMEN")
-                            .font(Theme.eyebrow)
+                            .font(Theme.TypeScale.eyebrow)
                             .tracking(2.4)
                         Text(verbatim: "v\(version)")
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(Theme.TypeScale.micro.weight(.medium))
+                            .monospacedDigit()
                             .foregroundStyle(.white.opacity(0.6))
                     }
                     Spacer()
-                    GlassEffectContainer(spacing: 8) {
-                        HStack(spacing: 8) {
+                    GlassEffectContainer(spacing: Theme.Space.xs) {
+                        HStack(spacing: Theme.Space.xs) {
                             SettingsLink {
                                 Image(systemName: "gearshape")
                                     .frame(width: 16, height: 16)
@@ -308,18 +312,18 @@ private struct MenuArtwork: View {
                 }
                 Spacer()
                 if let display, wallpaper != nil {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.Space.xxs + 2) {
                         DisplayStatusPill(display: display)
                         if display.wallpaperID != nil {
                             Text(display.name)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(Theme.TypeScale.caption.weight(.medium))
                                 .foregroundStyle(.white.opacity(0.75))
                                 .lineLimit(1)
                         }
                     }
                 }
             }
-            .padding(14)
+            .padding(Theme.Space.md)
         }
         .frame(height: 200)
     }
@@ -328,12 +332,13 @@ private struct MenuArtwork: View {
 /// Blurred, darkened echo of the artwork filling the whole panel.
 private struct MenuBackdrop: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let wallpaper: Wallpaper?
     @State private var image: NSImage?
 
     var body: some View {
         ZStack {
-            Color(red: 0.05, green: 0.05, blue: 0.08)
+            Theme.Surface.canvas
             Color.clear
                 .overlay {
                     if let image {
@@ -354,7 +359,7 @@ private struct MenuBackdrop: View {
                 return
             }
             let loaded = await ThumbnailCache.shared.backdrop(for: wallpaper, library: model.library)
-            withAnimation(.easeInOut(duration: 0.5)) { image = loaded }
+            withAnimation(reduceMotion ? nil : Theme.Motion.backdrop) { image = loaded }
         }
     }
 }
@@ -367,7 +372,17 @@ private struct QuickRowIcon: View {
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(Theme.accent)
             .frame(width: 28, height: 28)
-            .background(Circle().fill(Theme.accent.opacity(0.16)))
+            .background(Circle().fill(Theme.accentSoft))
+    }
+}
+
+/// Hairline between quick-settings rows, inset past the icon well.
+private struct QuickDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Theme.Surface.divider)
+            .frame(height: 1)
+            .padding(.leading, 28 + Theme.Space.sm - 2)
     }
 }
 
@@ -377,15 +392,15 @@ private struct QuickToggleRow: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.sm - 2) {
             QuickRowIcon(symbol: symbol)
-            Text(title).font(.system(size: 13))
-            Spacer(minLength: 8)
+            Text(title).font(Theme.TypeScale.bodyMedium)
+            Spacer(minLength: Theme.Space.xs)
             Toggle(title, isOn: $isOn)
                 .toggleStyle(.switch)
                 .controlSize(.mini)
                 .labelsHidden()
         }
-        .padding(.vertical, 7)
+        .padding(.vertical, Theme.Space.xs - 1)
     }
 }

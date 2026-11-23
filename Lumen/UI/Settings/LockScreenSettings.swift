@@ -107,8 +107,8 @@ private struct LockScreenPreview: View {
         }
         .aspectRatio(16.0 / 10.0, contentMode: .fit)
         .frame(maxWidth: 360)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white.opacity(0.12)))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Surface.strokeHover.opacity(0.5)))
         .frame(maxWidth: .infinity)
         .animation(.easeInOut(duration: 0.25), value: isEnabled)
     }

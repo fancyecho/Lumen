@@ -25,6 +25,8 @@ enum Theme {
         static let divider = Color.white.opacity(0.10)
         static let scrim = Color.black.opacity(0.60)
         static let scrimStroke = Color.white.opacity(0.14)
+        /// Darker inset for cards that sit on blurred artwork (menu bar quick settings), where a white fill would wash out.
+        static let recessed = Color.black.opacity(0.28)
     }
 
     // MARK: 4/8pt Spacing Grid
@@ -67,6 +69,7 @@ enum Theme {
         static let heroTitle = Theme.display(46)
         static let pageTitle = Theme.display(34)
         static let detailTitle = Theme.display(30)
+        static let panelTitle = Theme.display(22)
         static let sectionTitle = Theme.display(18, weight: .semibold)
         static let displayCardTitle = Theme.display(16, weight: .semibold)
         static let eyebrow = Font.system(size: 11, weight: .semibold).width(.expanded)
@@ -85,13 +88,6 @@ enum Theme {
         static let smooth = Animation.smooth(duration: 0.24)
         static let backdrop = Animation.easeInOut(duration: 0.65)
     }
-
-    // Legacy aliases kept for Batch 2 views until they migrate to nested tokens.
-    static let pagePadding: CGFloat = Space.page
-    static let cardRadius: CGFloat = Radius.lg
-    static let surface = Surface.base
-    static let surfaceStroke = Surface.stroke
-    static let eyebrow = TypeScale.eyebrow
 
     /// Wide display face for titles — the signature of the app's typography.
     static func display(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
@@ -178,6 +174,49 @@ struct SectionTitle<Trailing: View>: View {
 extension SectionTitle where Trailing == EmptyView {
     init(_ title: String, subtitle: String? = nil) {
         self.init(title: title, subtitle: subtitle) { EmptyView() }
+    }
+}
+
+// MARK: Empty States
+
+/// Dashed drop-zone panel for empty pages: accent symbol, wide title, explanation, optional action.
+struct EmptyStatePanel<Action: View>: View {
+    let symbol: String
+    let title: String
+    let message: String
+    @ViewBuilder var action: Action
+
+    var body: some View {
+        VStack(spacing: Theme.Space.md) {
+            Image(systemName: symbol)
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(Theme.accent)
+            Text(title).font(Theme.display(22))
+            Text(message)
+                .font(Theme.TypeScale.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 440)
+            action.padding(.top, Theme.Space.xxs)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+        .padding(.horizontal, Theme.Space.xl)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                .fill(Theme.Surface.base)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
+                .foregroundStyle(Theme.Surface.strokeHover)
+        )
+    }
+}
+
+extension EmptyStatePanel where Action == EmptyView {
+    init(symbol: String, title: String, message: String) {
+        self.init(symbol: symbol, title: title, message: message) { EmptyView() }
     }
 }
 

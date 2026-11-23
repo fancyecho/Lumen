@@ -32,6 +32,7 @@ struct WallpaperCard: View {
         .contextMenu { WallpaperMenuItems(wallpaper: wallpaper) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction { open() }
     }
 
     private var artwork: some View {

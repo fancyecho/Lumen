@@ -3,66 +3,100 @@ import SwiftUI
 struct PlaylistsView: View {
     @Environment(AppModel.self) private var model
 
+    private let columns = [GridItem(.adaptive(minimum: 264, maximum: 420), spacing: Theme.Space.lg, alignment: .top)]
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
                 PageHeader(
                     eyebrow: "Playlists",
                     title: "Rotations",
                     subtitle: String(localized: "Cycle through wallpapers on a schedule, across every display.")
-                )
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260, maximum: 400), spacing: 24, alignment: .top)], alignment: .leading, spacing: 30) {
-                    NewPlaylistCard {
-                        let playlist = model.playlists.create()
-                        model.router.open(.playlist(playlist.id))
+                ) {
+                    if !model.playlists.playlists.isEmpty {
+                        Button(action: createPlaylist) {
+                            Label("New Playlist", systemImage: "plus")
+                        }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
                     }
-                    ForEach(model.playlists.playlists) { playlist in
-                        PlaylistCard(playlist: playlist)
+                }
+
+                if model.playlists.playlists.isEmpty {
+                    EmptyStatePanel(
+                        symbol: "arrow.triangle.2.circlepath",
+                        title: String(localized: "No rotations yet"),
+                        message: String(localized: "Pick a few wallpapers and an interval. Lumen swaps them on every display and keeps pausing when nobody can see the desktop.")
+                    ) {
+                        Button(action: createPlaylist) {
+                            Label("New Playlist", systemImage: "plus")
+                        }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
+                    }
+                } else {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
+                        ForEach(model.playlists.playlists) { playlist in
+                            PlaylistCard(playlist: playlist)
+                        }
+                        NewPlaylistCard(action: createPlaylist)
                     }
                 }
             }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, 26)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 1480, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
     }
+
+    private func createPlaylist() {
+        let playlist = model.playlists.create()
+        model.router.open(.playlist(playlist.id))
+    }
 }
 
+/// Dashed placeholder at the end of the grid, sized like a playlist card.
 struct NewPlaylistCard: View {
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                        .fill(Color.white.opacity(hovering ? 0.07 : 0.035))
-                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
-                        .foregroundStyle(Color.white.opacity(hovering ? 0.35 : 0.18))
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                        .fill(hovering ? Theme.Surface.elevated : Theme.Surface.base)
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
+                        .foregroundStyle(hovering ? Theme.accent.opacity(0.6) : Theme.Surface.strokeHover)
                     Image(systemName: "plus")
-                        .font(.system(size: 28, weight: .light))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(hovering ? Theme.accent : .secondary)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(hovering ? Theme.accentSoft : Theme.Surface.elevated))
                 }
-                .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("New Playlist").font(.system(size: 14, weight: .semibold))
-                    Text("Pick wallpapers and an interval").font(.system(size: 12)).foregroundStyle(.secondary)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                VStack(alignment: .leading, spacing: Theme.Space.xxs - 1) {
+                    Text("New Playlist").font(Theme.TypeScale.cardTitle)
+                    Text("Pick wallpapers and an interval")
+                        .font(Theme.TypeScale.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(reduceMotion ? nil : Theme.Motion.quick, value: hovering)
     }
 }
 
 struct PlaylistCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let playlist: Playlist
     @State private var hovering = false
 
@@ -70,16 +104,29 @@ struct PlaylistCard: View {
 
     var body: some View {
         let wallpapers = playlist.wallpaperIDs.compactMap { model.library.wallpaper(id: $0) }
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
             collage(wallpapers)
-                .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .overlay {
+                    if hovering {
+                        LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                        .strokeBorder(isActive ? Theme.accent : Color.white.opacity(hovering ? 0.28 : 0.08), lineWidth: isActive ? 2 : 1)
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                        .strokeBorder(
+                            isActive ? Theme.accent : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
+                            lineWidth: isActive ? 2 : 1
+                        )
                 )
                 .overlay(alignment: .topLeading) {
-                    if isActive { ArtBadge(text: String(localized: "Rotating now"), symbol: "arrow.triangle.2.circlepath").padding(10) }
+                    if isActive {
+                        ArtBadge(text: String(localized: "Rotating now"), symbol: "arrow.triangle.2.circlepath")
+                            .padding(Theme.Space.sm - 2)
+                    }
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if hovering || isActive {
@@ -93,26 +140,33 @@ struct PlaylistCard: View {
                                     Label("Play", systemImage: "play.fill")
                                 }
                             }
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(Theme.TypeScale.bodyMedium)
                         }
                         .buttonStyle(.glassProminent)
                         .disabled(wallpapers.isEmpty)
-                        .padding(10)
+                        .padding(Theme.Space.sm - 2)
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
                     }
                 }
-                .shadow(color: .black.opacity(0.3), radius: 14, y: 8)
+                .shadow(color: .black.opacity(hovering ? 0.50 : 0.28), radius: hovering ? 22 : 12, y: hovering ? 12 : 6)
+                .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(playlist.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+            VStack(alignment: .leading, spacing: Theme.Space.xxs - 1) {
+                Text(playlist.name).font(Theme.TypeScale.cardTitle).lineLimit(1)
                 Text(summary(count: wallpapers.count))
-                    .font(.system(size: 12))
+                    .font(Theme.TypeScale.caption)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .contentShape(Rectangle())
         .onTapGesture { model.router.open(.playlist(playlist.id)) }
         .onHover { hovering = $0 }
-        .animation(.snappy(duration: 0.2), value: hovering)
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: hovering)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { model.router.open(.playlist(playlist.id)) }
     }
 
     private func summary(count: Int) -> String {
@@ -126,8 +180,10 @@ struct PlaylistCard: View {
         let tiles = Array(wallpapers.prefix(4))
         if tiles.isEmpty {
             ZStack {
-                Color.white.opacity(0.04)
-                Image(systemName: "rectangle.stack").font(.system(size: 26, weight: .light)).foregroundStyle(.secondary)
+                Theme.Surface.mediaFill
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(.secondary)
             }
         } else if tiles.count < 4 {
             ThumbnailView(wallpaper: tiles[0])
@@ -170,15 +226,18 @@ struct PlaylistEditorView: View {
     private func editor(_ playlist: Playlist) -> some View {
         let isActive = model.playlists.activeID == playlist.id
         return ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(verbatim: "PLAYLIST").font(Theme.eyebrow).tracking(1.8).foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                    Text(verbatim: "PLAYLIST")
+                        .font(Theme.TypeScale.eyebrow)
+                        .tracking(1.8)
+                        .foregroundStyle(Theme.accent)
                     TextField("Name", text: binding(\.name))
                         .textFieldStyle(.plain)
-                        .font(Theme.display(40))
+                        .font(Theme.TypeScale.pageTitle)
                 }
 
-                HStack(spacing: 14) {
+                HStack(spacing: Theme.Space.sm) {
                     Picker("Change wallpaper", selection: binding(\.intervalMinutes)) {
                         ForEach(intervals, id: \.self) { minutes in
                             Text(Format.interval(minutes: minutes).capitalizingFirstLetter).tag(minutes)
@@ -216,15 +275,23 @@ struct PlaylistEditorView: View {
 
                 if isActive, let next = model.playlists.nextChange {
                     Label("Next change \(next.formatted(.relative(presentation: .named)))", systemImage: "timer")
-                        .font(.system(size: 13))
+                        .font(Theme.TypeScale.bodyMedium)
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, Theme.Space.sm)
+                        .padding(.vertical, Theme.Space.xs)
+                        .background(Capsule().fill(Theme.Surface.elevated))
+                        .overlay(Capsule().strokeBorder(Theme.Surface.stroke))
                 }
 
                 SectionTitle(
                     "Wallpapers",
                     subtitle: String(localized: "\(playlist.wallpaperIDs.count) selected · click to add or remove. Order follows selection.")
                 )
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: 18, alignment: .top)], alignment: .leading, spacing: 22) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: Theme.Space.md, alignment: .top)],
+                    alignment: .leading,
+                    spacing: Theme.Space.lg
+                ) {
                     ForEach(model.library.all) { wallpaper in
                         SelectableWallpaperTile(
                             wallpaper: wallpaper,
@@ -235,10 +302,10 @@ struct PlaylistEditorView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.pagePadding)
-            .padding(.top, 22)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 1480, alignment: .leading)
+            .padding(.horizontal, Theme.Space.page)
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
     }
@@ -265,35 +332,45 @@ struct SelectableWallpaperTile: View {
     let wallpaper: Wallpaper
     let position: Int?
     let action: () -> Void
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 ThumbnailView(wallpaper: wallpaper)
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(position != nil ? Theme.accent : Color.white.opacity(0.08), lineWidth: position != nil ? 2.5 : 1)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                            .strokeBorder(
+                                position != nil ? Theme.accent : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
+                                lineWidth: position != nil ? 2 : 1
+                            )
                     )
                     .overlay(alignment: .topTrailing) {
                         if let position {
-                            Text("\(position + 1)")
-                                .font(.system(size: 12, weight: .bold))
+                            Text(verbatim: "\(position + 1)")
+                                .font(Theme.TypeScale.micro)
                                 .monospacedDigit()
                                 .foregroundStyle(.white)
                                 .frame(width: 24, height: 24)
                                 .background(Circle().fill(Theme.accent))
-                                .padding(8)
+                                .padding(Theme.Space.xs)
                         }
                     }
-                    .opacity(position == nil ? 0.75 : 1)
-                Text(wallpaper.title).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                    .opacity(position == nil && !hovering ? 0.72 : 1)
+                Text(wallpaper.title)
+                    .font(Theme.TypeScale.bodyMedium)
+                    .foregroundStyle(position == nil ? .secondary : .primary)
+                    .lineLimit(1)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(.snappy(duration: 0.18), value: position)
+        .onHover { hovering = $0 }
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: position)
+        .animation(reduceMotion ? nil : Theme.Motion.quick, value: hovering)
     }
 }
 

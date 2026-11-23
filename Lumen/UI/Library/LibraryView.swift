@@ -186,16 +186,11 @@ struct EmptyLibraryView: View {
     let filter: LibraryFilter
 
     var body: some View {
-        VStack(spacing: Theme.Space.md) {
-            Image(systemName: isSearching ? "magnifyingglass" : "square.and.arrow.down.on.square")
-                .font(.system(size: 38, weight: .light))
-                .foregroundStyle(Theme.accent)
-            Text(title).font(Theme.display(22))
-            Text(message)
-                .font(Theme.TypeScale.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 440)
+        EmptyStatePanel(
+            symbol: isSearching ? "magnifyingglass" : "square.and.arrow.down.on.square",
+            title: title,
+            message: message
+        ) {
             if !isSearching && filter != .favorites {
                 Button {
                     model.isImporterPresented = true
@@ -204,20 +199,8 @@ struct EmptyLibraryView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .padding(.top, Theme.Space.xxs)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 64)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
-                .fill(Theme.Surface.base)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
-                .foregroundStyle(Theme.Surface.strokeHover)
-        )
     }
 
     private var title: String {
