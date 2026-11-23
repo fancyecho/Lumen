@@ -13,7 +13,12 @@ struct WallpaperDetailView: View {
                 VStack(alignment: .leading, spacing: 30) {
                     hero(wallpaper)
                     info(wallpaper)
-                    FramingControls(wallpaper: wallpaper)
+                    if wallpaper.kind != .web {
+                        FramingControls(wallpaper: wallpaper)
+                    }
+                    if let package = wallpaper.package, package.properties.contains(where: \.isEditable) {
+                        PropertiesPanel(wallpaper: wallpaper, package: package)
+                    }
                     if let video = wallpaper.video {
                         OptimizationCard(wallpaper: wallpaper, video: video)
                     }
@@ -39,7 +44,7 @@ struct WallpaperDetailView: View {
                 .scaleEffect(1.12)
                 .blur(radius: 30)
                 .opacity(0.75)
-            LiveWallpaperPreview(wallpaper: wallpaper, shaderSettings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000))
+            LiveWallpaperPreview(wallpaper: wallpaper, shaderSettings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000), rendersLive: true)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)

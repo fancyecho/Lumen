@@ -78,6 +78,10 @@ struct WallpaperCard: View {
                 }
             case .shader:
                 ArtBadge(text: "Live", symbol: "sparkles")
+            case .web:
+                ArtBadge(text: "Web", symbol: "globe")
+            case .scene:
+                ArtBadge(text: String(localized: "Scene"), symbol: "square.3.layers.3d")
             }
         }
     }
@@ -146,13 +150,20 @@ struct WallpaperCard: View {
             return wallpaper.isBuiltin
                 ? String(localized: "Rendered live · \(category)")
                 : String(localized: "Your shader · \(category)")
+        case .web:
+            let category = WallpaperCategories.displayName(wallpaper.category)
+            if let host = wallpaper.package?.remoteURL.flatMap({ URL(string: $0)?.host() }) { return "\(category) · \(host)" }
+            return String(localized: "Web page · \(category)")
+        case .scene:
+            let category = WallpaperCategories.displayName(wallpaper.category)
+            return String(localized: "Scene · \(category)")
         }
     }
 
     private func open() {
         switch wallpaper.kind {
-        case .video: model.router.open(.wallpaper(wallpaper.id))
         case .shader: model.router.open(.studio(wallpaper.id))
+        default: model.router.open(.wallpaper(wallpaper.id))
         }
     }
 
@@ -193,7 +204,7 @@ struct WallpaperMenuItems: View {
         } label: {
             if wallpaper.isFavorite { Text("Remove from Favorites") } else { Text("Add to Favorites") }
         }
-        if wallpaper.kind == .video {
+        if wallpaper.kind == .video || model.library.packageFolder(for: wallpaper) != nil {
             Button("Show in Finder") { model.revealInFinder(wallpaper) }
         }
         if !wallpaper.isBuiltin {

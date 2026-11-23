@@ -28,6 +28,7 @@ final class WallpaperEngine {
     @ObservationIgnored private let system: SystemMonitor
     @ObservationIgnored private let occlusion = OcclusionMonitor()
     @ObservationIgnored private let stills = StillFrameSync()
+    @ObservationIgnored private let pointer = DesktopPointerMonitor()
     @ObservationIgnored private var assignments = AssignmentStore.load()
     @ObservationIgnored private var hosts: [String: DesktopHost] = [:]
     @ObservationIgnored private var players: [URL: SharedVideoPlayer] = [:]
@@ -50,6 +51,12 @@ final class WallpaperEngine {
         system.onChange = { [weak self] in self?.reconcile() }
         system.onWake = { [weak self] in self?.recoverAfterWake() }
         occlusion.onChange = { [weak self] in self?.reconcile() }
+        pointer.onMove = { [weak self] displayID, point in
+            (self?.hosts[displayID]?.renderer as? PointerAwareRenderer)?.pointerMoved(to: point)
+        }
+        pointer.onButton = { [weak self] displayID, isDown, point in
+            (self?.hosts[displayID]?.renderer as? PointerAwareRenderer)?.pointerPressed(isDown, at: point)
+        }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -99,6 +106,14 @@ final class WallpaperEngine {
             if settings.syncStillFrame, let screen = NSScreen.screen(withUUID: displayID) {
                 stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling, debounce: true)
             }
+        }
+    }
+
+    /// Sends changed user properties to every desktop showing this wallpaper.
+    func updateProperties(wallpaperID: UUID) {
+        guard let values = library.wallpaper(id: wallpaperID)?.package?.resolvedValues else { return }
+        for host in hosts.values where host.wallpaperID == wallpaperID {
+            (host.renderer as? PropertyAwareRenderer)?.update(values: values)
         }
     }
 
@@ -189,6 +204,63 @@ final class WallpaperEngine {
                 Log.engine.error("Shader failed to build: \(error.localizedDescription, privacy: .public)")
                 return nil
             }
+        case .web:
+            guard let package = wallpaper.package else { return nil }
+            let source: WebRenderer.Source
+            if let remote = package.remoteURL.flatMap(URL.init(string:)) {
+                source = .remote(remote, id: wallpaper.id)
+            } else if let folder = library.packageFolder(for: wallpaper) {
+                source = .folder(folder, entry: package.entry, id: wallpaper.id)
+            } else {
+                return nil
+            }
+            return WebRenderer(source: source, properties: package.properties, values: package.resolvedValues, settings: settings.webRenderSettings)
+        case .scene:
+            return makeSceneRenderer(for: wallpaper)
+        }
+    }
+
+    /// A small, muted renderer for previews in the window.
+    func makePreviewRenderer(for wallpaper: Wallpaper, framing: WallpaperFraming? = nil) -> WallpaperRenderer? {
+        switch wallpaper.kind {
+        case .web:
+            guard let package = wallpaper.package else { return nil }
+            var web = settings.webRenderSettings
+            web.muted = true
+            let source: WebRenderer.Source
+            if let remote = package.remoteURL.flatMap(URL.init(string:)) {
+                source = .remote(remote, id: wallpaper.id)
+            } else if let folder = library.packageFolder(for: wallpaper) {
+                source = .folder(folder, entry: package.entry, id: wallpaper.id)
+            } else {
+                return nil
+            }
+            return WebRenderer(source: source, properties: package.properties, values: package.resolvedValues, settings: web)
+        case .scene:
+            guard let package = wallpaper.package, let folder = library.packageFolder(for: wallpaper) else { return nil }
+            let source = SceneRenderer.Source(
+                id: wallpaper.id, folder: folder, entry: package.entry,
+                assets: settings.sceneAssets, preview: library.previewURL(for: wallpaper)
+            )
+            var preview = SceneRenderSettings.preview
+            preview.scaling = settings.videoScaling
+            return try? SceneRenderer(source: source, values: package.resolvedValues, settings: preview, framing: framing ?? wallpaper.resolvedFraming)
+        default:
+            return nil
+        }
+    }
+
+    private func makeSceneRenderer(for wallpaper: Wallpaper) -> WallpaperRenderer? {
+        guard let package = wallpaper.package, let folder = library.packageFolder(for: wallpaper) else { return nil }
+        let source = SceneRenderer.Source(
+            id: wallpaper.id, folder: folder, entry: package.entry,
+            assets: settings.sceneAssets, preview: library.previewURL(for: wallpaper)
+        )
+        do {
+            return try SceneRenderer(source: source, values: package.resolvedValues, settings: settings.sceneRenderSettings, framing: wallpaper.resolvedFraming)
+        } catch {
+            Log.engine.error("Scene renderer unavailable: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
@@ -250,6 +322,9 @@ final class WallpaperEngine {
             ))
         }
         if updated != displays { displays = updated }
+        pointer.isEnabled = settings.interactiveWallpapers
+            && hosts.values.contains { $0.renderer is PointerAwareRenderer }
+            && updated.contains(where: \.isPlaying)
     }
 
     private func recoverAfterWake() {
@@ -278,11 +353,18 @@ final class WallpaperEngine {
             for player in players.values {
                 player.configure(rate: Float(settings.playbackRate), muted: !settings.audioEnabled, volume: Float(settings.volume))
             }
+            let web = settings.webRenderSettings
+            hosts.values.compactMap { $0.renderer as? WebRenderer }.forEach { $0.update(settings: web) }
+            hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
         case .scaling:
             hosts.values.compactMap { $0.renderer as? VideoRenderer }.forEach { $0.setScaling(settings.videoScaling) }
+            hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
         case .shader:
             let renderSettings = settings.shaderRenderSettings
             hosts.values.compactMap { $0.renderer as? ShaderRenderer }.forEach { $0.update(settings: renderSettings) }
+            let web = settings.webRenderSettings
+            hosts.values.compactMap { $0.renderer as? WebRenderer }.forEach { $0.update(settings: web) }
+            hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
         case .stillFrame:
             if settings.syncStillFrame {
                 for screen in NSScreen.screens {
@@ -294,6 +376,11 @@ final class WallpaperEngine {
             }
         case .lockScreen:
             break
+        case .scene:
+            let ids = Set(hosts.values.compactMap { host in
+                host.wallpaperID.flatMap { library.wallpaper(id: $0) }.flatMap { $0.kind == .scene ? $0.id : nil }
+            })
+            if !ids.isEmpty { rebuild(animated: true, forceReload: ids) }
         }
     }
 }

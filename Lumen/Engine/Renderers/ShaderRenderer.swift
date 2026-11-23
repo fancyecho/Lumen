@@ -162,6 +162,8 @@ final class ShaderRenderer: NSObject, WallpaperRenderer, MTKViewDelegate {
     }
 
     private func render(in view: MTKView) {
+        // A hidden window gets no drawables; asking would stall the main thread for a second.
+        if let window = view.window, !window.occlusionState.contains(.visible), isReady { return }
         let now = CACurrentMediaTime()
         if isActive, let lastFrame {
             clock += min(now - lastFrame, 0.1) * params.speed

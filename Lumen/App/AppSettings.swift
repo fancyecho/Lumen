@@ -55,7 +55,7 @@ enum DockIconMode: String, CaseIterable, Identifiable {
 @Observable
 final class AppSettings {
     enum Change {
-        case policy, playback, scaling, shader, stillFrame, lockScreen
+        case policy, playback, scaling, shader, stillFrame, lockScreen, scene
     }
 
     @ObservationIgnored private var observers: [(Change) -> Void] = []
@@ -80,6 +80,10 @@ final class AppSettings {
     var crossfade: Bool { didSet { store(crossfade, "crossfade", nil) } }
 
     var shaderFrameRate: Int { didSet { store(shaderFrameRate, "shaderFrameRate", .shader) } }
+    /// Web and scene wallpapers follow the pointer while it rests on the desktop.
+    var interactiveWallpapers: Bool { didSet { store(interactiveWallpapers, "interactiveWallpapers", .policy) } }
+    /// Folder holding Wallpaper Engine's shared `assets` (shaders, materials, effects) for scenes.
+    var sceneAssetsPath: String { didSet { store(sceneAssetsPath, "sceneAssetsPath", .scene) } }
     var shaderQuality: ShaderQuality { didSet { store(shaderQuality.rawValue, "shaderQuality", .shader) } }
 
     var syncStillFrame: Bool { didSet { store(syncStillFrame, "syncStillFrame", .stillFrame) } }
@@ -93,6 +97,18 @@ final class AppSettings {
 
     var shaderRenderSettings: ShaderRenderSettings {
         ShaderRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.pixelBudget)
+    }
+
+    var sceneRenderSettings: SceneRenderSettings {
+        SceneRenderSettings(frameRate: shaderFrameRate, pixelBudget: shaderQuality.pixelBudget.isFinite ? shaderQuality.pixelBudget * 1.4 : 8_300_000,
+                            scaling: videoScaling, muted: !audioEnabled, volume: volume)
+    }
+
+    /// Wallpaper Engine's shared assets, from Settings or found automatically.
+    var sceneAssets: URL? { SceneAssetsLocator.resolve(configured: sceneAssetsPath) }
+
+    var webRenderSettings: WebRenderSettings {
+        WebRenderSettings(frameRate: shaderFrameRate, muted: !audioEnabled, volume: volume)
     }
 
     init() {
@@ -110,6 +126,8 @@ final class AppSettings {
             "videoScaling": VideoScaling.fill.rawValue,
             "crossfade": true,
             "shaderFrameRate": 30,
+            "interactiveWallpapers": true,
+            "sceneAssetsPath": "",
             "shaderQuality": ShaderQuality.balanced.rawValue,
             "syncStillFrame": true,
             "dockIconMode": DockIconMode.whileWindowOpen.rawValue,
@@ -128,6 +146,8 @@ final class AppSettings {
         crossfade = defaults.bool(forKey: "crossfade")
         shaderFrameRate = defaults.integer(forKey: "shaderFrameRate")
         shaderQuality = ShaderQuality(rawValue: defaults.string(forKey: "shaderQuality") ?? "") ?? .balanced
+        interactiveWallpapers = defaults.bool(forKey: "interactiveWallpapers")
+        sceneAssetsPath = defaults.string(forKey: "sceneAssetsPath") ?? ""
         syncStillFrame = defaults.bool(forKey: "syncStillFrame")
         dockIconMode = DockIconMode(rawValue: defaults.string(forKey: "dockIconMode") ?? "") ?? .whileWindowOpen
     }

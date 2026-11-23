@@ -151,7 +151,7 @@ struct DisplayCard: View {
             .onHover { hovering = $0 }
             .onTapGesture {
                 if let wallpaper {
-                    model.router.open(wallpaper.kind == .video ? .wallpaper(wallpaper.id) : .studio(wallpaper.id))
+                    model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
                 } else {
                     model.router.show(.library)
                 }

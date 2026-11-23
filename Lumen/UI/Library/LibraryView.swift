@@ -1,12 +1,14 @@
 import SwiftUI
 
 enum LibraryFilter: String, CaseIterable, Identifiable {
-    case all, videos, generative, favorites
+    case all, videos, scenes, web, generative, favorites
     var id: String { rawValue }
     var title: String {
         switch self {
         case .all: String(localized: "All")
         case .videos: String(localized: "Videos")
+        case .scenes: String(localized: "Scenes")
+        case .web: String(localized: "Web")
         case .generative: String(localized: "Rendered Live")
         case .favorites: String(localized: "Favorites")
         }
@@ -15,6 +17,8 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: "square.grid.2x2"
         case .videos: "film"
+        case .scenes: "square.3.layers.3d"
+        case .web: "globe"
         case .generative: "sparkles"
         case .favorites: "heart"
         }
@@ -138,6 +142,8 @@ struct LibraryView: View {
         switch filter {
         case .all: return library.all
         case .videos: return library.videos
+        case .scenes: return library.scenes
+        case .web: return library.webPages
         case .generative: return library.customShaders + library.builtins
         case .favorites: return library.all.filter(\.isFavorite)
         }

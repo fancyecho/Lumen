@@ -136,6 +136,17 @@ struct LockScreenStatusLabel: View {
                 StatusDot(color: Theme.playing)
                 Text("Showing “\(title)”")
             }
+        case .keepingPrevious(let title):
+            Group {
+                if let title {
+                    Text("Scenes and web pages can't play here yet. Still showing “\(title)”.")
+                } else {
+                    Text("Scenes and web pages can't play on the Lock Screen yet.")
+                }
+            }
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.trailing)
+            .fixedSize(horizontal: false, vertical: true)
         case .failed(let message):
             Text(message)
                 .foregroundStyle(.red)

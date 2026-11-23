@@ -123,10 +123,19 @@ struct FramingControls: View {
             let zoom = max(start.zoom, 1)
             return (2 * translation.width / previewSize.width / zoom,
                     2 * translation.height / previewSize.height / zoom)
-        case .video:
-            guard let video = wallpaper.video else { return (0, 0) }
+        case .web:
+            return (0, 0)
+        case .video, .scene:
+            let content: CGSize
+            if let video = wallpaper.video {
+                content = CGSize(width: video.width, height: video.height)
+            } else if let width = wallpaper.package?.width, let height = wallpaper.package?.height {
+                content = CGSize(width: width, height: height)
+            } else {
+                return (0, 0)
+            }
             let bounds = CGRect(origin: .zero, size: previewSize)
-            let placed = start.rect(for: CGSize(width: video.width, height: video.height), in: bounds, scaling: model.settings.videoScaling)
+            let placed = start.rect(for: content, in: bounds, scaling: model.settings.videoScaling)
             let overflowX = placed.width - bounds.width
             let overflowY = placed.height - bounds.height
             return (overflowX > 1 ? 2 * translation.width / overflowX : 0,
@@ -276,6 +285,7 @@ struct FramedWallpaperPreview: NSViewRepresentable {
         private var player: AVQueuePlayer?
         private var looper: AVPlayerLooper?
         private var shader: ShaderRenderer?
+        private var scene: WallpaperRenderer?
 
         func build(_ wallpaper: Wallpaper, url: URL?, framing: WallpaperFraming, scaling: VideoScaling, in container: NSView) {
             let content: NSView
@@ -301,6 +311,13 @@ struct FramedWallpaperPreview: NSViewRepresentable {
                 renderer.setActive(true)
                 shader = renderer
                 content = renderer.view
+            case .scene:
+                guard let renderer = AppModel.shared.engine.makePreviewRenderer(for: wallpaper, framing: framing) else { return }
+                renderer.setActive(true)
+                scene = renderer
+                content = renderer.view
+            case .web:
+                return
             }
             content.frame = container.bounds
             content.autoresizingMask = [.width, .height]
@@ -311,6 +328,7 @@ struct FramedWallpaperPreview: NSViewRepresentable {
             playerView?.scaling = scaling
             playerView?.framing = framing
             shader?.setFraming(framing)
+            scene?.setFraming(framing)
         }
 
         func tearDown() {
@@ -320,6 +338,8 @@ struct FramedWallpaperPreview: NSViewRepresentable {
             player = nil
             shader?.tearDown()
             shader = nil
+            scene?.tearDown()
+            scene = nil
         }
     }
 }

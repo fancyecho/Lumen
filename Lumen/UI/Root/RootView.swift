@@ -39,10 +39,16 @@ struct RootView: View {
         }
         .fileImporter(
             isPresented: $bindableModel.isImporterPresented,
-            allowedContentTypes: MediaInspector.supportedTypes,
+            allowedContentTypes: MediaInspector.supportedTypes + [.folder, .html, .json],
             allowsMultipleSelection: true
         ) { result in
             if case .success(let urls) = result { model.importFiles(urls) }
+        }
+        .sheet(isPresented: $bindableModel.isWebPageSheetPresented) {
+            AddWebPageSheet()
+        }
+        .sheet(isPresented: $bindableModel.isSteamPanelPresented) {
+            SteamPanel()
         }
         .confirmationDialog(
             "Delete “\(model.pendingDeletion?.title ?? "")”?",
@@ -65,7 +71,7 @@ struct RootView: View {
         .onAppear(perform: windowAppeared)
         .onDisappear(perform: windowDisappeared)
         .onChange(of: router.searchText) { _, text in
-            if !text.isEmpty, router.tab != .library || router.route != nil {
+            if !text.isEmpty, (router.tab != .library && router.tab != .workshop) || router.route != nil {
                 router.show(.library)
             }
         }
@@ -81,6 +87,7 @@ struct RootView: View {
             switch model.router.tab {
             case .home: HomeView()
             case .library: LibraryView()
+            case .workshop: WorkshopView()
             case .studio: StudioView()
             case .playlists: PlaylistsView()
             }
@@ -122,7 +129,7 @@ struct RootView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 360)
+            .frame(width: 450)
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
@@ -136,14 +143,22 @@ struct RootView: View {
         ToolbarSpacer(.fixed, placement: .primaryAction)
 
         ToolbarItem(placement: .primaryAction) {
-            Button {
-                model.isImporterPresented = true
+            Menu {
+                Button("Videos, Projects or Folders…") { model.isImporterPresented = true }
+                Button("Web Page…") { model.isWebPageSheetPresented = true }
+                Divider()
+                Button("Wallpaper Engine Projects on This Mac") { model.router.show(.workshop) }
+                Button("Download from Steam Workshop…") { model.isSteamPanelPresented = true }
             } label: {
                 Label("Add Wallpaper", systemImage: "plus")
                     .labelStyle(.titleAndIcon)
+            } primaryAction: {
+                model.isImporterPresented = true
             }
+            .menuStyle(.button)
             .buttonStyle(.glassProminent)
-            .help("Add videos to your library (⌘O)")
+            .fixedSize()
+            .help("Add videos, Wallpaper Engine projects or web pages (⌘O)")
         }
         .sharedBackgroundVisibility(.hidden)
     }
@@ -181,7 +196,7 @@ struct DisplaysMenu: View {
                     if let id = display.wallpaperID, let wallpaper = model.library.wallpaper(id: id) {
                         let state = display.pauseReason?.title ?? String(localized: "Playing")
                         Button(wallpaper.title + " — " + state) {
-                            model.router.open(wallpaper.kind == .video ? .wallpaper(id) : .studio(id))
+                            model.router.open(wallpaper.kind == .shader ? .studio(id) : .wallpaper(id))
                         }
                         Button("Use System Wallpaper") { model.clearWallpaper(on: .display(display.id)) }
                     } else {
@@ -229,7 +244,7 @@ struct DropTargetOverlay: View {
                     .foregroundStyle(Theme.accent)
                 Text("Drop to add to your library")
                     .font(Theme.display(24))
-                Text("MP4 or MOV · HEVC, H.264, ProRes · AV1 on M3 and later")
+                Text("Videos · Wallpaper Engine projects · HTML folders")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }

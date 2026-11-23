@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum AppTab: String, CaseIterable, Identifiable, Hashable {
-    case home, library, studio, playlists
+    case home, library, workshop, studio, playlists
 
     var id: String { rawValue }
 
@@ -10,6 +10,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .home: String(localized: "Home")
         case .library: String(localized: "Library")
+        case .workshop: String(localized: "Workshop")
         case .studio: String(localized: "Studio")
         case .playlists: String(localized: "Playlists")
         }

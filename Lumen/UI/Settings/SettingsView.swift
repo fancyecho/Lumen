@@ -7,8 +7,9 @@ struct SettingsView: View {
             Tab("Playback", systemImage: "play.rectangle") { PlaybackSettings() }
             Tab("Lock Screen", systemImage: "lock.fill") { LockScreenSettings() }
             Tab("Performance", systemImage: "gauge.with.dots.needle.50percent") { PerformanceSettings() }
+            Tab("Wallpaper Engine", systemImage: "square.3.layers.3d") { WallpaperEngineSettings() }
         }
-        .frame(width: 540)
+        .frame(width: 580)
         .frame(minHeight: 580)
     }
 }

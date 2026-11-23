@@ -80,6 +80,8 @@ final class StillFrameSync {
             tag = "v-\(wallpaper.id.uuidString)-\(wallpaper.video?.optimized?.fileName ?? "source")\(placement)"
         case .shader:
             tag = "s-\(StableHash.hex(of: wallpaper.shader))\(placement)"
+        case .web, .scene:
+            tag = "p-\(wallpaper.id.uuidString)\(placement)"
         }
         let url = AppPaths.stills.appending(path: "\(tag)-\(width)x\(height).jpg")
         if FileManager.default.fileExists(atPath: url.path) { return url }
@@ -91,6 +93,13 @@ final class StillFrameSync {
             let frame = try await MediaInspector.frame(of: source, maxPixelSize: nil, at: 0, exact: true)
             // Place the frame exactly as the desktop window does (position, zoom, scaling).
             guard let placed = framing.render(frame, into: pixelSize, scaling: scaling) else { throw ShaderError.renderFailed }
+            image = placed
+        case .web, .scene:
+            // The project's preview (or Lumen's thumbnail) stands in for a rendered frame.
+            guard let url = library.previewURL(for: wallpaper) ?? library.thumbnailURL(for: wallpaper),
+                  let frame = MediaInspector.loadImage(at: url),
+                  let placed = framing.render(frame, into: pixelSize, scaling: scaling)
+            else { throw ShaderError.renderFailed }
             image = placed
         case .shader:
             guard let config = wallpaper.shader else { throw ShaderError.missingSource }

@@ -9,6 +9,8 @@ enum LockScreenStatus: Equatable {
     case preparing(Double)
     case installing
     case active(title: String)
+    /// The followed wallpaper is a scene or web page; the previous Lock Screen stays.
+    case keepingPrevious(title: String?)
     case failed(String)
 }
 
@@ -118,6 +120,13 @@ final class LockScreenManager {
         }
         guard let wallpaper = sourceWallpaper else {
             status = .waitingForWallpaper
+            return
+        }
+        guard wallpaper.kind == .video || wallpaper.kind == .shader else {
+            // Live web pages and scenes can't be baked into a movie yet; leave whatever
+            // the Lock Screen shows now rather than tearing it down.
+            job?.cancel()
+            status = .keepingPrevious(title: state?.title)
             return
         }
         let request = makeRequest(for: wallpaper)

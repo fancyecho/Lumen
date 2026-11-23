@@ -69,6 +69,8 @@ enum LockScreenVideoBuilder {
             } else {
                 loop = source
             }
+        case .web, .scene:
+            throw Failure.exportFailed(String(localized: "web and scene wallpapers can't play on the Lock Screen yet"))
         case .shader:
             guard let shader = request.shader else { throw Failure.noVideoTrack }
             loop = workFolder.appending(path: "loop.mov")

@@ -36,7 +36,7 @@ struct NowPlayingBar: View {
                 model.router.show(.library)
                 return
             }
-            model.router.open(wallpaper.kind == .video ? .wallpaper(wallpaper.id) : .studio(wallpaper.id))
+            model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
         } label: {
             HStack(spacing: 10) {
                 Group {

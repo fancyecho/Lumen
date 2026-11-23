@@ -44,8 +44,20 @@ final class LibraryStore {
     var all: [Wallpaper] { items + builtins }
     var videos: [Wallpaper] { items.filter { $0.kind == .video } }
     var customShaders: [Wallpaper] { items.filter { $0.kind == .shader } }
+    var webPages: [Wallpaper] { items.filter { $0.kind == .web } }
+    var scenes: [Wallpaper] { items.filter { $0.kind == .scene } }
     var totalDiskUsage: Int64 {
-        items.compactMap(\.video).reduce(0) { $0 + $1.fileSize + ($1.optimized?.fileSize ?? 0) }
+        items.reduce(0) { total, item in
+            let video = item.video.map { $0.fileSize + ($0.optimized?.fileSize ?? 0) } ?? 0
+            return total + video + (item.package?.byteCount ?? 0)
+        }
+    }
+
+    /// Workshop items already imported, so discovery can mark them and skip duplicates.
+    var workshopIDs: Set<String> { Set(items.compactMap { $0.package?.workshopID }) }
+
+    func wallpaper(workshopID: String) -> Wallpaper? {
+        items.first { $0.package?.workshopID == workshopID }
     }
 
     func wallpaper(id: UUID) -> Wallpaper? {
@@ -71,8 +83,21 @@ final class LibraryStore {
     }
 
     func thumbnailURL(for wallpaper: Wallpaper) -> URL? {
-        guard wallpaper.kind == .video else { return nil }
+        guard wallpaper.kind != .shader, !wallpaper.isBuiltin else { return nil }
         return AppPaths.folder(for: wallpaper.id).appending(path: "thumb.jpg")
+    }
+
+    /// The folder holding a web or scene project's files.
+    func packageFolder(for wallpaper: Wallpaper) -> URL? {
+        guard let package = wallpaper.package, package.remoteURL == nil else { return nil }
+        return AppPaths.folder(for: wallpaper.id).appending(path: package.folder, directoryHint: .isDirectory)
+    }
+
+    /// Animated or still preview shipped with a project.
+    func previewURL(for wallpaper: Wallpaper) -> URL? {
+        guard let folder = packageFolder(for: wallpaper), let preview = wallpaper.package?.preview else { return nil }
+        let url = folder.appending(path: preview)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     // MARK: Persistence
@@ -152,6 +177,28 @@ final class LibraryStore {
         }
     }
 
+    /// Changes one user property; `nil` returns it to the project's default.
+    func setPropertyValue(_ value: PropertyValue?, key: String, for id: UUID) {
+        guard let index = items.firstIndex(where: { $0.id == id }), items[index].package != nil else { return }
+        guard items[index].package?.values[key] != value else { return }
+        items[index].package?.values[key] = value
+        pendingSave?.cancel()
+        pendingSave = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self?.save()
+        }
+    }
+
+    func resetProperties(for id: UUID) {
+        guard let index = items.firstIndex(where: { $0.id == id }), items[index].package != nil else { return }
+        items[index].package?.values = [:]
+        save()
+    }
+
+    /// Records a thumbnail rendered after import (web snapshot, scene frame).
+    func noteThumbnailChanged() { revision += 1 }
+
     func toggleFavorite(_ id: UUID) {
         if let index = items.firstIndex(where: { $0.id == id }) {
             items[index].isFavorite.toggle()
@@ -182,17 +229,28 @@ final class LibraryStore {
 
     // MARK: Import
 
-    func importFiles(_ urls: [URL]) async -> ImportResult {
+    func importFiles(_ urls: [URL], source: String = "folder") async -> ImportResult {
         var result = ImportResult()
         for url in urls {
-            guard MediaInspector.isVideoFile(url) else {
-                result.failures.append((url.lastPathComponent, String(localized: "Not a video file.")))
+            let candidate = PackageImporter.classify(url)
+            if case .unsupported(let reason) = candidate {
+                result.failures.append((url.lastPathComponent, reason))
                 continue
             }
             let job = ImportJob(id: UUID(), name: url.lastPathComponent)
             importJobs.append(job)
             do {
-                let wallpaper = try await importVideo(from: url, id: job.id)
+                let wallpaper: Wallpaper
+                switch candidate {
+                case .video(let file):
+                    wallpaper = try await importVideo(from: file, id: job.id)
+                case .project(let folder):
+                    wallpaper = try await importProject(at: folder, id: job.id, source: source)
+                case .webFolder(let folder, let entry):
+                    wallpaper = try await PackageImporter.importWebFolder(folder, entry: entry, id: job.id)
+                case .unsupported:
+                    throw PackageImporter.ImportError.notAWallpaper
+                }
                 items.insert(wallpaper, at: 0)
                 save()
                 result.added.append(wallpaper)
@@ -204,7 +262,41 @@ final class LibraryStore {
         return result
     }
 
-    private func importVideo(from source: URL, id: UUID) async throws -> Wallpaper {
+    /// Adds a web page shown straight from its address.
+    func addWebPage(_ url: URL, title: String?) throws -> Wallpaper {
+        let wallpaper = try PackageImporter.webPage(url, id: UUID(), title: title)
+        items.insert(wallpaper, at: 0)
+        save()
+        return wallpaper
+    }
+
+    private func importProject(at folder: URL, id: UUID, source: String) async throws -> Wallpaper {
+        let project = try await Task.detached(priority: .userInitiated) { try WEProject.load(folder: folder) }.value
+        if let workshopID = project.workshopID, let existing = wallpaper(workshopID: workshopID) {
+            throw PackageImporter.ImportError.alreadyInLibrary(existing.title)
+        }
+        guard project.kind == .video else {
+            return try await PackageImporter.importProject(project, id: id, source: source)
+        }
+        // A video project becomes an ordinary video wallpaper that remembers where it came from.
+        var wallpaper = try await importVideo(from: project.entryURL, id: id, title: project.title)
+        var package = PackageAsset(entry: project.entry)
+        package.folder = ""
+        package.workshopID = project.workshopID
+        package.source = source
+        package.tags = project.tags
+        package.contentRating = project.contentRating
+        wallpaper.package = package
+        wallpaper.category = PackageImporter.category(for: project.tags)
+        wallpaper.author = source == "folder" ? "You" : "Steam Workshop"
+        if let preview = project.previewURL, wallpaper.kind == .video {
+            // Wallpaper Engine previews are hand-picked frames; prefer them to an arbitrary one.
+            PackageImporter.writeThumbnail(from: preview, to: AppPaths.folder(for: id).appending(path: "thumb.jpg"))
+        }
+        return wallpaper
+    }
+
+    private func importVideo(from source: URL, id: UUID, title: String? = nil) async throws -> Wallpaper {
         let folder = AppPaths.folder(for: id)
         let ext = source.pathExtension.isEmpty ? "mov" : source.pathExtension.lowercased()
         let destination = folder.appending(path: "video.\(ext)")
@@ -218,13 +310,20 @@ final class LibraryStore {
         }.value
 
         do {
-            let meta = try await MediaInspector.inspect(destination)
+            let meta: MediaMetadata
+            do {
+                meta = try await MediaInspector.inspect(destination)
+            } catch MediaError.notPlayable(let ext) where ext == "WEBM" {
+                // AVFoundation has no WebM decoder, but WebKit does.
+                try? FileManager.default.removeItem(at: folder)
+                return try await PackageImporter.webVideoPackage(from: source, id: id, title: title ?? Self.prettyTitle(for: source))
+            }
             let thumbnail = try await MediaInspector.frame(of: destination, maxPixelSize: CGSize(width: 960, height: 960), at: 0.08)
             try MediaInspector.writeJPEG(thumbnail, to: folder.appending(path: "thumb.jpg"))
             return Wallpaper(
                 id: id,
                 kind: .video,
-                title: Self.prettyTitle(for: source),
+                title: title ?? Self.prettyTitle(for: source),
                 category: "Other",
                 author: "You",
                 addedAt: Date(),
@@ -244,7 +343,7 @@ final class LibraryStore {
         }
     }
 
-    static func prettyTitle(for url: URL) -> String {
+    nonisolated static func prettyTitle(for url: URL) -> String {
         let raw = url.deletingPathExtension().lastPathComponent
         // UUIDs and hashes from download sites make poor titles.
         let compact = raw.filter { $0 != "-" && $0 != "_" && $0 != " " }

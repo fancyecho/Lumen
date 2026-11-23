@@ -55,6 +55,8 @@ struct LiveWallpaperPreview: View {
     @Environment(AppModel.self) private var model
     let wallpaper: Wallpaper
     var shaderSettings: ShaderRenderSettings = .preview
+    /// Web and scene wallpapers show their animated preview unless asked to run for real.
+    var rendersLive = false
 
     var body: some View {
         switch wallpaper.kind {
@@ -66,6 +68,77 @@ struct LiveWallpaperPreview: View {
             if let config = wallpaper.shader {
                 ShaderPreview(config: config, settings: shaderSettings)
             }
+        case .web, .scene:
+            if rendersLive {
+                PackagePreview(wallpaper: wallpaper)
+            } else if let url = model.library.previewURL(for: wallpaper) {
+                AnimatedImagePreview(url: url)
+            }
+        }
+    }
+}
+
+/// Plays a project's preview GIF (or shows its still) without decoding anything heavier.
+struct AnimatedImagePreview: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> NSImageView {
+        let view = NSImageView()
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.animates = true
+        view.image = NSImage(contentsOf: url)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        return view
+    }
+
+    func updateNSView(_ view: NSImageView, context: Context) {}
+}
+
+/// A live web or scene renderer in a view, for the details page.
+struct PackagePreview: NSViewRepresentable {
+    @Environment(AppModel.self) private var model
+    let wallpaper: Wallpaper
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.black.cgColor
+        context.coordinator.build(wallpaper, model: model, in: container)
+        return container
+    }
+
+    func updateNSView(_ container: NSView, context: Context) {
+        context.coordinator.update(wallpaper, model: model)
+    }
+
+    static func dismantleNSView(_ container: NSView, coordinator: Coordinator) {
+        coordinator.renderer?.tearDown()
+        coordinator.renderer = nil
+    }
+
+    @MainActor
+    final class Coordinator {
+        var renderer: WallpaperRenderer?
+        private var values: [String: PropertyValue] = [:]
+
+        func build(_ wallpaper: Wallpaper, model: AppModel, in container: NSView) {
+            guard let renderer = model.engine.makePreviewRenderer(for: wallpaper) else { return }
+            renderer.view.frame = container.bounds
+            renderer.view.autoresizingMask = [.width, .height]
+            container.addSubview(renderer.view)
+            renderer.setActive(true)
+            values = wallpaper.package?.resolvedValues ?? [:]
+            self.renderer = renderer
+        }
+
+        func update(_ wallpaper: Wallpaper, model: AppModel) {
+            let newValues = wallpaper.package?.resolvedValues ?? [:]
+            guard newValues != values else { return }
+            values = newValues
+            (renderer as? PropertyAwareRenderer)?.update(values: newValues)
         }
     }
 }

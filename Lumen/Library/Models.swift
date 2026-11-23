@@ -5,6 +5,13 @@ import SwiftUI
 enum WallpaperKind: String, Codable, Hashable {
     case video
     case shader
+    /// An HTML page: a Wallpaper Engine web project, a folder with `index.html`, or a URL.
+    case web
+    /// A Wallpaper Engine scene, drawn by Lumen's Metal scene renderer.
+    case scene
+
+    /// Kinds that are drawn live by Lumen rather than decoded from a file.
+    var isRendered: Bool { self != .video }
 }
 
 struct Wallpaper: Identifiable, Codable, Hashable {
@@ -17,6 +24,8 @@ struct Wallpaper: Identifiable, Codable, Hashable {
     var isFavorite: Bool = false
     var video: VideoAsset?
     var shader: ShaderConfig?
+    /// Web pages and Wallpaper Engine projects.
+    var package: PackageAsset?
     /// Position and zoom on the display; nil means centred.
     var framing: WallpaperFraming?
 
@@ -38,6 +47,38 @@ struct VideoAsset: Codable, Hashable {
     var optimized: OptimizedVideo?
     /// Set when an optimised copy came out no smaller than the source, so it isn't offered again.
     var optimizationDeclined: Bool?
+}
+
+/// A folder of files (or a web address) that makes up a web or scene wallpaper.
+struct PackageAsset: Codable, Hashable {
+    /// Subfolder of the item folder that holds the project's files.
+    var folder: String = "content"
+    /// The file to open, relative to `folder` (`index.html`, `scene.json`).
+    var entry: String
+    /// A web page shown directly instead of a local folder.
+    var remoteURL: String?
+    var workshopID: String?
+    /// Where it was imported from (`steam`, `wallpapermachine`, `folder`, `web`).
+    var source: String?
+    var tags: [String] = []
+    var contentRating: String?
+    var properties: [WEProperty] = []
+    /// Values the person changed; everything else uses the property's default.
+    var values: [String: PropertyValue] = [:]
+    var byteCount: Int64 = 0
+    /// Preview image or GIF, relative to `folder`.
+    var preview: String?
+    /// Canvas size the author designed a scene for.
+    var width: Int?
+    var height: Int?
+    var supportsAudio: Bool = false
+
+    /// Every property's effective value.
+    var resolvedValues: [String: PropertyValue] {
+        var result: [String: PropertyValue] = [:]
+        for property in properties { result[property.id] = values[property.id] ?? property.defaultValue }
+        return result
+    }
 }
 
 struct OptimizedVideo: Codable, Hashable {

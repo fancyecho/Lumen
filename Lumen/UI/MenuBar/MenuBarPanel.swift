@@ -219,7 +219,7 @@ struct MenuBarPanel: View {
 
     private func openCurrent() {
         if let wallpaper {
-            model.router.open(wallpaper.kind == .video ? .wallpaper(wallpaper.id) : .studio(wallpaper.id))
+            model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
         } else {
             model.router.show(.library)
         }
