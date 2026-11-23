@@ -524,7 +524,8 @@ enum SceneLoader {
             guard let root = try particleSystem(path, overrides: overrides, kind: .independent, transform: matrix_identity_float4x4,
                                                 maxCount: nil, seed: UInt64(truncatingIfNeeded: object.id &* 7919), depth: 0)
             else { return nil }
-            root.prewarm(values.float((files.json(path))?["starttime"], default: 0))
+            let localInverse = SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale).inverse
+            root.prewarm(values.float((files.json(path))?["starttime"], default: 0), worldToLocal: localInverse)
             return ParticleLayer(object: object, root: root)
         }
 
@@ -542,7 +543,8 @@ enum SceneLoader {
             }
             let pass = try prepare(material, overrides: nil, combos: combos, base: nil, effect: false)
             let system = ParticleSystem(json: json, pass: pass, values: values, overrides: overrides, childKind: kind,
-                                        localTransform: transform, childMaxCount: maxCount, seed: seed)
+                                        localTransform: transform, childMaxCount: maxCount, seed: seed,
+                                        applyControlPointOverrides: depth == 0)
             for (index, raw) in (json["children"] as? [Any] ?? []).enumerated() {
                 guard let child = raw as? [String: Any], let name = child["name"] as? String else { continue }
                 let childKind: ParticleSystem.ChildKind

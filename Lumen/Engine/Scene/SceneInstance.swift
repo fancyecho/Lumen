@@ -607,11 +607,12 @@ final class SceneInstance: @unchecked Sendable {
             guard let particleState = state(of: particles.object.id) else { return }
             particles.parentModel = parentWorld(of: particles.object)
             particles.localModel = SceneMath.model(origin: particleState.origin, angles: particleState.angles, scale: particleState.scale)
-            particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas, audio: frame.audio)
+            let offset = document.parallaxEnabled ? frame.cameraOffset * particles.object.parallaxDepth : .zero
+            let pointerWorld = frame.pointerCanvas.map { $0 + offset }
+            particles.update(delta: frame.delta, pointerCanvas: pointerWorld, audio: frame.audio)
             guard particleState.visible else { return }
             if let encoder = session.encoder(buffer) {
                 if isSceneTarget { frameCopyValid = false }
-                let offset = document.parallaxEnabled ? frame.cameraOffset * particles.object.parallaxDepth : .zero
                 let vp = viewProjectionOverride ?? SceneMath.orthographic(canvas: canvas, offset: offset)
                 encodeParticles(particles, encoder: encoder, viewProjection: vp, targetSize: targetSize, frame: frame)
             }

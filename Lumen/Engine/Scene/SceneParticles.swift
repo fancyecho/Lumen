@@ -8,6 +8,7 @@ final class ParticleSystem {
     struct Emitter {
         enum Shape { case sphere, box }
         var shape: Shape
+        var controlPoint = 0
         var origin: SIMD3<Float>
         var distanceMin: SIMD3<Float>
         var distanceMax: SIMD3<Float>
@@ -24,6 +25,21 @@ final class ParticleSystem {
         var audioExponent: Float = 1
     }
 
+    struct ControlPoint {
+        var flags = 0
+        var offset = SIMD3<Float>.zero
+        var parentControlPoint: Int?
+
+        /// Bit 0: control point tracks the mouse pointer.
+        var lockToPointer: Bool { flags & 1 != 0 }
+        /// Bit 1: `offset` is expressed in scene canvas (world) space rather than local space.
+        var worldSpace: Bool { flags & 2 != 0 }
+        /// Bit 2: inherits position from a parent particle system's control point.
+        var linkToParent: Bool { flags & 4 != 0 }
+    }
+
+    enum SequenceLimit { case `repeat`, mirror, clamp }
+
     enum Initializer {
         case lifetime(ClosedRange<Float>, Float)
         case size(ClosedRange<Float>, Float)
@@ -34,6 +50,11 @@ final class ParticleSystem {
         case angularVelocity(SIMD3<Float>, SIMD3<Float>)
         case turbulentVelocity(speed: ClosedRange<Float>, scale: Float, offset: Float)
         case positionOffset(Float)
+        case mapSequenceAroundControlPoint(controlPoint: Int, count: Float, axis: SIMD3<Float>,
+                                           speedMin: SIMD3<Float>, speedMax: SIMD3<Float>,
+                                           bounds: SIMD2<Float>, limit: SequenceLimit)
+        case mapSequenceBetweenControlPoints(start: Int, end: Int, count: Float,
+                                             bounds: SIMD2<Float>, limit: SequenceLimit, arcAmount: Float)
     }
 
     enum Operator {
@@ -47,8 +68,11 @@ final class ParticleSystem {
         case oscillateSize(frequency: ClosedRange<Float>, scale: ClosedRange<Float>)
         case oscillatePosition(frequency: ClosedRange<Float>, scale: ClosedRange<Float>, mask: SIMD3<Float>)
         case turbulence(speed: ClosedRange<Float>, scale: Float, timescale: Float, mask: SIMD3<Float>)
-        case vortex(offset: SIMD3<Float>, axis: SIMD3<Float>, inner: Float, outer: Float, speedInner: Float, speedOuter: Float)
+        case vortex(controlPoint: Int, offset: SIMD3<Float>, axis: SIMD3<Float>, inner: Float, outer: Float,
+                    speedInner: Float, speedOuter: Float, ringShape: Bool)
         case attract(controlPoint: Int, origin: SIMD3<Float>, scale: Float, threshold: Float)
+        case reduceMovementNearControlPoint(controlPoint: Int, inner: Float, outer: Float,
+                                            reductionInner: Float, reductionOuter: Float)
     }
 
     enum Renderer {
@@ -89,13 +113,17 @@ final class ParticleSystem {
     private let emitters: [Emitter]
     private let initializers: [Initializer]
     private let operators: [Operator]
-    private let mouseControlPoints: Set<Int>
-    private let controlPointOffsets: [Int: SIMD3<Float>]
+    private let controlPoints: [Int: ControlPoint]
+    private let hasParentLinkedControlPoints: Bool
     private let sequenceMultiplier: Float
     private let randomFrame: Bool
     private let spriteFrames: Int
     private let overrides: Overrides
     private var accumulators: [Float]
+    private var sequenceCounters: [Int]
+    private var lastPointer: SIMD3<Float>?
+    private var worldToLocal: simd_float4x4 = matrix_identity_float4x4
+    private var parentControlPointPositions: [Int: SIMD3<Float>] = [:]
     private var emitted = false
     private var clock: Float = 0
     private var rng: SplitMix
@@ -109,6 +137,7 @@ final class ParticleSystem {
         var lifetime: Float = 1
         var alpha: Float = 1
         var color = SIMD3<Float>(1, 1, 1)
+        var controlPoints: [Int: SIMD3<Float>] = [:]
 
         init() {}
 
@@ -126,11 +155,17 @@ final class ParticleSystem {
                 color = values.vec3(raw["color"], default: SIMD3(255, 255, 255)) / 255
             }
             color *= values.float(raw["brightness"], default: 1)
+            for id in 0..<8 {
+                if let value = raw["controlpoint\(id)"] {
+                    controlPoints[id] = values.vec3(value, default: .zero)
+                }
+            }
         }
     }
 
     init(json: [String: Any], pass: PreparedPass, values: SceneValues, overrides: Overrides,
-         childKind: ChildKind, localTransform: simd_float4x4, childMaxCount: Int?, seed: UInt64) {
+         childKind: ChildKind, localTransform: simd_float4x4, childMaxCount: Int?, seed: UInt64,
+         applyControlPointOverrides: Bool = true) {
         self.pass = pass
         self.overrides = overrides
         self.childKind = childKind
@@ -147,6 +182,7 @@ final class ParticleSystem {
             let shape: Emitter.Shape = (raw["name"] as? String) == "boxrandom" ? .box : .sphere
             emitters.append(Emitter(
                 shape: shape,
+                controlPoint: values.int(raw["controlpoint"], default: 0),
                 origin: values.vec3(raw["origin"], default: .zero),
                 distanceMin: values.vec3(raw["distancemin"], default: .zero),
                 distanceMax: values.vec3(raw["distancemax"], default: SIMD3(repeating: 256)),
@@ -184,10 +220,32 @@ final class ParticleSystem {
                     offset: values.float(raw["offset"], default: 0)
                 ))
             case "positionoffsetrandom": initializers.append(.positionOffset(values.float(raw["distance"], default: 0)))
+            case "mapsequencearoundcontrolpoint":
+                let speedMin = values.vec3(raw["speedmin"], default: .zero)
+                let speedMax = values.vec3(raw["speedmax"] ?? raw["speedmin"], default: speedMin)
+                initializers.append(.mapSequenceAroundControlPoint(
+                    controlPoint: values.int(raw["controlpoint"], default: 0),
+                    count: values.float(raw["count"], default: 10),
+                    axis: values.vec3(raw["axis"], default: SIMD3(0, 0, 1)),
+                    speedMin: speedMin,
+                    speedMax: speedMax,
+                    bounds: values.vec2(raw["bounds"], default: SIMD2(0, 1)),
+                    limit: Self.sequenceLimit(raw["limitbehavior"] as? String)
+                ))
+            case "mapsequencebetweencontrolpoints":
+                initializers.append(.mapSequenceBetweenControlPoints(
+                    start: values.int(raw["controlpointstart"] ?? raw["controlpoint0"], default: 0),
+                    end: values.int(raw["controlpointend"] ?? raw["controlpoint1"], default: 1),
+                    count: values.float(raw["count"], default: 10),
+                    bounds: values.vec2(raw["bounds"], default: SIMD2(0, 1)),
+                    limit: Self.sequenceLimit(raw["limitbehavior"] as? String),
+                    arcAmount: values.float(raw["arcamount"], default: 0)
+                ))
             default: break
             }
         }
         self.initializers = initializers
+        sequenceCounters = Array(repeating: 0, count: initializers.count)
 
         var operators: [Operator] = []
         for case let raw as [String: Any] in json["operator"] as? [Any] ?? [] {
@@ -223,26 +281,49 @@ final class ParticleSystem {
                                              timescale: values.float(raw["timescale"], default: 1),
                                              mask: values.vec3(raw["mask"], default: SIMD3(1, 1, 0))))
             case "vortex":
-                operators.append(.vortex(offset: values.vec3(raw["offset"], default: .zero), axis: values.vec3(raw["axis"], default: SIMD3(0, 0, 1)),
-                                         inner: values.float(raw["distanceinner"], default: 500), outer: values.float(raw["distanceouter"], default: 650),
-                                         speedInner: values.float(raw["speedinner"], default: 2500), speedOuter: values.float(raw["speedouter"], default: 0)))
+                operators.append(.vortex(controlPoint: values.int(raw["controlpoint"], default: 0),
+                                         offset: values.vec3(raw["offset"], default: .zero),
+                                         axis: values.vec3(raw["axis"], default: SIMD3(0, 0, 1)),
+                                         inner: values.float(raw["distanceinner"], default: 500),
+                                         outer: values.float(raw["distanceouter"], default: 650),
+                                         speedInner: values.float(raw["speedinner"], default: 2500),
+                                         speedOuter: values.float(raw["speedouter"], default: 0),
+                                         ringShape: values.int(raw["flags"], default: 0) & 1 != 0))
             case "controlpointattract":
                 operators.append(.attract(controlPoint: values.int(raw["controlpoint"], default: 0), origin: values.vec3(raw["origin"], default: .zero),
                                           scale: values.float(raw["scale"], default: 0), threshold: values.float(raw["threshold"], default: 512)))
+            case "reducemovementnearcontrolpoint":
+                operators.append(.reduceMovementNearControlPoint(
+                    controlPoint: values.int(raw["controlpoint"], default: 0),
+                    inner: values.float(raw["distanceinner"], default: 0),
+                    outer: values.float(raw["distanceouter"], default: 100),
+                    reductionInner: values.float(raw["reductioninner"], default: 100),
+                    reductionOuter: values.float(raw["reductionouter"], default: 0)
+                ))
             default: break
             }
         }
         self.operators = operators
 
-        var mouse = Set<Int>()
-        var offsets: [Int: SIMD3<Float>] = [:]
+        var points: [Int: ControlPoint] = [:]
         for case let point as [String: Any] in json["controlpoint"] as? [Any] ?? [] {
             let id = values.int(point["id"], default: 0)
-            if values.int(point["flags"], default: 0) & 1 != 0 { mouse.insert(id) }
-            offsets[id] = values.vec3(point["offset"], default: .zero)
+            let parentCP = point["parentcontrolpoint"].map { values.int($0, default: id) }
+            points[id] = ControlPoint(
+                flags: values.int(point["flags"], default: 0),
+                offset: values.vec3(point["offset"], default: .zero),
+                parentControlPoint: parentCP
+            )
         }
-        mouseControlPoints = mouse
-        controlPointOffsets = offsets
+        if applyControlPointOverrides {
+            for (id, position) in overrides.controlPoints {
+                var cp = points[id] ?? ControlPoint()
+                cp.offset = position
+                points[id] = cp
+            }
+        }
+        controlPoints = points
+        hasParentLinkedControlPoints = points.values.contains(where: \.linkToParent)
 
         let rendererJSON = (json["renderer"] as? [Any])?.first as? [String: Any]
         switch rendererJSON?["name"] as? String {
@@ -265,7 +346,64 @@ final class ParticleSystem {
     /// Whether any emitter's rate follows the music.
     var usesAudio: Bool { emitters.contains { $0.audioMode > 0 } }
     /// Whether any particle control point is locked to the mouse pointer.
-    var usesPointer: Bool { !mouseControlPoints.isEmpty }
+    var usesPointer: Bool { controlPoints.values.contains(where: \.lockToPointer) }
+
+    /// Resolves a control point's position in this system's local space.
+    /// Mouse-locked points retain their last seen pointer position when the cursor leaves
+    /// the desktop, and fall back to `offset` before the first pointer sample arrives.
+    func controlPointPosition(_ id: Int) -> SIMD3<Float> {
+        guard let cp = controlPoints[id] else { return .zero }
+        if cp.lockToPointer {
+            return (lastPointer ?? .zero) + cp.offset
+        }
+        if cp.linkToParent {
+            let parentID = cp.parentControlPoint ?? id
+            return (parentControlPointPositions[parentID] ?? .zero) + cp.offset
+        }
+        if cp.worldSpace {
+            let p = worldToLocal * SIMD4(cp.offset, 1)
+            return SIMD3(p.x, p.y, p.z)
+        }
+        return cp.offset
+    }
+
+    private static func sequenceLimit(_ name: String?) -> SequenceLimit {
+        switch name?.lowercased() {
+        case "mirror": return .mirror
+        case "clamp": return .clamp
+        default: return .repeat
+        }
+    }
+
+    private static func sequenceProgress(step: Int, count: Float, bounds: SIMD2<Float>, limit: SequenceLimit) -> Float {
+        let span = max(count, 0.0001)
+        let raw = Float(step) / span
+        let t: Float
+        switch limit {
+        case .repeat:
+            t = raw - floor(raw)
+        case .clamp:
+            let denom = max(count - 1, 1)
+            t = min(max(Float(step) / denom, 0), 1)
+        case .mirror:
+            let cycle = raw.truncatingRemainder(dividingBy: 2)
+            t = cycle <= 1 ? cycle : 2 - cycle
+        }
+        return bounds.x + (bounds.y - bounds.x) * t
+    }
+
+    private static func basis(for axis: SIMD3<Float>) -> (axis: SIMD3<Float>, right: SIMD3<Float>, forward: SIMD3<Float>) {
+        let a = simd_length(axis) > 0.0001 ? simd_normalize(axis) : SIMD3<Float>(0, 0, 1)
+        let ref = abs(a.z) < 0.9 ? SIMD3<Float>(0, 0, 1) : SIMD3<Float>(0, 1, 0)
+        let right = simd_normalize(simd_cross(ref, a))
+        let forward = simd_cross(a, right)
+        return (a, right, forward)
+    }
+
+    private static func rotate(_ v: SIMD3<Float>, around axis: SIMD3<Float>, angle: Float) -> SIMD3<Float> {
+        let c = cos(angle), s = sin(angle)
+        return v * c + simd_cross(axis, v) * s + axis * simd_dot(axis, v) * (1 - c)
+    }
 
     private static func bandRange(_ start: Int, _ end: Int) -> ClosedRange<Int> {
         let low = min(max(min(start, end), 0), 15), high = min(max(max(start, end), 0), 15)
@@ -281,28 +419,61 @@ final class ParticleSystem {
     // MARK: Simulation
 
     /// `pointer` is the cursor in this system's local space, if it's over the scene.
-    func update(delta: Float, pointer: SIMD3<Float>?, audio: AudioBands = .silent) {
+    func update(delta: Float, pointer: SIMD3<Float>?, worldToLocal: simd_float4x4 = matrix_identity_float4x4,
+                parentControlPoints: [Int: SIMD3<Float>] = [:], audio: AudioBands = .silent) {
+        if let pointer { lastPointer = pointer }
+        self.worldToLocal = worldToLocal
+        self.parentControlPointPositions = parentControlPoints
         clock += delta
-        // Age and remove.
+        // Age and remove. Rope strips connect consecutive particles in spawn order, so preserve ordering for `.rope`.
+        let preserveOrder: Bool
+        if case .rope = renderer { preserveOrder = true } else { preserveOrder = false }
         var index = 0
         while index < particles.count {
             particles[index].age += delta
             if particles[index].age >= particles[index].lifetime {
                 let dead = particles[index]
-                particles.swapAt(index, particles.count - 1)
-                particles.removeLast()
+                if preserveOrder {
+                    particles.remove(at: index)
+                } else {
+                    particles.swapAt(index, particles.count - 1)
+                    particles.removeLast()
+                }
                 for child in children where child.childKind == .death { child.burst(at: dead.position + dead.offset) }
                 continue
             }
             index += 1
         }
         emit(delta: delta, audio: audio)
-        simulate(delta: delta, pointer: pointer)
-        for child in children {
-            if child.childKind == .follow {
-                child.followOrigins = particles.map { $0.position + $0.offset }
+        simulate(delta: delta)
+        if !children.isEmpty {
+            let needsParentCPs = children.contains(where: \.hasParentLinkedControlPoints)
+            var resolvedCPs: [Int: SIMD3<Float>] = [:]
+            if needsParentCPs {
+                for id in 0..<8 where controlPoints[id] != nil {
+                    resolvedCPs[id] = controlPointPosition(id)
+                }
             }
-            child.update(delta: delta, pointer: pointer, audio: audio)
+            for child in children {
+                if child.childKind == .follow {
+                    child.followOrigins = particles.map { $0.position + $0.offset }
+                }
+                let childPointer: SIMD3<Float>?
+                let childWorldToLocal: simd_float4x4
+                if child.childKind == .independent, child.localTransform != matrix_identity_float4x4 {
+                    let invLocal = child.localTransform.inverse
+                    childWorldToLocal = invLocal * worldToLocal
+                    childPointer = pointer.map {
+                        let p = invLocal * SIMD4($0, 1)
+                        return SIMD3(p.x, p.y, p.z)
+                    }
+                } else {
+                    childWorldToLocal = worldToLocal
+                    childPointer = pointer
+                }
+                child.update(delta: delta, pointer: childPointer, worldToLocal: childWorldToLocal,
+                             parentControlPoints: resolvedCPs, audio: audio)
+            }
         }
     }
 
@@ -342,9 +513,13 @@ final class ParticleSystem {
 
     private func spawn(_ emitter: Emitter, at base: SIMD3<Float>? = nil) {
         guard particles.count < maxCount else { return }
-        var origin = base ?? emitter.origin
-        if base == nil, childKind == .follow, !followOrigins.isEmpty {
+        var origin: SIMD3<Float>
+        if let base {
+            origin = base
+        } else if childKind == .follow, !followOrigins.isEmpty {
             origin = followOrigins[Int(rng.next() * Float(followOrigins.count)) % followOrigins.count]
+        } else {
+            origin = controlPointPosition(emitter.controlPoint) + emitter.origin
         }
         var offset: SIMD3<Float>
         switch emitter.shape {
@@ -376,7 +551,7 @@ final class ParticleSystem {
         if emitter.speed.upperBound > 0, simd_length(offset) > 0.0001 {
             particle.velocity += simd_normalize(offset) * rng.value(in: emitter.speed)
         }
-        for initializer in initializers {
+        for (initIndex, initializer) in initializers.enumerated() {
             switch initializer {
             case .lifetime(let range, let exponent): particle.lifetime = rng.value(in: range, exponent: exponent)
             case .size(let range, let exponent): particle.size = rng.value(in: range, exponent: exponent)
@@ -390,6 +565,46 @@ final class ParticleSystem {
                 let angle = (sin(p.x * 1.7 + p.y * 0.9) + cos(p.y * 1.3 - p.x * 0.7)) * .pi + offsetAngle
                 particle.velocity += SIMD3(cos(angle), sin(angle), 0) * rng.value(in: speed)
             case .positionOffset(let distance): particle.position += rng.unitVector() * distance * rng.next()
+            case .mapSequenceAroundControlPoint(let cp, let count, let axis, let speedMin, let speedMax, let bounds, let limit):
+                let cpPos = controlPointPosition(cp)
+                let step = sequenceCounters[initIndex]
+                sequenceCounters[initIndex] += 1
+                let t = Self.sequenceProgress(step: step, count: count, bounds: bounds, limit: limit)
+                let angle = t * 2 * .pi
+                let (a, right, forward) = Self.basis(for: axis)
+                let rel = particle.position - cpPos
+                let along = a * simd_dot(rel, a)
+                let perp = rel - along
+                let radius = simd_length(perp)
+                if radius > 0.0001 {
+                    let radial = right * cos(angle) + forward * sin(angle)
+                    particle.position = cpPos + along + radial * radius
+                }
+                if simd_length_squared(speedMin) > 0 || simd_length_squared(speedMax) > 0 {
+                    let speed = rng.vector(speedMin, speedMax)
+                    particle.velocity += Self.rotate(speed, around: a, angle: angle)
+                }
+            case .mapSequenceBetweenControlPoints(let start, let end, let count, let bounds, let limit, let arcAmount):
+                let startPos = controlPointPosition(start)
+                let endPos = controlPointPosition(end)
+                let step = sequenceCounters[initIndex]
+                sequenceCounters[initIndex] += 1
+                let t = Self.sequenceProgress(step: step, count: count, bounds: bounds, limit: limit)
+                let emitterBase = base ?? controlPointPosition(emitter.controlPoint)
+                let span = endPos - startPos
+                var shift = (startPos - emitterBase) + span * t
+                if abs(arcAmount) > 0.0001 {
+                    let len = simd_length(span)
+                    if len > 0.0001 {
+                        let dir = span / len
+                        let perp = SIMD3<Float>(-dir.y, dir.x, 0)
+                        let perpLen = simd_length(perp)
+                        if perpLen > 0.0001 {
+                            shift += (perp / perpLen) * (sin(t * .pi) * arcAmount * len)
+                        }
+                    }
+                }
+                particle.position += shift
             }
         }
         particle.lifetime = max(0.01, particle.lifetime * overrides.lifetime)
@@ -402,7 +617,7 @@ final class ParticleSystem {
         for child in children where child.childKind == .spawn { child.burst(at: particle.position) }
     }
 
-    private func simulate(delta: Float, pointer: SIMD3<Float>?) {
+    private func simulate(delta: Float) {
         guard !particles.isEmpty else { return }
         for index in particles.indices {
             var p = particles[index]
@@ -425,25 +640,30 @@ final class ParticleSystem {
                     ) * 0.5
                     let strength = speed.lowerBound + (speed.upperBound - speed.lowerBound) * p.random.w
                     p.velocity += force * mask * strength * delta
-                case .vortex(let offset, let axis, let inner, let outer, let speedInner, let speedOuter):
-                    let relative = p.position - offset
-                    let distance = simd_length(relative)
-                    let t = min(max((distance - inner) / max(outer - inner, 0.001), 0), 1)
+                case .vortex(let point, let offset, let axis, let inner, let outer, let speedInner, let speedOuter, let ringShape):
+                    let center = controlPointPosition(point) + offset
+                    let axisNorm = simd_length(axis) > 0.0001 ? simd_normalize(axis) : SIMD3<Float>(0, 0, 1)
+                    let relative = p.position - center
+                    let radial = ringShape ? (relative - axisNorm * simd_dot(relative, axisNorm)) : relative
+                    let distance = simd_length(radial)
+                    let t: Float = outer > inner ? min(max((distance - inner) / (outer - inner), 0), 1) : (distance <= inner ? 0 : 1)
                     let speed = speedInner + (speedOuter - speedInner) * t
-                    let tangent = simd_cross(simd_normalize(axis), relative)
+                    let tangent = simd_cross(axisNorm, radial)
                     if simd_length(tangent) > 0.0001 { p.velocity += simd_normalize(tangent) * speed * delta }
                 case .attract(let point, let origin, let scale, let threshold):
-                    let target: SIMD3<Float>
-                    if mouseControlPoints.contains(point) {
-                        guard let pointer else { continue }
-                        target = pointer + origin
-                    } else {
-                        target = (controlPointOffsets[point] ?? .zero) + origin
-                    }
+                    let target = controlPointPosition(point) + origin
                     let delta3 = target - p.position
                     let distance = simd_length(delta3)
                     if distance < threshold, distance > 0.001 {
                         p.velocity += delta3 / distance * scale * delta
+                    }
+                case .reduceMovementNearControlPoint(let point, let inner, let outer, let reductionInner, let reductionOuter):
+                    let center = controlPointPosition(point)
+                    let distance = simd_length(p.position - center)
+                    if distance < outer {
+                        let t: Float = outer > inner ? 1 - min(max((distance - inner) / (outer - inner), 0), 1) : 1
+                        let reduction = reductionOuter + (reductionInner - reductionOuter) * t
+                        if reduction > 0 { p.velocity /= (1 + reduction * delta) }
                     }
                 default:
                     break
@@ -584,12 +804,12 @@ final class ParticleSystem {
     }
 
     /// Advances the simulation as if it had been running for `seconds` (`starttime`).
-    func prewarm(_ seconds: Float) {
+    func prewarm(_ seconds: Float, worldToLocal: simd_float4x4 = matrix_identity_float4x4) {
         guard seconds > 0 else { return }
         let step: Float = 1.0 / 15
         var remaining = min(seconds, 30)
         while remaining > 0 {
-            update(delta: min(step, remaining), pointer: nil)
+            update(delta: min(step, remaining), pointer: nil, worldToLocal: worldToLocal)
             remaining -= step
         }
     }
@@ -625,11 +845,12 @@ final class ParticleLayer {
     }
 
     func update(delta: Float, pointerCanvas: SIMD2<Float>?, audio: AudioBands = .silent) {
+        let inv = model.inverse
         let local = pointerCanvas.map { point -> SIMD3<Float> in
-            let p = model.inverse * SIMD4(point.x, point.y, 0, 1)
+            let p = inv * SIMD4(point.x, point.y, 0, 1)
             return SIMD3(p.x, p.y, p.z)
         }
-        root.update(delta: delta, pointer: local, audio: audio)
+        root.update(delta: delta, pointer: local, worldToLocal: inv, audio: audio)
     }
 
     static func sharedIndices(device: MTLDevice) -> MTLBuffer? {
