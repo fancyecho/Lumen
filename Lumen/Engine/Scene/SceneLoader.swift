@@ -28,7 +28,8 @@ enum SceneLoader {
         guard let json = files.json(request.entry) ?? files.json("scene.json") else {
             throw SceneLoadError.missingFile(request.entry)
         }
-        let values = SceneValues(properties: request.values)
+        let comboOffValues = SceneValues.comboOffValues(from: files.json("project.json"))
+        let values = SceneValues(properties: request.values, comboOffValues: comboOffValues)
         let document = SceneDocument(json: json, values: values)
         let renderSize = Self.renderSize(canvas: document.canvas, display: request.displaySize, budget: request.pixelBudget)
         // Textures keep a little more detail than the render scale needs: layers are often
@@ -250,8 +251,10 @@ enum SceneLoader {
             let pointSize = values.float(raw["pointsize"], default: 32)
             let font = SceneTextTexture.font(named: raw["font"] as? String ?? "systemfont_arial", size: CGFloat(pointSize * Self.pointScale), files: files)
             let padding = values.vec2(raw["padding"], default: SIMD2(32, 32))
+            let horizontalName = (raw["horizontalalign"] as? String)?.lowercased() ?? "center"
+            let verticalName = (raw["verticalalign"] as? String)?.lowercased() ?? "center"
             let horizontal: CTTextAlignment = {
-                switch raw["horizontalalign"] as? String {
+                switch horizontalName {
                 case "left": return .left
                 case "right": return .right
                 default: return .center
@@ -262,6 +265,13 @@ enum SceneLoader {
                 let color = values.vec3(raw["backgroundcolor"], default: .zero) * values.float(raw["backgroundbrightness"], default: 1)
                 background = SIMD4(color, 1)
             }
+            let limitWidth = values.bool(raw["limitwidth"], default: false)
+            let maxWidthValue = values.float(raw["maxwidth"], default: 0)
+            let maxWidth: Float? = limitWidth && maxWidthValue > 0 ? maxWidthValue : nil
+            let limitRows = values.bool(raw["limitrows"], default: false)
+            let maxRows: Int? = limitRows ? max(1, values.int(raw["maxrows"], default: 1)) : nil
+            let ellipsis = values.bool(raw["limituseellipsis"], default: false)
+
             // `size` is the text's own box; padding is margin around it (room for effects).
             let box: SIMD2<Float> = {
                 if let size = object.size, size.x > 1, size.y > 1 { return size }
@@ -270,10 +280,13 @@ enum SceneLoader {
                 )), []).size
                 return SIMD2(Float(measured.width), Float(measured.height))
             }()
-            let overflow = box.x
+            // Unwrapped text gets extra horizontal room so dynamic strings aren't clipped; wrapped
+            // (`limitwidth`) text stays tight to its box so scroll/mask effects align cleanly.
+            let overflow: Float = maxWidth != nil ? 0 : box.x
             let size = box + padding * 2 + SIMD2(overflow * 2, 0)
-            let style = SceneTextTexture.Style(font: font, horizontal: horizontal, vertical: raw["verticalalign"] as? String ?? "center",
-                                               padding: padding, background: background, overflow: overflow)
+            let style = SceneTextTexture.Style(font: font, horizontal: horizontal, vertical: verticalName,
+                                               padding: padding, background: background, overflow: overflow,
+                                               maxWidth: maxWidth, maxRows: maxRows, ellipsis: ellipsis)
             let rendered = SceneTextTexture(device: textures.device, text: text, size: size, scale: textScale, style: style)
             let sceneTexture = SceneTexture(texture: rendered.texture() ?? textures.clear.texture,
                                             sampler: textures.samplers.state(nearest: false, clamp: true), dynamic: rendered)
@@ -293,9 +306,15 @@ enum SceneLoader {
             let base = try prepare(material, overrides: nil, combos: baseCombos, base: nil, effect: false,
                                    textureOverrides: [0: sceneTexture], ownerID: object.id)
             let compositePass = needsChain && object.colorBlendMode != 0 ? blendCompositePass(mode: object.colorBlendMode, ownerID: object.id) : nil
+            // Wallpaper Engine anchors text layers by `horizontalalign` and `verticalalign` on the text box.
+            let textAnchor = SIMD2<Float>(
+                horizontalName == "left" ? box.x / 2 : (horizontalName == "right" ? -box.x / 2 : 0),
+                verticalName == "top" ? -box.y / 2 : (verticalName == "bottom" ? box.y / 2 : 0)
+            )
             let layer = ImageLayer(object: object, size: size, base: base, steps: steps, blend: .translucent,
                                    isPassthrough: false, isFullscreen: false, isCompositeSource: isCompositeSource,
-                                   compositePass: compositePass, imageExtent: SIMD2(1, 1), targetScales: targetScales)
+                                   compositePass: compositePass, imageExtent: SIMD2(1, 1), targetScales: targetScales,
+                                   anchorOverride: raw["alignment"] == nil ? textAnchor : nil)
             layer.text = rendered
             return layer
         }

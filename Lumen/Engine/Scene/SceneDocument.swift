@@ -5,25 +5,67 @@ import simd
 /// and objects bound to user properties (`{"user": "dust", "value": true}`).
 struct SceneValues {
     let properties: [String: PropertyValue]
+    /// For two-option on/off combo properties bound directly to a boolean without a condition
+    /// (e.g. `"1": 开, "2": 关` on `cameraparallax`), records option values that mean false.
+    let comboOffValues: [String: Set<String>]
+
+    init(properties: [String: PropertyValue], comboOffValues: [String: Set<String>] = [:]) {
+        self.properties = properties
+        self.comboOffValues = comboOffValues
+    }
+
+    /// Scans `project.json` for two-option on/off combos so direct boolean bindings treat the
+    /// off option (such as `"2"` = `"关"`) as `false` rather than non-zero `true`.
+    static func comboOffValues(from projectJSON: [String: Any]?) -> [String: Set<String>] {
+        guard let general = projectJSON?["general"] as? [String: Any],
+              let props = general["properties"] as? [String: Any]
+        else { return [:] }
+        let offLabels: Set<String> = ["关", "关闭", "无", "off", "no", "none", "false", "disabled", "disable"]
+        let onLabels: Set<String> = ["开", "开启", "有", "on", "yes", "true", "enabled", "enable"]
+        var result: [String: Set<String>] = [:]
+        for (key, raw) in props {
+            guard let dict = raw as? [String: Any],
+                  (dict["type"] as? String)?.lowercased() == "combo",
+                  let options = dict["options"] as? [[String: Any]], options.count == 2
+            else { continue }
+            var offValue: String?
+            var hasOn = false
+            for option in options {
+                let label = (option["label"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let value = option["value"].map { PropertyValue(json: $0).stringValue } ?? ""
+                if offLabels.contains(label) { offValue = value }
+                else if onLabels.contains(label) { hasOn = true }
+            }
+            if hasOn, let offValue { result[key] = [offValue] }
+        }
+        return result
+    }
 
     /// Unwraps `{"value": …}` wrappers, applying a user-property binding when present.
     func resolve(_ raw: Any?) -> Any? {
-        resolve(raw, matching: nil)
+        resolve(raw, matching: nil, depth: 0)
     }
 
-    private func resolve(_ raw: Any?, matching destination: Any?) -> Any? {
-        guard let object = raw as? [String: Any] else { return raw }
+    private func resolve(_ raw: Any?, matching destination: Any?, depth: Int = 0) -> Any? {
+        guard depth < 8, let object = raw as? [String: Any] else { return raw }
         let fallback = object["value"]
         let user = object["user"]
         guard fallback != nil || user != nil else { return raw }
         let binding = user as? [String: Any]
         let name = user as? String ?? binding?["name"] as? String
-        guard let name, let bound = properties[name] else { return fallback }
+        guard let name, let bound = properties[name] else {
+            return resolve(fallback, matching: destination, depth: depth + 1)
+        }
         if let condition = binding?["condition"] {
             // Option IDs are compared before converting values to the field's type.
             return bound.stringValue == PropertyValue(json: condition).stringValue
         }
-        return bound.anyValue(matching: destination ?? fallback)
+        let target = destination ?? fallback
+        if let number = target as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID(),
+           comboOffValues[name]?.contains(bound.stringValue) == true {
+            return false
+        }
+        return bound.anyValue(matching: target)
     }
 
     func float(_ raw: Any?, default fallback: Float) -> Float {

@@ -130,7 +130,7 @@ final class ImageLayer {
          isPassthrough: Bool, isFullscreen: Bool, copyBackground: Bool = true, isCompositeSource: Bool = false,
          compositePass: PreparedPass? = nil, imageExtent: SIMD2<Float>, targetScales: [String: Float],
          puppet: PuppetAnimator? = nil, puppetClipping: PuppetClipping? = nil,
-         chainCenter: SIMD2<Float> = .zero, chainSize: SIMD2<Float>? = nil) {
+         chainCenter: SIMD2<Float> = .zero, chainSize: SIMD2<Float>? = nil, anchorOverride: SIMD2<Float>? = nil) {
         self.object = object
         self.size = size
         self.base = base
@@ -147,7 +147,7 @@ final class ImageLayer {
         self.puppetClipping = puppetClipping
         self.chainCenter = chainCenter
         self.chainSize = chainSize ?? size
-        anchor = SceneMath.translation(SceneMath.anchorOffset(object.raw["alignment"] as? String, size: size))
+        anchor = SceneMath.translation(anchorOverride ?? SceneMath.anchorOffset(object.raw["alignment"] as? String, size: size))
         localModel = SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale) * anchor
     }
 
