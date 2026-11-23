@@ -4,11 +4,12 @@ import SwiftUI
 /// Static thumbnail for any wallpaper, filling its frame.
 struct ThumbnailView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let wallpaper: Wallpaper
     @State private var image: NSImage?
 
     var body: some View {
-        Color.white.opacity(0.04)
+        Theme.Surface.mediaFill
             .overlay {
                 if let image {
                     Image(nsImage: image)
@@ -21,7 +22,11 @@ struct ThumbnailView: View {
             .clipped()
             .task(id: ThumbnailCache.shared.cacheKey(for: wallpaper)) {
                 let loaded = await ThumbnailCache.shared.thumbnail(for: wallpaper, library: model.library)
-                withAnimation(.easeOut(duration: 0.25)) { image = loaded }
+                if reduceMotion {
+                    image = loaded
+                } else {
+                    withAnimation(Theme.Motion.smooth) { image = loaded }
+                }
             }
     }
 }
@@ -29,6 +34,7 @@ struct ThumbnailView: View {
 /// Pre-blurred version of a wallpaper used as soft light behind hero artwork.
 struct AmbientGlow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let wallpaper: Wallpaper
     @State private var image: NSImage?
 
@@ -45,7 +51,11 @@ struct AmbientGlow: View {
             }
             .task(id: ThumbnailCache.shared.cacheKey(for: wallpaper)) {
                 let loaded = await ThumbnailCache.shared.backdrop(for: wallpaper, library: model.library)
-                withAnimation(.easeInOut(duration: 0.6)) { image = loaded }
+                if reduceMotion {
+                    image = loaded
+                } else {
+                    withAnimation(Theme.Motion.backdrop) { image = loaded }
+                }
             }
     }
 }

@@ -10,7 +10,7 @@ struct WallpaperDetailView: View {
     var body: some View {
         if let wallpaper = model.library.wallpaper(id: wallpaperID) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
+                VStack(alignment: .leading, spacing: Theme.Space.xl) {
                     hero(wallpaper)
                     info(wallpaper)
                     if wallpaper.kind != .web {
@@ -23,10 +23,10 @@ struct WallpaperDetailView: View {
                         OptimizationCard(wallpaper: wallpaper, video: video)
                     }
                 }
-                .padding(.horizontal, Theme.pagePadding)
-                .padding(.top, 22)
-                .padding(.bottom, 32)
-                .frame(maxWidth: 1180)
+                .padding(.horizontal, Theme.Space.page)
+                .padding(.top, Theme.Space.md)
+                .padding(.bottom, Theme.Space.xxl + Theme.Space.md)
+                .frame(maxWidth: Theme.Layout.detailMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
             .onAppear { draftTitle = wallpaper.title }
@@ -41,80 +41,115 @@ struct WallpaperDetailView: View {
     private func hero(_ wallpaper: Wallpaper) -> some View {
         ZStack {
             AmbientGlow(wallpaper: wallpaper)
-                .scaleEffect(1.12)
-                .blur(radius: 30)
-                .opacity(0.75)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .frame(maxHeight: Theme.Layout.detailHeroMaxHeight)
+                .scaleEffect(1.04)
+                .blur(radius: 28)
+                .opacity(0.28)
+                .allowsHitTesting(false)
             LiveWallpaperPreview(wallpaper: wallpaper, shaderSettings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000), rendersLive: true)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .frame(maxHeight: Theme.Layout.detailHeroMaxHeight)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.12))
+                    RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                        .strokeBorder(Theme.Surface.scrimStroke, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.5), radius: 30, y: 18)
+                .shadow(color: .black.opacity(0.50), radius: 28, y: 14)
         }
-        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        .frame(maxWidth: .infinity)
     }
 
     private func info(_ wallpaper: Wallpaper) -> some View {
         let showing = model.engine.displays(showing: wallpaper.id)
-        return VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                TextField("Title", text: $draftTitle)
-                    .textFieldStyle(.plain)
-                    .font(Theme.display(36))
-                    .focused($titleFocused)
-                    .onSubmit { commitTitle(for: wallpaper) }
-                    .disabled(wallpaper.isBuiltin)
+        return VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack(alignment: .center, spacing: Theme.Space.md) {
+                HStack(spacing: Theme.Space.xs) {
+                    TextField("Title", text: $draftTitle)
+                        .textFieldStyle(.plain)
+                        .font(Theme.TypeScale.detailTitle)
+                        .lineLimit(1)
+                        .focused($titleFocused)
+                        .onSubmit { commitTitle(for: wallpaper) }
+                        .disabled(wallpaper.isBuiltin)
+                    if !wallpaper.isBuiltin, !titleFocused {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+
                 categoryMenu(wallpaper)
             }
 
             if let video = wallpaper.video {
-                HStack(spacing: 8) {
+                FlowLayout(spacing: Theme.Space.xs, lineSpacing: Theme.Space.xs) {
                     MetaChip(symbol: "rectangle.dashed", text: Format.resolution(video.width, video.height))
                     MetaChip(symbol: "film", text: video.codec)
                     MetaChip(symbol: "speedometer", text: Format.frameRate(video.frameRate))
                     MetaChip(symbol: "clock", text: Format.duration(video.duration))
                     MetaChip(symbol: "internaldrive", text: Format.bytes(video.fileSize))
-                    if video.isHDR { MetaChip(symbol: "sun.max.fill", text: "HDR", tint: .yellow) }
+                    if video.isHDR { MetaChip(symbol: "sun.max.fill", text: "HDR", tint: Theme.paused) }
                     if video.hasAudio { MetaChip(symbol: "speaker.wave.2.fill", text: String(localized: "Audio")) }
+                }
+            } else if let package = wallpaper.package {
+                FlowLayout(spacing: Theme.Space.xs, lineSpacing: Theme.Space.xs) {
+                    MetaChip(
+                        symbol: wallpaper.kind == .scene ? "square.3.layers.3d" : "globe",
+                        text: wallpaper.kind == .scene ? String(localized: "Scene") : "Web"
+                    )
+                    if let width = package.width, let height = package.height, width > 0, height > 0 {
+                        MetaChip(symbol: "rectangle.dashed", text: Format.resolution(width, height))
+                    }
+                    let editableCount = package.properties.filter(\.isEditable).count
+                    if editableCount > 0 {
+                        MetaChip(symbol: "slider.horizontal.3", text: "\(editableCount)")
+                    }
                 }
             }
 
             ForEach(showing) { display in
                 if let notice = display.sceneNotice {
                     Label(String(localized: "\(display.name) — \(notice.message)"), systemImage: "exclamationmark.circle")
+                        .font(Theme.TypeScale.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            HStack(spacing: 10) {
-                SetWallpaperButton { target in model.setWallpaper(wallpaper, on: target) }
-                    .controlSize(.large)
+            HStack(spacing: Theme.Space.sm) {
+                GlassEffectContainer(spacing: Theme.Space.xs) {
+                    HStack(spacing: Theme.Space.xs) {
+                        SetWallpaperButton { target in model.setWallpaper(wallpaper, on: target) }
+                            .controlSize(.large)
 
-                Button {
-                    model.library.toggleFavorite(wallpaper.id)
-                } label: {
-                    Image(systemName: wallpaper.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(wallpaper.isFavorite ? Color.pink : Color.primary)
+                        Button {
+                            model.library.toggleFavorite(wallpaper.id)
+                        } label: {
+                            Image(systemName: wallpaper.isFavorite ? "heart.fill" : "heart")
+                                .foregroundStyle(wallpaper.isFavorite ? Theme.favorite : Color.primary)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .controlSize(.large)
+                        .help(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
+
+                        Menu {
+                            WallpaperMenuItems(wallpaper: wallpaper)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .menuIndicator(.hidden)
+                        .controlSize(.large)
+                        .fixedSize()
+                    }
                 }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .help(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
 
-                Menu {
-                    WallpaperMenuItems(wallpaper: wallpaper)
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .menuIndicator(.hidden)
-                .controlSize(.large)
-                .fixedSize()
-
-                Spacer()
+                Spacer(minLength: Theme.Space.sm)
 
                 HStack(spacing: 6) {
                     if showing.isEmpty {
@@ -125,8 +160,13 @@ struct WallpaperDetailView: View {
                         Text("On \(showing.map(\.name).formatted(.list(type: .and)))")
                     }
                 }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .font(Theme.TypeScale.bodyMedium)
+                .foregroundStyle(showing.isEmpty ? Color.secondary : Theme.playing)
+                .padding(.horizontal, Theme.Space.sm)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Theme.Surface.base))
+                .overlay(Capsule().strokeBorder(showing.isEmpty ? Theme.Surface.stroke : Theme.playing.opacity(0.35)))
+                .lineLimit(1)
             }
         }
     }
@@ -145,7 +185,7 @@ struct WallpaperDetailView: View {
             }
         } label: {
             Label(WallpaperCategories.displayName(wallpaper.category), systemImage: "tag")
-                .font(.system(size: 13, weight: .medium))
+                .font(Theme.TypeScale.bodyMedium)
         }
         .menuStyle(.button)
         .buttonStyle(.glass)
@@ -175,27 +215,31 @@ struct OptimizationCard: View {
         let maxWidth = NSScreen.screens.map { Int($0.pixelSize.width) }.max() ?? 3840
         let plan = VideoOptimizer.plan(for: video, maxDisplayWidth: maxWidth)
         let progress = model.library.optimizing[wallpaper.id]
+        let isEfficient = video.optimized != nil || plan == nil
 
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .center, spacing: Theme.Space.md) {
             Image(systemName: icon(plan: plan))
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(video.optimized != nil || plan == nil ? Theme.saving : Theme.accent)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.white.opacity(0.07)))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isEfficient ? Theme.saving : Theme.accent)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill((isEfficient ? Theme.saving : Theme.accent).opacity(0.15)))
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title(plan: plan)).font(.system(size: 15, weight: .semibold))
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                Text(title(plan: plan)).font(Theme.TypeScale.cardTitle)
                 Text(message(plan: plan))
-                    .font(.system(size: 13))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: Theme.Space.sm)
 
             if let progress {
                 VStack(alignment: .trailing, spacing: 6) {
                     ProgressView(value: progress).frame(width: 160)
-                    Text("\(Int(progress * 100))%").font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary)
+                    Text(verbatim: "\(Int(progress * 100))%")
+                        .font(Theme.TypeScale.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
             } else if let plan {
                 Button {
@@ -207,9 +251,8 @@ struct OptimizationCard: View {
                 .controlSize(.large)
             }
         }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.surfaceStroke))
+        .padding(Theme.Space.lg)
+        .lumenSurface(radius: Theme.Radius.xl)
     }
 
     private func icon(plan: VideoOptimizer.Plan?) -> String {

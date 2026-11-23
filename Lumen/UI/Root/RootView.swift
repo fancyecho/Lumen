@@ -5,6 +5,7 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -15,19 +16,19 @@ struct RootView: View {
             AmbientBackdrop(focus: focusedWallpaper)
             page
                 .id(pageID)
-                .transition(.opacity.combined(with: .offset(y: 10)))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 6)))
         }
-        .animation(.smooth(duration: 0.32), value: pageID)
+        .animation(reduceMotion ? nil : Theme.Motion.smooth, value: pageID)
         .safeAreaBar(edge: .bottom) {
-            NowPlayingBar().padding(.bottom, 14)
+            NowPlayingBar().padding(.bottom, Theme.Space.sm)
         }
         .overlay(alignment: .top) {
-            ToastOverlay().padding(.top, 8)
+            ToastOverlay().padding(.top, Theme.Space.xs)
         }
         .overlay {
             if isDropTargeted { DropTargetOverlay().transition(.opacity) }
         }
-        .animation(.easeOut(duration: 0.15), value: isDropTargeted)
+        .animation(reduceMotion ? nil : Theme.Motion.quick, value: isDropTargeted)
         .toolbar { toolbarContent }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .searchable(text: $router.searchText, placement: .toolbar, prompt: "Search wallpapers")
@@ -65,7 +66,7 @@ struct RootView: View {
         } message: {
             Text("Lumen's copy of this wallpaper is removed. The original file you imported is not touched.")
         }
-        .frame(minWidth: 1020, minHeight: 680)
+        .frame(minWidth: Theme.Layout.minWindowWidth, minHeight: Theme.Layout.minWindowHeight)
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
         .onAppear(perform: windowAppeared)
@@ -129,7 +130,7 @@ struct RootView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 450)
+            .frame(minWidth: 360, idealWidth: 420, maxWidth: 450)
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
@@ -169,6 +170,9 @@ struct RootView: View {
         if UserDefaults.standard.bool(forKey: "LumenDebugMenuPreview") {
             openWindow(id: SceneID.menuPreview)
         }
+        if let dir = UserDefaults.standard.string(forKey: "LumenDebugCaptureDir"), !dir.isEmpty {
+            Task { @MainActor in await runDebugCapture(to: URL(fileURLWithPath: dir)) }
+        }
         #endif
         if model.launchedAsLoginItem {
             // Started by launch-at-login: run quietly from the menu bar.
@@ -176,6 +180,76 @@ struct RootView: View {
             Task { @MainActor in dismissWindow(id: SceneID.main) }
         }
     }
+
+    #if DEBUG
+    private func runDebugCapture(to dir: URL) async {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let rawSuffix = UserDefaults.standard.string(forKey: "LumenDebugCaptureSuffix") ?? ""
+        let suffix = rawSuffix.isEmpty ? "" : (rawSuffix.hasPrefix("-") ? rawSuffix : "-\(rawSuffix)")
+        let mainWindow = { NSApp.windows.first { $0.isVisible && $0.level == .normal && $0.frame.width >= 900 } }
+        func snap(_ name: String, sheet: Bool = false) {
+            guard let win = mainWindow() else { return }
+            let targetWin = sheet ? (win.attachedSheet ?? win) : win
+            guard let view = targetWin.contentView?.superview ?? targetWin.contentView else { return }
+            view.layoutSubtreeIfNeeded()
+            let bounds = view.bounds
+            guard let rep = view.bitmapImageRepForCachingDisplay(in: bounds) else { return }
+            view.cacheDisplay(in: bounds, to: rep)
+            if let data = rep.representation(using: .png, properties: [:]) {
+                try? data.write(to: dir.appending(path: "\(name)\(suffix).png"))
+            }
+        }
+        try? await Task.sleep(for: .seconds(2.2))
+        mainWindow()?.setContentSize(NSSize(width: 1280, height: 840))
+        try? await Task.sleep(for: .milliseconds(400))
+        model.router.show(.home)
+        try? await Task.sleep(for: .milliseconds(900))
+        snap("home")
+
+        model.router.show(.library)
+        try? await Task.sleep(for: .milliseconds(1200))
+        snap("library")
+
+        model.router.show(.workshop)
+        try? await Task.sleep(for: .seconds(2.2))
+        snap("workshop")
+
+        if suffix.isEmpty {
+            model.isSteamPanelPresented = true
+            try? await Task.sleep(for: .milliseconds(900))
+            snap("steam", sheet: true)
+            model.isSteamPanelPresented = false
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
+        if let scene = model.library.scenes.max(by: { ($0.package?.properties.count ?? 0) < ($1.package?.properties.count ?? 0) }) {
+            model.router.open(.wallpaper(scene.id))
+            try? await Task.sleep(for: .seconds(2.0))
+            snap("detail-scene")
+        }
+        if suffix.isEmpty, let video = model.library.videos.first {
+            model.router.open(.wallpaper(video.id))
+            try? await Task.sleep(for: .milliseconds(1200))
+            snap("detail-video")
+        }
+        if suffix.isEmpty {
+            model.router.show(.studio)
+            try? await Task.sleep(for: .milliseconds(900))
+            snap("studio")
+            model.router.show(.playlists)
+            try? await Task.sleep(for: .milliseconds(900))
+            snap("playlists")
+            mainWindow()?.setContentSize(NSSize(width: 1020, height: 680))
+            model.router.show(.home)
+            try? await Task.sleep(for: .milliseconds(700))
+            snap("home-min")
+            model.router.show(.library)
+            try? await Task.sleep(for: .milliseconds(700))
+            snap("library-min")
+        }
+        NSApp.terminate(nil)
+    }
+    #endif
 
     private func windowDisappeared() {
         if model.settings.dockIconMode == .whileWindowOpen {
@@ -219,14 +293,14 @@ struct ToastOverlay: View {
 
     var body: some View {
         if let toast = model.toast {
-            HStack(spacing: 9) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: toast.symbol).foregroundStyle(Theme.accent)
                 Text(toast.message)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Theme.TypeScale.bodyMedium)
                     .lineLimit(2)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.vertical, Theme.Space.sm - 2)
             .glassEffect(.regular, in: .capsule)
             .transition(.move(edge: .top).combined(with: .opacity))
             .id(toast.id)
@@ -237,23 +311,27 @@ struct ToastOverlay: View {
 struct DropTargetOverlay: View {
     var body: some View {
         ZStack {
-            Color.black.opacity(0.5)
-            VStack(spacing: 14) {
+            Color.black.opacity(0.6)
+            VStack(spacing: Theme.Space.sm) {
                 Image(systemName: "square.and.arrow.down.on.square")
-                    .font(.system(size: 46, weight: .light))
+                    .font(.system(size: 44, weight: .light))
                     .foregroundStyle(Theme.accent)
                 Text("Drop to add to your library")
-                    .font(Theme.display(24))
+                    .font(Theme.display(22))
                 Text("Videos · Wallpaper Engine projects · HTML folders")
-                    .font(.system(size: 13))
+                    .font(Theme.TypeScale.caption)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 56)
             .padding(.vertical, 44)
             .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
+                    .fill(Theme.Surface.canvas.opacity(0.85))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [9, 7]))
-                    .foregroundStyle(Theme.accent.opacity(0.8))
+                    .foregroundStyle(Theme.accent.opacity(0.85))
             )
         }
         .ignoresSafeArea()

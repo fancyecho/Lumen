@@ -3,6 +3,7 @@ import SwiftUI
 /// Floating glass capsule: what's on the desktop, its state, and global transport controls.
 struct NowPlayingBar: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var focusedDisplayID: String?
 
     private var display: WallpaperEngine.Display? {
@@ -15,18 +16,18 @@ struct NowPlayingBar: View {
 
     var body: some View {
         let wallpaper = display?.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.sm) {
             info(wallpaper: wallpaper)
             Rectangle()
-                .fill(.white.opacity(0.14))
-                .frame(width: 1, height: 26)
+                .fill(Theme.Surface.divider)
+                .frame(width: 1, height: 24)
             controls(hasWallpaper: wallpaper != nil)
         }
-        .padding(.leading, 7)
-        .padding(.trailing, 10)
-        .padding(.vertical, 7)
+        .padding(.leading, Theme.Space.xs)
+        .padding(.trailing, Theme.Space.sm - 2)
+        .padding(.vertical, 6)
         .glassEffect(.regular, in: .capsule)
-        .animation(.snappy(duration: 0.25), value: wallpaper?.id)
+        .animation(reduceMotion ? nil : Theme.Motion.snappy, value: wallpaper?.id)
     }
 
     @ViewBuilder
@@ -38,28 +39,32 @@ struct NowPlayingBar: View {
             }
             model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.Space.sm - 2) {
                 Group {
                     if let wallpaper {
                         ThumbnailView(wallpaper: wallpaper)
                     } else {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color.white.opacity(0.08))
+                            .background(Theme.Surface.elevated)
                     }
                 }
-                .frame(width: 40, height: 40)
-                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .frame(width: 48, height: 34)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.Surface.scrimStroke, lineWidth: 0.75)
+                )
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(wallpaper?.title ?? String(localized: "Nothing on your desktop yet"))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Theme.TypeScale.bodyMedium.weight(.semibold))
                         .lineLimit(1)
                     statusLine(hasWallpaper: wallpaper != nil)
                 }
-                .frame(width: 210, alignment: .leading)
+                .frame(minWidth: 160, idealWidth: 204, maxWidth: 230, alignment: .leading)
             }
             .contentShape(Rectangle())
         }
@@ -108,7 +113,7 @@ struct NowPlayingBar: View {
     private func controls(hasWallpaper: Bool) -> some View {
         let engine = model.engine
         let settings = model.settings
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.Space.xxs) {
             if model.playlists.active != nil {
                 Button { model.playlists.previous() } label: {
                     Image(systemName: "backward.fill")
@@ -118,10 +123,10 @@ struct NowPlayingBar: View {
 
             Button { engine.toggleUserPause() } label: {
                 Image(systemName: engine.userPaused ? "play.fill" : "pause.fill")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
             }
-            .buttonStyle(BarIconButtonStyle(size: 38))
+            .buttonStyle(BarIconButtonStyle(size: 36))
             .disabled(!hasWallpaper)
             .help(engine.userPaused ? Text("Resume all displays") : Text("Pause all displays"))
 
@@ -149,10 +154,10 @@ struct NowPlayingBar: View {
                 }
                 .pickerStyle(.inline)
             } label: {
-                Text(Theme.rateLabel(settings.playbackRate))
+                Text(verbatim: Theme.rateLabel(settings.playbackRate))
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
-                    .frame(minWidth: 40)
+                    .frame(minWidth: 38)
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
