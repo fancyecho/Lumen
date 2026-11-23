@@ -9,22 +9,14 @@ struct ImagePair {
     let preview: CGImage
 
     static func read(id: String, in directory: URL) -> Self? {
-        guard let render = readImage(directory.appending(path: "\(id).png")),
-              let preview = readImage(directory.appending(path: "\(id)-ref.png")) else { return nil }
+        guard let render = readSceneImage(id, in: directory, maxSize: 1024),
+              let preview = readSceneImage(id + "-ref", in: directory, maxSize: 1024) else { return nil }
         let aspect = Double(preview.width) / Double(preview.height)
         let w = min(render.width, max(1, Int((Double(render.height) * aspect).rounded())))
         let h = min(render.height, max(1, Int((Double(render.width) / aspect).rounded())))
         let crop = CGRect(x: (render.width - w) / 2, y: (render.height - h) / 2, width: w, height: h)
         guard let cropped = render.cropping(to: crop) else { return nil }
         return Self(render: cropped, preview: preview)
-    }
-
-    private static func readImage(_ url: URL) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1024,
-        ] as CFDictionary)
     }
 
     func compare() -> ImageSimilarity? {
@@ -35,23 +27,36 @@ struct ImagePair {
               let reference = rasterize(preview, width: width, height: height) else { return nil }
         return ImageSimilarity(rendered: rendered, reference: reference, width: width, height: height)
     }
+}
 
-    private func rasterize(_ image: CGImage, width: Int, height: Int) -> [UInt8]? {
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        let drew = bytes.withUnsafeMutableBytes { buffer in
-            let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
-            guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                          bytesPerRow: width * 4, space: comparisonColorSpace, bitmapInfo: bitmapInfo)
-            else { return false }
-            let destination = CGRect(x: 0, y: 0, width: width, height: height)
-            context.setFillColor(gray: 0, alpha: 1)
-            context.fill(destination)
-            context.interpolationQuality = .high
-            context.draw(image, in: destination)
-            return true
-        }
-        return drew ? bytes : nil
+func readSceneImage(_ name: String, in directory: URL, maxSize: Int? = nil) -> CGImage? {
+    guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
+          let source = CGImageSourceCreateWithURL(directory.appending(path: name + ".png") as CFURL, nil)
+    else { return nil }
+    if let maxSize {
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxSize,
+        ] as CFDictionary)
     }
+    return CGImageSourceCreateImageAtIndex(source, 0, nil)
+}
+
+private func rasterize(_ image: CGImage, width: Int, height: Int) -> [UInt8]? {
+    var bytes = [UInt8](repeating: 0, count: width * height * 4)
+    let drew = bytes.withUnsafeMutableBytes { buffer in
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * 4, space: comparisonColorSpace, bitmapInfo: bitmapInfo)
+        else { return false }
+        let destination = CGRect(x: 0, y: 0, width: width, height: height)
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(destination)
+        context.interpolationQuality = .high
+        context.draw(image, in: destination)
+        return true
+    }
+    return drew ? bytes : nil
 }
 
 struct ImageSimilarity {
@@ -108,5 +113,35 @@ struct ImageSimilarity {
 
     private static func luma(_ pixels: [UInt8], at index: Int) -> Double {
         (0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])) / 255
+    }
+}
+
+
+struct RenderDifference {
+    let width: Int
+    let height: Int
+    let changedPixels: Int
+    /// Average absolute difference per sRGB channel, in 8-bit channel levels.
+    let meanRGBDifference: Double
+
+    var changedPixelPercent: Double { 100 * Double(changedPixels) / Double(width * height) }
+
+    init?(before: CGImage, after: CGImage) {
+        width = before.width
+        height = before.height
+        guard before.width == after.width, before.height == after.height,
+              let first = rasterize(before, width: width, height: height),
+              let second = rasterize(after, width: width, height: height) else { return nil }
+        var changed = 0
+        var difference = 0
+        for i in stride(from: 0, to: first.count, by: 4) {
+            let delta = abs(Int(first[i]) - Int(second[i]))
+                + abs(Int(first[i + 1]) - Int(second[i + 1]))
+                + abs(Int(first[i + 2]) - Int(second[i + 2]))
+            if delta != 0 { changed += 1 }
+            difference += delta
+        }
+        changedPixels = changed
+        meanRGBDifference = Double(difference) / Double(width * height * 3)
     }
 }
