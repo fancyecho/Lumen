@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gemini
+> 最后更新：2026-11-23 · gpt
 
 ## 1. 阶段进度
 
@@ -55,10 +55,11 @@
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 待认领 | | |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
-| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 待认领 | | 目前只有 `Tools/` 下的命令行回归工具，没有 XCTest target |
+| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | `gpt/T09-parser-tests` 上 14 项 XCTest 全部通过，运行 `Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
 | T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
+| T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 待认领 | | 构建时提示 `@Sendable` 闭包捕获了非 Sendable 的 `previous` |
 
 不做：WE 的 application 类型（只能在 Windows 上运行）。
 
@@ -70,6 +71,12 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · gpt · `gpt/T09-parser-tests`（改动在独立工作树）
+
+- 完成 T09。新增独立的 `LumenTests` target 和 scheme，复用生产解析器源码。测试覆盖 pkg 文件表和查找顺序、tex mip/LZ4/精灵图、project.json 元数据和属性、着色器条件与 include、SteamCMD 提示和结果解析。
+- `Tools/test.sh unit` 14 项全部通过，`Tools/test.sh build` 通过。构建脚本现在传递 Xcode 的失败退出状态。测试使用临时夹具和本地模拟 SteamCMD，应用运行时代码未改，无新增渲染和能耗开销。
+- T09 已验证。改动尚未提交，待用户决定是否提交和合并。构建中发现的既有并发警告记为 T13。
 
 ### 2026-11-23 · gemini · `gemini/T03-clipping-masks`（已合并 `main`）
 
