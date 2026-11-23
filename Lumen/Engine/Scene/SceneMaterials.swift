@@ -323,7 +323,7 @@ struct UniformBlock {
     /// Material constants with keyframes.
     private var animated: [(SceneAnimation, WEUniform)] = []
 
-    init(program: WEShaderProgram, constants: [[String: Any]], values: SceneValues) {
+    init(program: WEShaderProgram, constants: [[String: Any]], values: SceneValues, isEffect: Bool = false) {
         slots = Array(repeating: .zero, count: program.slotCount)
         for uniform in program.uniforms {
             let engine = EngineUniform.classify(uniform.name)
@@ -333,7 +333,9 @@ struct UniformBlock {
                 default: return false
                 }
             }()
-            if let engine, uniform.materialKey == nil || objectDriven {
+            // Effect passes with a material key (e.g. `effects/opacity`'s `g_UserAlpha` -> `alpha`)
+            // read their own constant/animation rather than the owner object's opacity.
+            if let engine, uniform.materialKey == nil || (objectDriven && !isEffect) {
                 dynamic.append((engine, uniform))
                 continue
             }

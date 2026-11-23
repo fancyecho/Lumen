@@ -38,7 +38,14 @@ enum SceneLoader {
         let textScale = min(3, Float(renderSize.x) / max(document.canvas.x, 1) * 1.5)
         // Layers whose rendered composite buffer is read by another layer (clipping masks, blend frames).
         var compositeSources: Set<Int> = []
+        var passthroughIDs: Set<Int> = []
+        var objectsByID: [Int: SceneDocument.Object] = [:]
         for object in document.objects {
+            if objectsByID[object.id] == nil { objectsByID[object.id] = object }
+            if object.kind == .image, let path = object.image, let model = files.json(path),
+               model["passthrough"] as? Bool == true {
+                passthroughIDs.insert(object.id)
+            }
             for effect in object.effects where effect.visible {
                 for pass in effect.passes {
                     for case let name? in pass.textures {
@@ -49,9 +56,31 @@ enum SceneLoader {
                 }
             }
         }
+        // Map each drawable descendant to its nearest passthrough (composelayer) ancestor so
+        // grouped children render into the parent's offscreen buffer instead of directly to the scene.
+        var groupOwner: [Int: Int] = [:]
+        var groupParents: Set<Int> = []
+        if !passthroughIDs.isEmpty {
+            for object in document.objects {
+                switch object.kind {
+                case .image, .particle, .text: break
+                default: continue
+                }
+                var cursor = object.parent
+                var visited: Set<Int> = [object.id]
+                while let pid = cursor, visited.insert(pid).inserted {
+                    if passthroughIDs.contains(pid) {
+                        groupOwner[object.id] = pid
+                        groupParents.insert(pid)
+                        break
+                    }
+                    cursor = objectsByID[pid]?.parent
+                }
+            }
+        }
         let builder = Builder(files: files, values: values, textures: textures, shaders: shaders,
                               assetsAvailable: request.assets != nil, textScale: textScale,
-                              compositeSources: compositeSources)
+                              compositeSources: compositeSources, groupParents: groupParents)
 
         var models: [Int: simd_float4x4] = [:]
         var parents: [Int: simd_float4x4] = [:]
@@ -111,14 +140,32 @@ enum SceneLoader {
         let drawables = built.compactMap { $0 }
         if missingFiles > 0, request.assets == nil, drawables.count < objects.count / 2 { throw SceneLoadError.noAssets }
         if drawables.isEmpty, request.assets == nil { throw SceneLoadError.noAssets }
+        var imageByID: [Int: ImageLayer] = [:]
+        for drawable in drawables {
+            if case .image(let layer) = drawable { imageByID[layer.object.id] = layer }
+        }
+        var rootDrawables: [SceneDrawable] = []
+        rootDrawables.reserveCapacity(drawables.count)
+        for drawable in drawables {
+            let id: Int = switch drawable {
+            case .image(let layer): layer.object.id
+            case .particles(let layer): layer.object.id
+            }
+            if let ownerID = groupOwner[id], let owner = imageByID[ownerID] {
+                owner.children.append(drawable)
+            } else {
+                rootDrawables.append(drawable)
+            }
+        }
         textures.flushUploads(queue: request.queue)
         let utility = try SceneUtilityPipelines.shared(device: request.device)
         let scripts = Self.scripts(for: document, json: json, values: values, userProperties: request.values,
                                    storageKey: request.folder.lastPathComponent)
         let sounds = SceneSoundPlayer(document: document, files: files, values: values)
         return try SceneInstance(
-            document: document, renderSize: renderSize, drawables: drawables, textures: textures,
-            utility: utility, queue: request.queue, unsupported: Array(Set(unsupported)).sorted(), scripts: scripts,
+            document: document, renderSize: renderSize, drawables: drawables, rootDrawables: rootDrawables,
+            textures: textures, utility: utility, queue: request.queue,
+            unsupported: Array(Set(unsupported)).sorted(), scripts: scripts,
             sounds: sounds.isEmpty ? nil : sounds
         )
     }
@@ -180,6 +227,7 @@ enum SceneLoader {
         let assetsAvailable: Bool
         let textScale: Float
         let compositeSources: Set<Int>
+        let groupParents: Set<Int>
 
         /// Text layers draw a Core Text texture with Wallpaper Engine's image shader, so
         /// colour, opacity and effects work as on image layers.
@@ -259,6 +307,8 @@ enum SceneLoader {
             let isFullscreen = model["fullscreen"] as? Bool ?? false
             let isPassthrough = model["passthrough"] as? Bool ?? false
             let isCompositeSource = compositeSources.contains(object.id)
+            let hasGroupChildren = groupParents.contains(object.id)
+            let copyBackground = values.bool(object.raw["copybackground"], default: true)
 
             var steps: [EffectStep] = []
             var targetScales: [String: Float] = [:]
@@ -272,8 +322,8 @@ enum SceneLoader {
                 }
             }
             // A composition layer without effects copies the background and paints it back
-            // unchanged; keep it only when another layer samples its composite target.
-            if isPassthrough, steps.isEmpty, !isCompositeSource { return nil }
+            // unchanged; keep it when another layer samples it or when it groups child layers.
+            if isPassthrough, steps.isEmpty, !isCompositeSource, !hasGroupChildren { return nil }
 
             // Solid layers use `flat` (which lacks BLENDMODE), and chained layers must apply
             // `colorBlendMode` at final composite rather than baking the scene into Pass 0.
@@ -342,7 +392,7 @@ enum SceneLoader {
 
             return ImageLayer(
                 object: object, size: size, base: base, steps: steps, blend: pass.blend,
-                isPassthrough: isPassthrough, isFullscreen: isFullscreen,
+                isPassthrough: isPassthrough, isFullscreen: isFullscreen, copyBackground: copyBackground,
                 isCompositeSource: isCompositeSource, compositePass: compositePass,
                 imageExtent: mainTexture?.imageExtent ?? SIMD2(1, 1), targetScales: targetScales,
                 puppet: puppet, puppetClipping: puppetClipping, chainCenter: chainCenter, chainSize: chainSize
@@ -538,7 +588,7 @@ enum SceneLoader {
             // Effect passes write a whole buffer; only the base and final draws blend.
             let pipeline = try program.pipeline(blend: effect ? .opaque : material.blend)
             let constants = [overrides?.constants ?? [:], material.constants]
-            let uniforms = UniformBlock(program: program.info, constants: constants, values: values)
+            let uniforms = UniformBlock(program: program.info, constants: constants, values: values, isEffect: effect)
             return PreparedPass(program: program, pipeline: pipeline, uniforms: uniforms, textures: sources, spriteSheet: sheet)
         }
 

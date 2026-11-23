@@ -106,6 +106,10 @@ final class ImageLayer {
     let blend: SceneBlend
     let isPassthrough: Bool
     let isFullscreen: Bool
+    /// For passthrough composition layers, whether Pass 0 copies the scene background (default `true`).
+    let copyBackground: Bool
+    /// Child drawables grouped into this composition layer's offscreen buffer.
+    var children: [SceneDrawable] = []
     /// Another layer reads this layer's composite buffer (`_rt_imageLayerComposite_<id>_a/b`).
     let isCompositeSource: Bool
     /// Optional `BLENDMODE` composite pass used when a chained layer has `colorBlendMode != 0`.
@@ -123,9 +127,10 @@ final class ImageLayer {
     let targetScales: [String: Float]
 
     init(object: SceneDocument.Object, size: SIMD2<Float>, base: PreparedPass, steps: [EffectStep], blend: SceneBlend,
-         isPassthrough: Bool, isFullscreen: Bool, isCompositeSource: Bool = false, compositePass: PreparedPass? = nil,
-         imageExtent: SIMD2<Float>, targetScales: [String: Float], puppet: PuppetAnimator? = nil,
-         puppetClipping: PuppetClipping? = nil, chainCenter: SIMD2<Float> = .zero, chainSize: SIMD2<Float>? = nil) {
+         isPassthrough: Bool, isFullscreen: Bool, copyBackground: Bool = true, isCompositeSource: Bool = false,
+         compositePass: PreparedPass? = nil, imageExtent: SIMD2<Float>, targetScales: [String: Float],
+         puppet: PuppetAnimator? = nil, puppetClipping: PuppetClipping? = nil,
+         chainCenter: SIMD2<Float> = .zero, chainSize: SIMD2<Float>? = nil) {
         self.object = object
         self.size = size
         self.base = base
@@ -133,6 +138,7 @@ final class ImageLayer {
         self.blend = blend
         self.isPassthrough = isPassthrough
         self.isFullscreen = isFullscreen
+        self.copyBackground = copyBackground
         self.isCompositeSource = isCompositeSource
         self.compositePass = compositePass
         self.imageExtent = imageExtent
@@ -169,6 +175,9 @@ final class SceneInstance: @unchecked Sendable {
     let canvas: SIMD2<Float>
     let renderSize: SIMD2<Int>
     let drawables: [SceneDrawable]
+    /// Top-level drawables not grouped under a passthrough composition layer.
+    private let rootDrawables: [SceneDrawable]
+    private let groupParentIDs: Set<Int>
     var layers: [ImageLayer] { drawables.compactMap { if case .image(let layer) = $0 { layer } else { nil } } }
     var particleLayers: [ParticleLayer] { drawables.compactMap { if case .particles(let layer) = $0 { layer } else { nil } } }
     let textures: SceneTextureCache
@@ -201,8 +210,8 @@ final class SceneInstance: @unchecked Sendable {
 
     let sounds: SceneSoundPlayer?
 
-    init(document: SceneDocument, renderSize: SIMD2<Int>, drawables: [SceneDrawable], textures: SceneTextureCache,
-         utility: SceneUtilityPipelines, queue: MTLCommandQueue? = nil, unsupported: [String],
+    init(document: SceneDocument, renderSize: SIMD2<Int>, drawables: [SceneDrawable], rootDrawables: [SceneDrawable]? = nil,
+         textures: SceneTextureCache, utility: SceneUtilityPipelines, queue: MTLCommandQueue? = nil, unsupported: [String],
          scripts: SceneScriptRuntime? = nil, sounds: SceneSoundPlayer? = nil) throws {
         self.document = document
         self.sounds = sounds
@@ -211,15 +220,19 @@ final class SceneInstance: @unchecked Sendable {
         for object in document.objects where objects[object.id] == nil { objects[object.id] = object }
         self.objects = objects
         var puppets: [Int: PuppetAnimator] = [:]
+        var groupParents: Set<Int> = []
         for drawable in drawables {
-            if case .image(let layer) = drawable, let puppet = layer.puppet {
-                puppets[layer.object.id] = puppet
+            if case .image(let layer) = drawable {
+                if let puppet = layer.puppet { puppets[layer.object.id] = puppet }
+                if layer.isPassthrough, !layer.children.isEmpty { groupParents.insert(layer.object.id) }
             }
         }
         self.puppetsByID = puppets
+        self.groupParentIDs = groupParents
         canvas = document.canvas
         self.renderSize = renderSize
         self.drawables = drawables
+        self.rootDrawables = rootDrawables ?? drawables
         self.textures = textures
         self.utility = utility
         self.unsupported = unsupported
@@ -338,7 +351,10 @@ final class SceneInstance: @unchecked Sendable {
         if let parentID = object.parent, parentID != id, let parent = objects[parentID],
            parent.raw["disablepropagation"] as? Bool != true, let parentState = self.state(of: parentID) {
             state.visible = state.visible && parentState.visible
-            state.alpha *= parentState.alpha
+            // Grouped composition layers apply their own alpha once when compositing the group.
+            if !groupParentIDs.contains(parentID) {
+                state.alpha *= parentState.alpha
+            }
         }
         frameStates[id] = state
         return state
@@ -413,54 +429,65 @@ final class SceneInstance: @unchecked Sendable {
         var session = SceneSession(target: sceneTexture, clear: document.clearColor)
         // Clear up front: a layer may copy the background before anything has drawn.
         _ = session.encoder(buffer)
+        let sceneTargetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
 
-        for drawable in drawables {
-            let layer: ImageLayer
-            switch drawable {
-            case .image(let image):
-                layer = image
-            case .particles(let particles):
-                guard let particleState = state(of: particles.object.id) else { continue }
-                particles.parentModel = parentWorld(of: particles.object)
-                particles.localModel = SceneMath.model(origin: particleState.origin, angles: particleState.angles, scale: particleState.scale)
-                particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas, audio: frame.audio)
-                guard particleState.visible else { continue }
-                if let encoder = session.encoder(buffer) {
-                    frameCopyValid = false
-                    encodeParticles(particles, encoder: encoder, frame: frame)
-                }
-                continue
-            }
-            if let text = layer.text, let newText = scriptChanges[layer.object.id]?.text { text.update(newText) }
-            guard let objectState = state(of: layer.object.id) else { continue }
-            let drawsToScene = objectState.visible && objectState.alpha > 0.001 && (!layer.isPassthrough || !layer.steps.isEmpty)
-            let capturesForOthers = layer.isCompositeSource && parentVisible(of: layer.object.id)
-            guard drawsToScene || capturesForOthers else { continue }
-            let parentWorld = parentWorld(of: layer.object)
-            // Parallax moves each layer by its depth (background layers usually less than 1).
-            let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
-            let layerVP = SceneMath.orthographic(canvas: canvas, offset: offset)
-            if layer.needsChain {
-                encodeChain(layer, state: objectState, parent: parentWorld, buffer: buffer, session: &session,
-                            viewProjection: layerVP, frame: frame, compositeToScene: drawsToScene)
-            } else {
-                let needsFB = layer.base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true)
-                if needsFB { session.end(); copyFrame(buffer) }
-                var state = drawState(frame: frame, object: objectState)
-                state.model = layer.model(for: objectState, parent: parentWorld)
-                state.viewProjection = layerVP
-                state.targetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
-                encodeImageBase(
-                    layer: layer, state: state, buffer: buffer,
-                    openEncoder: {
-                        frameCopyValid = false
-                        return session.encoder(buffer)
-                    },
-                    closeEncoder: { session.end() }
-                )
-            }
+        for drawable in rootDrawables {
+            encodeDrawable(drawable, into: buffer, session: &session, viewProjectionOverride: nil,
+                           targetSize: sceneTargetSize, frame: frame)
         }
         session.end(clearIfUnused: buffer)
+    }
+
+    private func encodeDrawable(_ drawable: SceneDrawable, into buffer: MTLCommandBuffer, session: inout SceneSession,
+                                viewProjectionOverride: simd_float4x4?, targetSize: SIMD2<Float>, frame: Frame) {
+        let isSceneTarget = (session.target === sceneTexture)
+        let layer: ImageLayer
+        switch drawable {
+        case .image(let image):
+            layer = image
+        case .particles(let particles):
+            guard let particleState = state(of: particles.object.id) else { return }
+            particles.parentModel = parentWorld(of: particles.object)
+            particles.localModel = SceneMath.model(origin: particleState.origin, angles: particleState.angles, scale: particleState.scale)
+            particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas, audio: frame.audio)
+            guard particleState.visible else { return }
+            if let encoder = session.encoder(buffer) {
+                if isSceneTarget { frameCopyValid = false }
+                let offset = document.parallaxEnabled ? frame.cameraOffset * particles.object.parallaxDepth : .zero
+                let vp = viewProjectionOverride ?? SceneMath.orthographic(canvas: canvas, offset: offset)
+                encodeParticles(particles, encoder: encoder, viewProjection: vp, targetSize: targetSize, frame: frame)
+            }
+            return
+        }
+        if let text = layer.text, let newText = scriptChanges[layer.object.id]?.text { text.update(newText) }
+        guard let objectState = state(of: layer.object.id) else { return }
+        let drawsToTarget = objectState.visible && objectState.alpha > 0.001
+            && (!layer.isPassthrough || !layer.steps.isEmpty || !layer.children.isEmpty)
+        let capturesForOthers = layer.isCompositeSource && parentVisible(of: layer.object.id)
+        guard drawsToTarget || capturesForOthers else { return }
+        let parentTransform = parentWorld(of: layer.object)
+        // Parallax moves each layer by its depth (background layers usually less than 1).
+        let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
+        let layerVP = viewProjectionOverride ?? SceneMath.orthographic(canvas: canvas, offset: offset)
+        if layer.needsChain {
+            encodeChain(layer, state: objectState, parent: parentTransform, buffer: buffer, session: &session,
+                        viewProjection: layerVP, targetSize: targetSize, frame: frame, compositeToTarget: drawsToTarget)
+        } else {
+            let needsFB = layer.base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true)
+            if needsFB { session.end(); copyFrame(buffer) }
+            var state = drawState(frame: frame, object: objectState)
+            state.model = layer.model(for: objectState, parent: parentTransform)
+            state.viewProjection = layerVP
+            state.targetSize = targetSize
+            encodeImageBase(
+                layer: layer, state: state, buffer: buffer,
+                openEncoder: {
+                    if isSceneTarget { frameCopyValid = false }
+                    return session.encoder(buffer)
+                },
+                closeEncoder: { session.end() }
+            )
+        }
     }
 
     private struct MeshRange {
@@ -531,16 +558,20 @@ final class SceneInstance: @unchecked Sendable {
     }
 
     private func encodeChain(_ layer: ImageLayer, state objectState: SceneDocument.State, parent: simd_float4x4, buffer: MTLCommandBuffer,
-                             session: inout SceneSession, viewProjection: simd_float4x4, frame: Frame, compositeToScene: Bool) {
+                             session: inout SceneSession, viewProjection: simd_float4x4, targetSize: SIMD2<Float>,
+                             frame: Frame, compositeToTarget: Bool) {
+        let isSceneTarget = (session.target === sceneTexture)
         let model = layer.model(for: objectState, parent: parent)
         guard layer.buffers.count == 2 else { return }
         let base = layer.base
-        // The chain renders into its own buffers, so the scene's encoder has to close first.
+        // The chain renders into its own buffers, so the caller's encoder has to close first.
         session.end()
-        if base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true) || layer.isPassthrough {
+        let copyBg = layer.isPassthrough && layer.copyBackground
+        if base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true) || copyBg {
             copyFrame(buffer)
         }
-        // Pass 0: the object's own material into the first buffer.
+        // Pass 0: the object's own material into the first buffer (or transparent black when
+        // a composition layer opts out of `copybackground`).
         var state = drawState(frame: frame, object: objectState)
         state.targetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
         if layer.isPassthrough {
@@ -552,26 +583,44 @@ final class SceneInstance: @unchecked Sendable {
                 * SceneMath.translation(-layer.chainCenter)
         }
         var current = 0
-        var pass0Encoder: MTLRenderCommandEncoder?
-        var pass0Cleared = false
-        encodeImageBase(
-            layer: layer, state: state, buffer: buffer,
-            openEncoder: {
-                if let existing = pass0Encoder { return existing }
-                let enc = beginPass(buffer, target: layer.buffers[0], clear: !pass0Cleared)
-                pass0Cleared = true
-                pass0Encoder = enc
-                return enc
-            },
-            closeEncoder: {
-                pass0Encoder?.endEncoding()
-                pass0Encoder = nil
-            }
-        )
-        if !pass0Cleared, let enc = beginPass(buffer, target: layer.buffers[0], clear: true) {
-            enc.endEncoding()
+        if layer.isPassthrough, !layer.copyBackground {
+            beginPass(buffer, target: layer.buffers[0], clear: true)?.endEncoding()
         } else {
-            pass0Encoder?.endEncoding()
+            var pass0Encoder: MTLRenderCommandEncoder?
+            var pass0Cleared = false
+            encodeImageBase(
+                layer: layer, state: state, buffer: buffer,
+                openEncoder: {
+                    if let existing = pass0Encoder { return existing }
+                    let enc = beginPass(buffer, target: layer.buffers[0], clear: !pass0Cleared)
+                    pass0Cleared = true
+                    pass0Encoder = enc
+                    return enc
+                },
+                closeEncoder: {
+                    pass0Encoder?.endEncoding()
+                    pass0Encoder = nil
+                }
+            )
+            if !pass0Cleared, let enc = beginPass(buffer, target: layer.buffers[0], clear: true) {
+                enc.endEncoding()
+            } else {
+                pass0Encoder?.endEncoding()
+            }
+        }
+
+        // Grouped composition layer children draw into Pass 0's buffer before parent effects run.
+        if layer.isPassthrough, !layer.children.isEmpty, abs(simd_determinant(model)) > 1e-10 {
+            let groupVP = SceneMath.scale(SIMD2(2 / max(layer.chainSize.x, 1), 2 / max(layer.chainSize.y, 1)))
+                * SceneMath.translation(-layer.chainCenter)
+                * model.inverse
+            let groupTargetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
+            var groupSession = SceneSession(target: layer.buffers[0], clear: .zero, cleared: true)
+            for child in layer.children {
+                encodeDrawable(child, into: buffer, session: &groupSession, viewProjectionOverride: groupVP,
+                               targetSize: groupTargetSize, frame: frame)
+            }
+            groupSession.end()
         }
 
         // Effects, ping-ponging between the two buffers.
@@ -608,32 +657,34 @@ final class SceneInstance: @unchecked Sendable {
         if layer.isCompositeSource {
             compositeTextures[layer.object.id] = layer.buffers[current]
         }
-        guard compositeToScene else { return }
+        guard compositeToTarget else { return }
 
-        // Composite the result onto the scene with the object's transform.
+        // Composite the result onto the target with the object's transform.
         let compositeQuad = SceneVertex.quad(halfSize: layer.chainSize / 2, center: layer.chainCenter)
         if let composite = layer.compositePass {
             if composite.usesFrameBuffer, !frameCopyValid { copyFrame(buffer) }
             guard let encoder = session.encoder(buffer) else { return }
-            frameCopyValid = false
+            if isSceneTarget { frameCopyValid = false }
             var compState = drawState(frame: frame, object: objectState)
-            // Colour, brightness and alpha were already applied in Pass 0.
+            // Colour, brightness and alpha were already applied in Pass 0 for non-passthrough layers.
             compState.color = SIMD3(1, 1, 1)
-            compState.alpha = 1
+            compState.alpha = layer.isPassthrough ? objectState.alpha : 1
             compState.brightness = 1
             compState.model = model
             compState.viewProjection = viewProjection
-            compState.targetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
+            compState.targetSize = targetSize
             draw(composite, encoder: encoder, vertices: compositeQuad,
                  state: compState, previous: layer.buffers[current], layer: layer)
             return
         }
         guard let encoder = session.encoder(buffer), let pipeline = utility.composite[layer.blend] ?? utility.composite[.translucent] else { return }
-        frameCopyValid = false
+        if isSceneTarget { frameCopyValid = false }
         var mvp = viewProjection * model
+        var compositeAlpha: Float = layer.isPassthrough ? objectState.alpha : 1
         encoder.setRenderPipelineState(pipeline)
         compositeQuad.withUnsafeBytes { encoder.setVertexBytes($0.baseAddress!, length: $0.count, index: 1) }
         encoder.setVertexBytes(&mvp, length: MemoryLayout<simd_float4x4>.size, index: 0)
+        encoder.setFragmentBytes(&compositeAlpha, length: MemoryLayout<Float>.size, index: 0)
         encoder.setFragmentTexture(layer.buffers[current], index: 0)
         encoder.setFragmentSamplerState(textures.samplers.state(nearest: false, clamp: true), index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -776,9 +827,8 @@ final class SceneInstance: @unchecked Sendable {
     }
 
     /// Simulated particles, drawn as quads with each system's own material.
-    private func encodeParticles(_ layer: ParticleLayer, encoder: MTLRenderCommandEncoder, frame: Frame) {
-        let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
-        let viewProjection = SceneMath.orthographic(canvas: canvas, offset: offset)
+    private func encodeParticles(_ layer: ParticleLayer, encoder: MTLRenderCommandEncoder,
+                                 viewProjection: simd_float4x4, targetSize: SIMD2<Float>, frame: Frame) {
         for system in layer.systems {
             guard case .none = system.renderer else {
                 guard let buffer = layer.vertexBuffer(for: system, device: device) else { continue }
@@ -788,7 +838,7 @@ final class SceneInstance: @unchecked Sendable {
                 var state = drawState(frame: frame, object: self.state(of: layer.object.id) ?? layer.object.state(at: frame.time))
                 state.model = system.childKind == .independent && system !== layer.root ? layer.model * system.localTransform : layer.model
                 state.viewProjection = viewProjection
-                state.targetSize = SIMD2(Float(renderSize.x), Float(renderSize.y))
+                state.targetSize = targetSize
                 // Particle colour and alpha come from the simulation, not the object.
                 state.color = SIMD3(1, 1, 1)
                 state.alpha = 1
@@ -815,9 +865,10 @@ private struct SceneSession {
     private var encoder: MTLRenderCommandEncoder?
     private var cleared = false
 
-    init(target: MTLTexture, clear: SIMD3<Float>) {
+    init(target: MTLTexture, clear: SIMD3<Float>, cleared: Bool = false) {
         self.target = target
         self.clear = clear
+        self.cleared = cleared
     }
 
     mutating func encoder(_ buffer: MTLCommandBuffer) -> MTLRenderCommandEncoder? {
@@ -896,8 +947,10 @@ final class SceneUtilityPipelines: @unchecked Sendable {
         return o;
     }
 
-    fragment float4 lumen_scene_composite_fragment(CompositeOut in [[stage_in]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
-        return t.sample(s, in.uv);
+    fragment float4 lumen_scene_composite_fragment(CompositeOut in [[stage_in]], constant float& alpha [[buffer(0)]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {
+        float4 c = t.sample(s, in.uv);
+        c.a *= alpha;
+        return c;
     }
 
     struct PresentOut { float4 position [[position]]; float2 uv; };
