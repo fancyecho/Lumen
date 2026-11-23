@@ -3,12 +3,15 @@ import CoreServices
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let diagnostics = LocalDiagnostics()
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppModel.shared.launchedAsLoginItem = Self.isLoginItemLaunch()
         _ = AppLanguage.atLaunch
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        diagnostics.start()
         AppModel.shared.start()
     }
 
@@ -23,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationWillTerminate(_ notification: Notification) {
+        diagnostics.stop()
         AppModel.shared.shutdown()
     }
 

@@ -134,7 +134,10 @@ extension NSScreen {
 // MARK: - Launch at login
 
 enum LoginItem {
-    static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
+    static var isEnabled: Bool { SMAppService.mainApp.status == .enabled || requiresApproval }
+    static var requiresApproval: Bool { SMAppService.mainApp.status == .requiresApproval }
+
+    static func openSettings() { SMAppService.openSystemSettingsLoginItems() }
 
     static func setEnabled(_ enabled: Bool) throws {
         if enabled {
