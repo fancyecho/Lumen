@@ -33,6 +33,15 @@ Tools/test.sh scenes
 - `LUMEN_BENCH=1`：每个场景连续渲染 60 帧取 GPU 时间中位数（GPU 频率升上来后的数字，比默认的单帧数字稳定）。
 - `LUMEN_MEMORY=1`：打印每个场景加载后的 GPU 内存。
 
+
+```bash
+Tools/test.sh visual 10
+```
+
+在 `Tools/test.sh scenes` 后运行。按本轮生成的清单匹配渲染 PNG 与作者预览首帧，输出相似度最低的 N 个场景和对比拼图。省略 N 时取 10。每张拼图最多 10 组，左列为参与评分的渲染裁切区域，右列为作者预览。终端会给出 `build/tools/visual/` 下的产物路径，同目录的 `report.json` 保留全部分数、渲染批次和跳过原因。
+
+评分先把渲染图居中裁切到作者预览的宽高比，再缩小到同样尺寸。分数取 70% 局部亮度 SSIM 与 30% RGB 色彩一致度，100 为最相似。动画时刻、作者构图和裁切都可能影响结果。 GIF 首帧的黑场和渲染中的片头也会拉低分数。排名用于安排人工抽查，无通过阈值。 [SSIM 原论文](https://eceweb.uwaterloo.ca/~z70wang/publications/ssim.html)
+
 ```bash
 Tools/test.sh shaders
 ```
