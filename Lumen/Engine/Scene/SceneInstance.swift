@@ -155,6 +155,13 @@ final class SceneInstance: @unchecked Sendable {
     private let objects: [Int: SceneDocument.Object]
     let scripts: SceneScriptRuntime?
     private var scriptChanges: [Int: SceneScriptRuntime.Change] = [:]
+    private var cursorTracker = SceneCursorTracker()
+    private lazy var cursorLayers: [ImageLayer] = {
+        guard let ids = scripts?.cursorLayerIDs, !ids.isEmpty else { return [] }
+        // Some Workshop projects omit Solid for their scripted hit areas. An explicit false
+        // still opts out, and a transparent but visible layer can be a click target.
+        return layers.reversed().filter { ids.contains($0.object.id) && $0.object.raw["solid"] as? Bool != false }
+    }()
     private var frameStates: [Int: SceneDocument.State] = [:]
     private var frameWorlds: [Int: simd_float4x4] = [:]
     private var compositeTextures: [Int: MTLTexture] = [:]
@@ -248,6 +255,7 @@ final class SceneInstance: @unchecked Sendable {
         /// Camera offset in canvas units from parallax.
         var cameraOffset: SIMD2<Float>
         var parallax: SIMD2<Float>
+        var cursorInput = SceneCursorInput()
     }
 
     /// This frame's state of an object: keyframes, then script changes, then what its
@@ -294,6 +302,21 @@ final class SceneInstance: @unchecked Sendable {
         return state(of: parentID)?.visible ?? true
     }
 
+    private func cursorEvents(for frame: Frame) -> [SceneCursorEvent] {
+        let input = frame.cursorInput
+        guard input.reset || !input.samples.isEmpty, !cursorLayers.isEmpty else { return [] }
+        let targets: [SceneCursorTarget] = input.samples.contains(where: { $0.world != nil })
+            ? cursorLayers.compactMap { layer in
+                let object = layer.object
+                guard let state = self.state(of: object.id), state.visible else { return nil }
+                let offset = document.parallaxEnabled ? frame.cameraOffset * object.parallaxDepth : .zero
+                return SceneCursorTarget(layerID: object.id, size: layer.size,
+                                         model: layer.model(for: state, parent: world(of: object.parent)), cameraOffset: offset)
+            }
+            : []
+        return cursorTracker.events(for: input, targets: targets)
+    }
+
     /// Draws the whole scene into `outputTexture`.
     func encode(into buffer: MTLCommandBuffer, frame: Frame) {
         frameCopyValid = false
@@ -302,8 +325,15 @@ final class SceneInstance: @unchecked Sendable {
         frameWorlds.removeAll(keepingCapacity: true)
         compositeTextures.removeAll(keepingCapacity: true)
         if let scripts {
+            let events = cursorEvents(for: frame)
             scriptChanges = scripts.update(time: Double(frame.time), delta: Double(frame.delta), daytime: Double(frame.daytime),
-                                           cursor: frame.pointerCanvas, cursorDown: false)
+                                           cursor: frame.pointerCanvas, cursorDown: frame.cursorInput.isDown,
+                                           cursorScreen: frame.cursorInput.screen, cursorEvents: events)
+            if !frameStates.isEmpty {
+                // Hit testing used the last script state. Draw with changes from this frame's callbacks.
+                frameStates.removeAll(keepingCapacity: true)
+                frameWorlds.removeAll(keepingCapacity: true)
+            }
         }
         var session = SceneSession(target: sceneTexture, clear: document.clearColor)
         // Clear up front: a layer may copy the background before anything has drawn.

@@ -79,6 +79,7 @@
 		D1947C2634CCE180A7B98F58 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82F8F2F06698872283B45F55 /* Theme.swift */; };
 		D2DCE31CE32DDC35D600E83A /* PropertiesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00306F245817BC0D3C857F30 /* PropertiesPanel.swift */; };
 		D6EFA3292F0833F23374BA36 /* WorkshopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029A06C41E41D605B173EDA3 /* WorkshopView.swift */; };
+		DA75B20F8A14483597390D50 /* SceneCursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412C249E27C5A37ECA710FCB /* SceneCursor.swift */; };
 		DF67661AA845F059C11693C7 /* SceneMaterials.swift in Sources */ = {isa = PBXBuildFile; fileRef = C825817C6CEE7EE71AE14A76 /* SceneMaterials.swift */; };
 		E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E435D49B649CBC8FED581694 /* StudioEditorView.swift */; };
 		EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DB38C40FFF27490AAC894D /* WallpaperCard.swift */; };
@@ -109,6 +110,7 @@
 		39DB38C40FFF27490AAC894D /* WallpaperCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCard.swift; sourceTree = "<group>"; };
 		3FD7CDCF7BD18261650FE168 /* SteamPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamPanel.swift; sourceTree = "<group>"; };
 		40FAD20AD6D740C31FF87167 /* SceneSound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSound.swift; sourceTree = "<group>"; };
+		412C249E27C5A37ECA710FCB /* SceneCursor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCursor.swift; sourceTree = "<group>"; };
 		4244B249389139ABF718F32A /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		434FBF47296311D0EB8ADDE0 /* PauseReason.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseReason.swift; sourceTree = "<group>"; };
 		4764DB2F8A1988E5DACCB3F6 /* SceneAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAnimation.swift; sourceTree = "<group>"; };
@@ -415,6 +417,7 @@
 			children = (
 				4764DB2F8A1988E5DACCB3F6 /* SceneAnimation.swift */,
 				5B8E58D600AAAD5BD271D584 /* SceneAssetsLocator.swift */,
+				412C249E27C5A37ECA710FCB /* SceneCursor.swift */,
 				5C31C8B90CE5826A36437805 /* SceneDocument.swift */,
 				B9E69A288561E1B79D84D5C2 /* SceneFileSystem.swift */,
 				B6E0048C98CCE52FEE49F10C /* SceneInstance.swift */,
@@ -578,6 +581,7 @@
 				6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */,
 				3EDB86D5408D810CF1600327 /* SceneAnimation.swift in Sources */,
 				5B6C6632EE1ED8DEDD0B0743 /* SceneAssetsLocator.swift in Sources */,
+				DA75B20F8A14483597390D50 /* SceneCursor.swift in Sources */,
 				F6F0AFCB2EE11E8512DE6AC0 /* SceneDocument.swift in Sources */,
 				3596CBD5573774AA781143F0 /* SceneFileSystem.swift in Sources */,
 				4818E3709751A3250D167DFE /* SceneInstance.swift in Sources */,

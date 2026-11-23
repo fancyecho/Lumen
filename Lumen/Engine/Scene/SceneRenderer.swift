@@ -56,6 +56,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     private var lastFrame: CFTimeInterval?
     private var pointer = SIMD2<Float>(0.5, 0.5)
     private var pointerTarget: SIMD2<Float>?
+    private var cursorInput = SceneCursorInput()
     private var pointerLast = SIMD2<Float>(0.5, 0.5)
     private var parallax = SIMD2<Float>(0, 0)
     private var presentRect = SIMD4<Float>(-1, -1, 2, 2)
@@ -119,6 +120,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
             switch result {
             case .success(let instance):
                 self.instance = instance
+                self.cursorInput = SceneCursorInput(reset: true)
                 self.skippedFeatures = instance.unsupported
                 self.state = .ready
                 self.fallbackView.isHidden = true
@@ -158,6 +160,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     func setActive(_ active: Bool) {
         guard !isTornDown, active != isActive else { return }
         isActive = active
+        cursorInput = SceneCursorInput(reset: true)
         lastFrame = nil
         metalView.isPaused = !active || instance == nil
         instance?.setPlaying(active)
@@ -206,18 +209,45 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     // MARK: Pointer
 
     func pointerMoved(to point: CGPoint?) {
-        guard let point, container.bounds.width > 0, container.bounds.height > 0 else {
-            pointerTarget = nil
-            return
-        }
-        // Map from view points to the scene's 0…1 coordinates (y down) through the placement.
-        let bounds = container.bounds
-        let u = (Float(point.x / bounds.width) * 2 - 1 - presentRect.x) / presentRect.z
-        let v = ((1 - Float(point.y / bounds.height)) * 2 - 1 - presentRect.y) / presentRect.w
-        pointerTarget = SIMD2(min(max(u, 0), 1), min(max(1 - v, 0), 1))
+        trackPointer(point, phase: point == nil ? .leave : .move)
     }
 
-    func pointerPressed(_ isDown: Bool, at point: CGPoint) {}
+    func pointerPressed(_ isDown: Bool, at point: CGPoint) {
+        trackPointer(point, phase: isDown ? .down : .up)
+    }
+
+    private func trackPointer(_ point: CGPoint?, phase: SceneCursorInput.Sample.Phase) {
+        let bounds = container.bounds
+        let position: SIMD2<Float>? = point.flatMap {
+            guard bounds.width > 0, bounds.height > 0, presentRect.z > 0, presentRect.w > 0 else { return nil }
+            let u = (Float($0.x / bounds.width) * 2 - 1 - presentRect.x) / presentRect.z
+            let v = ((1 - Float($0.y / bounds.height)) * 2 - 1 - presentRect.y) / presentRect.w
+            return SIMD2(u, v)
+        }
+        // Parallax still follows the nearest edge in the letterbox. Cursor events need a real hit.
+        pointerTarget = position.map { SIMD2(min(max($0.x, 0), 1), min(max(1 - $0.y, 0), 1)) }
+
+        guard isActive, let instance, let scripts = instance.scripts else { return }
+        let scale = Float(container.window?.backingScaleFactor ?? 1)
+        cursorInput.screen = point.map { SIMD2(Float($0.x), Float($0.y)) * scale }
+        switch phase {
+        case .down: cursorInput.isDown = true
+        case .up, .leave: cursorInput.isDown = false
+        case .move: break
+        }
+        guard !scripts.cursorLayerIDs.isEmpty else { return }
+
+        let world = position.flatMap { position -> SIMD2<Float>? in
+            guard (0...1).contains(position.x), (0...1).contains(position.y) else { return nil }
+            return position * instance.canvas
+        }
+        if cursorInput.samples.count == 64 {
+            // If drawable delivery stalls, discard the backlog and cancel any partial click.
+            cursorInput.samples.removeAll(keepingCapacity: true)
+            cursorInput.reset = true
+        }
+        cursorInput.samples.append(.init(phase: phase, world: world, screen: cursorInput.screen, isDown: cursorInput.isDown))
+    }
 
     // MARK: Drawing
 
@@ -258,7 +288,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         let components = calendar.dateComponents([.hour, .minute, .second], from: Date())
         let daytime = Float((components.hour ?? 0) * 3600 + (components.minute ?? 0) * 60 + (components.second ?? 0)) / 86400
         let pointerCanvas: SIMD2<Float>? = pointerTarget.map { SIMD2($0.x * instance.canvas.x, (1 - $0.y) * instance.canvas.y) }
-        let frame = SceneInstance.Frame(
+        var frame = SceneInstance.Frame(
             time: Float(clock),
             delta: isActive ? Float(delta) : 0,
             pointerCanvas: pointerCanvas,
@@ -268,6 +298,9 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
             cameraOffset: parallax,
             parallax: parallax / max(instance.canvas, SIMD2(1, 1))
         )
+        frame.cursorInput = cursorInput
+        cursorInput.samples.removeAll(keepingCapacity: true)
+        cursorInput.reset = false
         instance.encode(into: buffer, frame: frame)
 
         let pass = MTLRenderPassDescriptor()

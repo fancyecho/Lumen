@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gemini
+> 最后更新：2026-11-23 · gpt
 
 ## 1. 阶段进度
 
@@ -52,7 +52,7 @@
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待认领 | | 需要系统音频采集（Core Audio tap 或 ScreenCaptureKit），注意权限和能耗 |
 | T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
-| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 待认领 | | |
+| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | `gpt/T06-scene-cursor-events` 支持 2D 图层六种鼠标事件，75/75 场景通过，待提交 |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 待认领 | | 目前只有 `Tools/` 下的命令行回归工具，没有 XCTest target |
@@ -70,6 +70,13 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · gpt · `gpt/T06-scene-cursor-events`（独立工作树）
+
+- 完成 T06。图片和文本图层支持 `cursorEnter`、`cursorLeave`、`cursorMove`、`cursorDown`、`cursorUp` 和 `cursorClick`。同帧按下和释放按顺序派发，按下和释放命中同一图层才产生点击。事件携带画布和图层局部坐标。命中考虑裁切、留黑、父级变换和视差，保留可见的透明交互层与省略 `solid` 的脚本图层。
+- `Tools/test.sh build` 通过，`scenes` 75/75 通过、0 洋红块，`shaders` 300/316 通过。抽查了语料截图，另外 5 个 Swift/JavaScriptCore 用例和 1 个合成 Metal 场景通过。
+- 复用原有桌面输入和暂停策略。只在新输入到达时对候选图层做 CPU 命中检测，沿用现有帧率和渲染过程。五个代表场景交替复测的 GPU 帧时间中位为基线 7.39 ms、T06 6.27 ms，单场景有双向波动。
+- 当前使用 2D 图层矩形命中。木偶专用命中框与禁用点击传播尚未接入，真实桌面交互尚未手测。合并 T04 时保留 `SceneInstance.Frame` 与 `SceneScriptRuntime.update` 的鼠标和音频参数。[Wallpaper Engine 光标事件文档](https://docs.wallpaperengine.io/en/scene/scenescript/reference/event/cursor.html)
 
 ### 2026-11-23 · gemini · `gemini/T03-clipping-masks`（已合并 `main`）
 
