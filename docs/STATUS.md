@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gemini
+> 最后更新：2026-11-23 · claude（合并）
 
 ## 1. 阶段进度
 
@@ -30,16 +30,17 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-23，`Tools/test.sh`，语料为 WallpaperMachine 库，75 个场景）
+**回归基线**（2026-11-23 合并后，`Tools/test.sh`，语料为 WallpaperMachine 库，75 个场景）
 
 | 项目 | 基线 |
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
-| 加载耗时（着色器缓存命中） | 中位 0.42s，最大 1.44s |
-| GPU 帧时间（约 2MP） | 中位 3.02ms，p90 6.81ms（158 层含木偶+眼部裁剪的 3808922316 为 13.23ms） |
+| 加载耗时（着色器缓存命中） | 中位 0.39s，最大 1.5s |
+| GPU 帧时间（约 2MP） | 中位 3.6ms，p90 6.9ms，最大 15.5ms（含木偶、音频） |
 | 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
+| 单元测试（`Tools/test.sh unit`） | 14/14 通过 |
 
 ## 3. 任务板
 
@@ -48,18 +49,18 @@
 | ID | 任务 | 模块 | 优先级 | 状态 | 负责 | 备注 |
 |---|---|---|---|---|---|---|
 | T01 | 提交阶段 3/4 的改动 | 全局 | 高 | 完成 | claude | `23d33aa` |
-| T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 分支 `gemini/T02-puppet-warp`（待提交）：全语料 93/93 `.mdl` 解析、骨骼蒙皮/`SKINNING_ALPHA`、`animationlayers`（loop/mirror/single + additive/override）、`MDAT0001` 骨骼附着与 6 场景 MDL 眼部/部件裁剪蒙版均已完成验证 |
+| T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 已合并 `main`（`ca5ee70`）：MDL 网格、骨骼蒙皮、animationlayers、MDL 内嵌裁剪蒙版；Chisa 眼睛错位已修复。未做：`MORPHING` |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
-| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 分支 `claude/T04-audio-reactive`。Core Audio process tap + FFT，接入着色器、粒子发射器、SceneScript、Web 监听器；需用户授权「录制系统音频」后用真实音乐验证手感 |
+| T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
 | T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待认领 | | 现在保留上一个视频锁屏（`.keepingPrevious`） |
-| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | `gpt/T06-scene-cursor-events` 支持 2D 图层六种鼠标事件，75/75 场景通过，待提交 |
+| T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 待认领 | | |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
-| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | `gpt/T09-parser-tests` 独立工作树中 14 项 XCTest 和 Debug 构建通过，待提交 |
+| T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
 | T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
-| T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | `gpt/T13-desktop-transition` Debug 构建通过，已提交为 `08045c9` |
+| T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 待认领 | | 「清风·兰亭」（库里 D198B112…/ WM 3420988161）背景字列应是 18%/36% 透明、模糊的，现在是清晰叠影；语料 3 个场景。改 `SceneLoader`/`SceneInstance`，与 T02 同文件，**等 T02 合并后再做** |
 | T15 | 用户属性绑定的类型转换：`visible` 等布尔字段绑到颜色/滑块/下拉属性时按「非空、非 0 即真」处理（WE 行为），数值字段绑到布尔属性时 true=1 | 场景 | 高 | 待认领 | | 「清风」的白色底图因此被隐藏，露出 0.7 灰的清屏色；语料 3 个场景。只改 `SceneDocument.swift` 的 `SceneValues`，可独立并行 |
 | T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待认领 | | 现在 Balanced 只渲染约 2.9MP，再双线性拉伸到 2560×1664 屏（需约 4.9MP）；84 个场景里 68 个是 4K 画布。需实测 M4 上 GPU 时间/功耗。改 `SceneRenderer`、`SceneLoader.renderSize`、`AppSettings` |
@@ -78,6 +79,27 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 合并到 `main`
+
+- 合并了 `gemini/T02-puppet-warp`、`gpt/T13-desktop-transition`、`claude/T04-audio-reactive`、`gpt/T06-scene-cursor-events`、`gpt/T09-parser-tests`。
+- 冲突处理：`SceneMaterials` 同时保留 `bones/bonesAlpha` 和 `audio(resolution:right:)`；`SceneScript.update` 和 `__frame` 同时接收鼠标事件与音频；`project.pbxproj` 用 xcodegen 重新生成。
+- 合并后验证：build 通过；`unit` 14/14；`shaders` 300/316；`scenes` 75/75、0 洋红；`steam` 通过；抽查 Chisa 眼睛已正常。
+- **之后开工请从最新 `main` 拉新分支。**
+
+### 2026-11-23 · claude · 分支 `claude/T04-audio-reactive`（已合并 `main`）
+
+- **做了什么**：
+  - 新增 `Lumen/Engine/Audio/`：`SystemAudioCapture`（Core Audio process tap + 私有聚合设备，切换输出设备时自动重建）、`AudioSpectrumAnalyzer`（2048 点 FFT，64 段对数频带 45 Hz–16 kHz，快起慢落平滑）、`AudioSpectrumService`（引用计数，只在有音频响应壁纸正在播放时采集）。
+  - 场景：`g_AudioSpectrum{16,32,64}{Left,Right}` 填入真实数据；粒子发射器支持 `audioprocessingmode/bounds/exponent/frequencystart/end`；SceneScript 的 `engine.registerAudioBuffers()` 每帧刷新 `left/right/average`。
+  - Web：`wallpaperRegisterAudioListener` 收到 128 个值（64 左 + 64 右），约 30 次/秒。
+  - 设置：`audioReactiveWallpapers`（默认开，「设置 › Wallpaper Engine」里可关）；`project.yml` 加了 `NSAudioCaptureUsageDescription`。预览渲染器不会触发采集。
+  - 场景回归工具支持 `LUMEN_FAKE_AUDIO=1` 注入假频谱。
+- **验证**：build 通过；场景 75/75 OK、0 洋红；假频谱下音频条/脉冲效果有变化；合成正弦波测试频带位置正确。**没有**在真机上采集过真实音频（会弹系统权限框，需要用户本人授权）。
+- **接口改动**：`EngineUniform.audio` 变成 `.audio(resolution:right:)`；`SceneInstance.Frame`、`DrawState` 新增 `audio`；`ParticleSystem.update`、`SceneScriptRuntime.update` 新增带默认值的 `audio` 参数；`SceneRenderSettings`、`WebRenderSettings` 新增 `audioReactive`。
+- **合并提示**：Gemini 的 T02 在 `SceneMaterials.swift` 同一位置加了 `bones/bonesAlpha`，后合并的一方会有小冲突：两个 case 都保留即可。
+- **建议下一步**：用户授权后播放音乐，看频谱条高度和粒子节奏，必要时调整 `AudioSpectrumAnalyzer` 里的电平映射（`decibels + 60) / 48`）和倾斜（3 dB/oct，以 400 Hz 为轴）。
+
 
 ### 2026-11-23 · gemini · `gemini/T02-puppet-warp`（待提交）
 
