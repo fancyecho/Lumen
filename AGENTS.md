@@ -7,7 +7,8 @@ Lumen 是 macOS 原生动态壁纸播放器（SwiftUI + AppKit + AVFoundation + 
 
 1. 本文件（规则）
 2. [`docs/STATUS.md`](docs/STATUS.md)：当前进度、任务板、交接日志
-3. 需要时再读 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)（代码结构）和 [`docs/TESTING.md`](docs/TESTING.md)（怎么验证）
+3. [`docs/PLAN.md`](docs/PLAN.md)：当前阶段计划、问题根因、任务说明（任务由 claude 分配，接手后改状态即可）
+4. 需要时再读 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)（代码结构）和 [`docs/TESTING.md`](docs/TESTING.md)（怎么验证）
 
 ## 1. 协作流程
 
@@ -15,7 +16,7 @@ Lumen 是 macOS 原生动态壁纸播放器（SwiftUI + AppKit + AVFoundation + 
 2. **分支**：每个助手在自己的分支上工作，命名 `<身份>/<任务ID>-<简述>`，例如 `gemini/T07-clipping-masks`。
    - 同一台机器上同时开工时用 `git worktree`，不要在同一个工作目录里互相覆盖。
    - 不要直接在 `main` 上改代码。
-3. **范围**：只改任务需要的文件。
+3. **范围**：只改任务需要的文件。**优先修共性问题**，不为个别壁纸做专门适配（用户要求）。
    - 发现别的问题时，记到任务板「待认领」，不要顺手修。
    - 跨模块的接口改动（如 `WallpaperRenderer` 协议、`Wallpaper` 模型、`AppSettings` 键）先在交接日志里写明，再动手。
 4. **验证**：至少保证 `Tools/test.sh build` 通过；改到场景引擎还要跑 `Tools/test.sh scenes` 和 `shaders`，结果不能比 STATUS.md 记录的基线差。
