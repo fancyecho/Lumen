@@ -2,6 +2,10 @@
 
 macOS 原生动态壁纸播放器。SwiftUI + AppKit + AVFoundation + Metal，最低 macOS 26。
 
+支持视频、Metal 着色器、网页和 Wallpaper Engine 场景壁纸，可从 Steam 创意工坊下载。
+
+协作开发（Claude / Gemini / GPT）请先读 [AGENTS.md](AGENTS.md)；进度和任务板在 [docs/STATUS.md](docs/STATUS.md)，代码结构在 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，测试方法在 [docs/TESTING.md](docs/TESTING.md)。
+
 ## 构建
 
 ```bash
@@ -24,6 +28,10 @@ open build/DerivedData/Build/Products/Debug/Lumen.app
 |---|---|
 | `Lumen/Engine` | 桌面窗口、视频/着色器渲染器、暂停策略、系统壁纸同步 |
 | `Lumen/Engine/Shaders` | 运行时编译的 Metal 着色器（6 个内置 + 用户自写） |
+| `Lumen/Engine/Web` | 网页壁纸（WKWebView） |
+| `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（着色器翻译、粒子、脚本） |
+| `Lumen/Library/Steam` | SteamCMD 与创意工坊下载 |
+| `Tools` | 命令行回归工具 |
 | `Lumen/Library` | 资源库、导入、元数据、缩略图、HEVC 优化、播放列表 |
 | `Lumen/UI` | 主窗口各页面、菜单栏面板、设置 |
 
