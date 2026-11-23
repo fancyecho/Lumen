@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（合并 T17 / T21 / T22 / T23 / T25）
+> 最后更新：2026-11-23 · claude（收尾阶段分工：GPT T29/T28/T26/T27，Gemini T12/T11）
 
 ## 1. 阶段进度
 
@@ -11,9 +11,9 @@
 | 2 | 锁屏视频、画面裁切（framing）、遮挡阈值、简体中文本地化 | ✅ 已提交（`509c56d`、`0af720e`） |
 | 3 | Web 壁纸（本地 HTML / 网址，WE web 项目属性 API） | ✅ 已提交（`23d33aa`） |
 | 4 | Wallpaper Engine 场景壁纸 + Steam 创意工坊下载 | ✅ 主体完成（木偶、裁剪蒙版、组合层、音频、鼠标事件、3D 光照等已合并）；Steam 实际登录未通 |
-| 6 | **通用问题与可用性**：锁屏免手动、鼠标输入、原生 Steam 扫码登录、通用还原度、能耗 | 🔵 进行中，计划见 [`PLAN.md`](PLAN.md) |
-| 7 | 发布准备：签名、公证、自动更新 | ⏳ |
-| 5 | 全局 UI 打磨 + 补翻译 | ⏳ 放到最后（用户要求） |
+| 6 | **通用问题与可用性**：锁屏免手动、鼠标输入、原生 Steam 扫码登录、通用还原度 | ✅ 已合并（`a966ee5`），用户实测基本正常；剩 T28/T29 两个共性问题 |
+| 7 | 发布准备与能耗：T26、T27 | 🔵 进行中（gpt），计划见 [`PLAN.md`](PLAN.md) |
+| 5 | 全局 UI 打磨 + 补翻译：T12、T11 | 🔵 进行中（gemini），计划见 [`PLAN.md`](PLAN.md) |
 
 ## 2. 功能现状
 
@@ -54,28 +54,30 @@
 | T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 已合并 `main`（`ca5ee70`）：MDL 网格、骨骼蒙皮、animationlayers、MDL 内嵌裁剪蒙版；Chisa 眼睛错位已修复。未做：`MORPHING` |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
-| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 已合并 `main`（`e079a73`）：场景离屏录 30 秒、网页快照录 12 秒做锁屏循环。待用户开启锁屏实测 |
+| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 完成 | claude | 已合并 `main`（`e079a73`）；配合 T21 用户实测正常 |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
 | T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 完成 | gemini | 已合并 `main`（`328e04c`）。分支 `gemini/T07-timeline-and-layout`：实现 `thisScene.destroyLayer` 与帧时钟 `setTimeout`/`clearTimeout`；支持二选一开/关下拉框直绑布尔与嵌套用户属性回退；实现文本层 `limitwidth`/`limitrows`/省略号自动换行、对齐锚点偏移及 4096 纹理缩放一致性修复。3436945972 片头淡出与视差开关、3463692991/2867182492 文本布局均已修复 |
 | T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`c0a0e7f`）。`gpt/T08-scene-lighting`。静态单网格、点光照与正交点光体积通过应用预览和真实桌面验证，已提交 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
-| T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
-| T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
+| T11 | 补全简体中文翻译（T12 改动后的全部界面，及 Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 中 | 待开始 | gemini | 已分配，T12 之后做。见 `PLAN.md` |
+| T12 | 全局 UI 打磨：参考 Wallper 的质感，颜色和布局更高级；先出 `docs/DESIGN.md` 和前后截图 | UI | 高 | 待开始 | gemini | 已分配。见 `PLAN.md` |
 | T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | 已合并 `main`（`08045c9`） |
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`d8663af`）：组合层子图层画进父层缓冲，支持 `copybackground`；「清风」背景字列已正常 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
-| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
+| T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 完成 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。用户实测清晰 |
 | T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`1ea4e5b`）。`Tools/test.sh visual [N]`：0–100 相似度排序，输出 JSON 与最差 N 张对比拼图 |
 | T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`640bb08`）。`gpt/T18-scene-animation-control`。具名及绑定属性时间线支持播放控制，共用轨道同步。23 项 XCTest 和 75/75 场景通过 |
 | T19 | 修复仍编译失败的 10 个工坊特效着色器（翻译层）：数组初始化、`clamp` 歧义、向量隐式截断、`sample`/`currentColor` 等未声明标识符、宏展开语法 | 场景 | 中 | 完成 | claude | 已合并 `main`（`a5b0c5e`）：10 个工坊特效能编译 |
 | T20 | 3347416586（海边摩托）画面上有大片白色「裂纹」图层，作者预览里没有：查明是哪层、为什么可见（可能是条件可见、遮罩或混合模式） | 场景 | 中 | 完成 | gemini | 随 T25 合并：离屏 Pass 0 投影没缩放 Z，木偶骨骼 Z 偏移被深度裁剪出空洞。属共性缺陷，已统一修复 |
-| T21 | 锁屏改为写 Desktop 选择（免去系统设置里手动选），协调 StillFrameSync，扩展备份/恢复 | 锁屏 | 高 | 待验证 | gemini | 已合并 `main`（`1654110`）：同时写 Desktop/Idle 全部容器，新增「也用作屏保」开关，关闭时按备份原样恢复；锁屏开启时主屏不再写静态图。待用户开锁屏后按 `⌃⌘Q` 目测 |
-| T22 | 鼠标输入管线：位置改为轮询、按需开启；补 `g_EffectTextureProjectionMatrix`；核对坐标系 | 场景/Web | 高 | 待验证 | gemini | 已合并 `main`（`0eba484`）：只在有交互壁纸播放时按帧率轮询（≤60Hz，静止时跳过）；补特效投影矩阵及逆矩阵，`g_ParallaxPosition` 改为 [0,1] 居中。待用户在桌面实测鼠标跟随 |
+| T21 | 锁屏改为写 Desktop 选择（免去系统设置里手动选），协调 StillFrameSync，扩展备份/恢复 | 锁屏 | 高 | 完成 | gemini | 已合并 `main`（`1654110`）：同时写 Desktop/Idle 全部容器，新增「也用作屏保」开关，关闭时按备份原样恢复；锁屏开启时主屏不再写静态图。用户实测正常 |
+| T22 | 鼠标输入管线：位置改为轮询、按需开启；补 `g_EffectTextureProjectionMatrix`；核对坐标系 | 场景/Web | 高 | 完成 | gemini | 已合并 `main`（`0eba484`）：只在有交互壁纸播放时按帧率轮询（≤60Hz，静止时跳过）；补特效投影矩阵及逆矩阵，`g_ParallaxPosition` 改为 [0,1] 居中。用户实测正常；粒子控制点跟随鼠标另见 T28 |
 | T23 | 原生 Steam 客户端：扫码登录（钥匙串存 token）+ CM/CDN 下载创意工坊；先改好 SteamCMD 的错误分类和重试 | Steam | 高 | 待验证 | gpt | 已合并 `main`（`72b575b`）：Steam 面板二维码登录、CM/CDN 下载与校验；SteamCMD 分类报错并对网络失败重试。新增 SPM 依赖 zstd 1.5.7。待用户网络可达时扫码实测 |
 | T25 | 通用场景还原度：用 T17 报告和「不支持特性统计」找影响面最大的共性问题，逐类修 | 场景 | 中 | 完成 | gemini | 已合并 `main`（`6135397`）：离屏/组合层 Z 深度映射、`rope`/`ropetrail` 粒子、场景全局 bloom、最后一个着色器。着色器 316/316 |
-| T26 | 能耗与稳定：按 GPU 实测自适应分辨率、指针/音频按需、加载失败与内存压力降级 | 引擎 | 中 | 待认领 |  | 未分配 |
-| T27 | 发布准备：Developer ID 签名、公证、Hardened Runtime、自动更新、开机启动 | 发布 | 中 | 待认领 |  | 未分配；在 UI 打磨之前 |
+| T26 | 能耗与稳定：按 GPU 实测自适应分辨率、加载失败与内存压力降级、长时间播放稳定性检查 | 引擎 | 中 | 待开始 | gpt | 已分配，T28 之后做。见 `PLAN.md` |
+| T27 | 发布准备：Hardened Runtime、签名公证脚本、开机启动、Sparkle 自动更新、本地崩溃记录 | 发布 | 中 | 待开始 | gpt | 已分配，T26 之后做；证书和凭据需用户提供。见 `PLAN.md` |
+| T28 | 粒子控制点跟随鼠标：发射器、`mapsequencearoundcontrolpoint`/`betweencontrolpoints`、`vortex` 等以控制点为中心；测试工具支持模拟指针 | 场景 | 高 | 待开始 | gpt | 已分配，T29 之后做。32 个场景的粒子带鼠标控制点；用户反馈「战双帕弥什 赛琳娜」3516294127 鼠标樱花不跟随。见 `PLAN.md` |
+| T29 | 父层 alpha 不再乘到子图层（只传可见性和变换），用 T17 打分验证 | 场景 | 高 | 待开始 | gpt | 已分配，先做。「清风」3420988161 印章的父层 alpha 为 0；全库约 10 个场景用透明容器。见 `PLAN.md` |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -89,6 +91,18 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 收尾阶段分工（未改代码）
+
+- 用户实测第 6 阶段合并版：「绝大部分正常且清晰」。T05、T16、T21、T22 标为完成；T04（音频手感）、T23/T10（Steam 扫码）仍待用户确认。
+- 查了用户报的两个问题，都是共性问题：
+  - 「清风」印章：父层 alpha 被乘到子图层，归为 T29。
+  - 赛琳娜的鼠标樱花：粒子控制点只用在吸引算子里，归为 T28。
+- 根因、证据和场景清单写在 [`PLAN.md`](PLAN.md)。
+- 分工：
+  - GPT：T29 → T28 → T26 → T27；用户反馈 Steam 问题时 T23 插队。
+  - Gemini：T12（参考 Wallper 的界面打磨，先出 `docs/DESIGN.md`）→ T11。
+- 唯一的文件交集是设置页：T27 只加最朴素的「开机启动」和「检查更新」，样式由 Gemini 统一调。
 
 ### 2026-11-23 · claude · 合并第 6 阶段到 `main`
 

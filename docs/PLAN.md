@@ -1,84 +1,108 @@
-# Lumen · 第 6 阶段计划：通用问题与可用性
+# Lumen · 收尾阶段计划：剩余共性问题、发布准备、界面打磨
 
-> 2026-11-23 · claude 起草。用户实测后定的方向：**优先修通用、共性的问题，不再为个别壁纸做专门适配**；界面打磨放到最后。
-> 解决思路可以参考 WallpaperMachine 和 MirageWallpaper 两个开源项目，但它们是 GPL-3.0，**只看文档和思路，不复制代码**（见 `AGENTS.md`）。
-> 任务由 claude 分配；接手的助手在 `docs/STATUS.md` 任务板上把状态改成「进行中」即可，不用再「认领」。
+> 2026-11-23 · claude 起草。第 6 阶段（锁屏免手动、鼠标轮询、原生 Steam、通用还原度）已合并，用户实测「绝大部分正常且清晰」。
+> 现在三条线并行：**GPT** 收掉剩下两个渲染共性问题，再做能耗和发布准备；**Gemini** 做全局界面打磨和翻译。
+> 规则不变：只修共性问题，不为单个壁纸做适配；GPL 参考项目只看格式和思路，不复制代码（见 `AGENTS.md`）。
+> 任务由 claude 分配。接手后在 `docs/STATUS.md` 任务板上把状态改成「进行中」，按下面的顺序做。
 
-## 分工原则
+## 分工与顺序
 
-- **GPT（6.2，solmax）**：长链路、协议、系统状态这类必须严谨的工作，以及测试和回归工具。
-- **Gemini（neon，high）**：渲染、输入、引擎行为这类大块功能实现。
-- **Claude**：排查根因、写任务说明、审查和合并、维护文档。
-
-## 用户反馈的问题与根因
-
-| 问题 | 根因（已查实） | 参考项目的做法 |
+| 助手 | 顺序 | 说明 |
 |---|---|---|
-| 锁屏要去系统设置里手动选一次 Lumen 的视频才生效 | Lumen 只写了壁纸存储里的 **Idle**（屏保）选择。macOS 14+ 的锁屏播放的是 **Desktop** 选择里的 Aerial，所以要等用户在系统设置里选一次才生效。另外 `StillFrameSync` 会把每个桌面空间的 Desktop 改成静态图，这同样会盖掉 Aerial。 | WallpaperMachine 的文档：「锁屏动画替换 Desktop，屏保替换 Idle」；每个显示器的覆盖项必须**同时**带 Desktop 和 Idle 字段，否则 macOS 会拒绝整个存储。它在 macOS 26+ 还用 ExtensionKit 壁纸扩展实时渲染锁屏，但依赖私有 XPC 协议，太脆弱，暂不跟进。 |
-| 鼠标跟随（眼睛跟着鼠标转、光标特效）没有反应 | `DesktopPointerMonitor` 依赖全局 `mouseMoved` 事件监听。指针停在桌面上时，底下的窗口（Finder 桌面或 Lumen 不接收鼠标的壁纸窗口）不要移动事件，系统很可能就不生成，监听自然收不到；点击照常能收到。另外 `g_EffectTextureProjectionMatrix` 及其逆矩阵目前一律给单位矩阵，跟光标相关的特效坐标不对。 | WallpaperMachine：全局/本地 `NSEvent` 监听只用来唤醒，真正的位置每 16ms 轮询一次（`CGEventCreate` / `NSEvent.mouseLocation`）；点击先用 `windowNumberAtPoint` 加窗口层级判断是不是落在桌面上；只有确实用到指针的场景才轮询。 |
-| Steam 登录不上 | `SteamCMD/logs/console_log.txt` 里第一次是 Invalid Password（可能输错，也可能是 PTY 传密码的问题），之后每次都是 Retrying… → Timeout / No Connection。用户的系统代理是 127.0.0.1:7890。按 WallpaperMachine 的说法，steamclient 会跟随系统的 HTTP/HTTPS 代理，但不读环境变量、也不支持纯 SOCKS，所以连不上可能是代理或网络本身的问题。另外让用户把密码交给 SteamCMD，本身体验也差。 | 两个项目都另做了**原生 Steam 客户端**：扫码登录（`IAuthenticationService/BeginAuthSessionViaQR` + `PollAuthSessionStatus`），refresh token 存钥匙串，通过 WebSocket 登录连接管理器（CM），再从 CDN 拉清单和分块，自己解密、解压、校验。SteamCMD 只作兜底（WallpaperMachine 默认仍用 SteamCMD，Mirage 完全不用）。 |
+| **GPT**（6.2，solmax） | T29 → T28 → T26 → T27 | 用户若反馈 Steam 扫码有问题，T23 的修复插队到最前 |
+| **Gemini**（neon，high） | T12 → T11 | 用户指定：界面打磨交给 Gemini，参考 Wallper，颜色和布局都要更高级 |
+| **Claude** | — | 审查、合并、维护文档；不认领 |
+
+两条线改的文件基本不重叠。唯一交集是设置页：T27 要加「开机启动」「检查更新」入口，见 T27 的说明。
+
+## 用户这轮实测发现的问题
+
+| 现象 | 根因（已查实） | 性质 |
+|---|---|---|
+| 「清风」（3420988161）的红色印章不见了 | 印章 `Y2` 是纯色层 `纯色`（id 134）的子图层。这个父层 `alpha: 0`，只用来挂点击脚本。`SceneInstance.state(of:)`（约第 437 行）把父层 alpha 乘到子图层上（`state.alpha *= parentState.alpha`），印章就被乘成了 0。WE 里印章是显示的，说明 WE **不把父层 alpha 传给子图层**。 | 共性：全库至少 10 个场景用「透明容器 + 可见子图层」的结构（见 T29） |
+| 「战双帕弥什 赛琳娜」（3516294127）的鼠标樱花不跟随鼠标 | 粒子 `Cherry_Blossoms_2` 的控制点 0 带 `flags: 1`（跟随鼠标），发射器和 `mapsequencearoundcontrolpoint` 初始化器都以控制点 0 为中心。Lumen 只在 `controlpointattract` 算子里用到鼠标控制点：发射位置固定在 `emitter.origin`，`mapsequencearoundcontrolpoint` 不支持，`vortex` 也不认控制点。所以樱花一直在图层原位生成。 | 共性：全库 32 个场景的粒子带鼠标控制点（见 T28） |
 
 ## 任务
 
-### T21 · 锁屏改为写 Desktop 选择（Gemini，高）
+### T29 · 父层 alpha 不再传给子图层（GPT，高，先做，小）
 
-- **目标**：在 Lumen 里开启锁屏后，**不需要去系统设置**，锁屏就播放 Lumen 生成的视频（包括场景、网页录出来的那段循环）。
+- **目标**：父子层级的属性传递跟 WE 一致。「清风」的印章恢复，透明容器下的子图层正常显示。
+- **现状**：`Lumen/Engine/Scene/SceneInstance.swift` 的 `state(of:)` 在父层没有 `disablepropagation` 时，同时传递 `visible` 和 `alpha`。组合层（composelayer）分组另有逻辑：组的 alpha 在合成时只乘一次。
+- **证据**（全库父层 alpha ≠ 1 且有子图层的场景）：
+  - `alpha: 0` 的透明容器：3420988161 `纯色`、3608766143 `Media Info (ROUND)` / `Settings Container`、3819548334 `Drag & Drop (Left)`、3583954054 两个导航栏按钮。这些子图层在作者预览里都是可见的。
+  - 0 < alpha < 1：3354881783、3463692991、3583954054、3608766143、3610728777、3613963197、3808922316、3819548334。
+  - alpha 由用户属性或脚本控制：3354881783、3367836416、3397287008、3494484288、3787382101、3819548334。
+- **做法**：去掉非组合层父层的 alpha 传递；`visible` 传递和变换继承保持不变；组合层分组的 alpha 逻辑不动。然后用 T17 的 `Tools/test.sh visual` 对上面这些场景前后打分、看拼图。
+  - 如果某个场景反而变差，就去找真正的规则（比如只有某类父层会传 alpha），**不要按场景 ID 特判**。
+  - 同时检查 `parentVisible(of:)` 和合成捕获（`isCompositeSource`）没有受影响。
+- **验收**：3420988161 的印章出现（作者预览里在「清」字左下方）；上面列出的场景分数不降；`scenes` 75/75、0 洋红。
+
+### T28 · 粒子控制点跟随鼠标（GPT，高）
+
+- **目标**：粒子控制点的语义跟 WE 一致。「跟随鼠标」的控制点能带着发射器、初始化器和算子一起走，赛琳娜的樱花在光标处生成、绕着光标转。
+- **现状**：`Lumen/Engine/Scene/SceneParticles.swift` 解析了 `controlpoint` 数组（`flags & 1` 记为鼠标控制点，还记录了 `offset`），但只有 `.attract` 用到。`pointer` 已经换算到粒子系统的局部空间传进 `update(delta:pointer:audio:)`。
 - **做法**：
-  - `AerialSystem.select` 同时写 Desktop 选择（锁屏用）和 Idle 选择（屏保用，可以做成单独开关，默认跟随）。覆盖范围：`SystemDefault`、`AllSpacesAndDisplays`、`Displays/<id>`，以及 `Spaces/<id>/Default` 和 `Spaces/<id>/Displays/<id>`。每个显示器的覆盖项必须同时有 Desktop 和 Idle。
-  - 第一次替换前，把原内容完整备份进 `InstalledState.backup`，关闭锁屏时原样恢复。原有的备份/恢复逻辑是给 Idle 写的，要扩展到 Desktop。
-  - 和 `StillFrameSync` 协调：锁屏开启时，主显示器（以及锁屏跟随的那块屏）**不再**写静态图到 Desktop，Aerial 本身就是当前壁纸录出来的，调度中心里看到的也是它。其他显示器照旧。
-  - 确认：在本机上开启锁屏后读 `Index.plist`，所有该改的 Desktop/Idle 都指向 Lumen 的资产 ID；锁屏一次确认在播；关闭后恢复成原来的内容。
-- **注意**：这是在改用户的系统设置，测试前先把 `~/Library/Application Support/com.apple.wallpaper/Store/Index.plist` 备份到 `build/`，测完复原。只改 Lumen 自己的条目。
-- **涉及文件**：`Lumen/Engine/LockScreen/AerialSystem.swift`、`LockScreenManager.swift`、`Lumen/Engine/StillFrameSync.swift`。
+  - 控制点位置统一用一个函数算：`offset`，加上鼠标位置（鼠标控制点才加）。指针离开桌面时保留最后的位置，不要跳回原点。第一次拿到指针之前用 `offset`。
+  - 发射器按自己的 `controlpoint` 字段（缺省 0）的位置生成粒子。已经生成的粒子留在原地，这样移动光标会拖出一串，跟 WE 一样。
+  - 补初始化器 `mapsequencearoundcontrolpoint`（`count`、`speedmin`/`speedmax`、`controlpoint`）和 `mapsequencebetweencontrolpoints`。
+  - `vortex` 等带 `controlpoint` 字段的算子以控制点为中心；`offset` 是相对控制点的偏移。
+  - 查清 `flags` 其他位的含义（比如世界空间），只看公开资料和参考项目的文档。
+  - 场景对象的 `instanceoverride` 里如果有控制点覆盖，一并支持（先统计语料里有没有）。
+- **测试**：场景测试工具现在没法模拟指针。加一个环境变量（比如 `LUMEN_POINTER=0.3,0.6`，或者一段移动轨迹），就能离屏验证；顺手写进 `docs/TESTING.md`。
+- **涉及场景**（粒子带鼠标控制点的 32 个）：1115554966、1723129994、1959836574、2275492265、2504353624、2656356265、2862513197、2927107167、3000562427、3050040845、3213265031、3284620454、3321517192、3354881783、3373818743、3445973124、3478434536、3479521040、3491865410、3494484288、3516294127、3551347452、3576254553、3583954054、3595247436、3610728777、3610990328、3615984066、3652040138、3652110998、3675289919、3690417937。
+- **验收**：3516294127 在模拟指针移动时樱花跟着走；已有的「吸引到鼠标」效果不退化；`scenes` 75/75，T17 分数不降。没有额外的常驻开销：只有用到鼠标控制点的场景才开轮询，T22 的 `usesPointer` 已经覆盖这一点。
 
-### T22 · 鼠标输入管线（Gemini，高；T21 之后）
+### T26 · 能耗与稳定（GPT，中）
 
-- **目标**：所有交互式壁纸（场景的视差、跟随光标的特效、`cursor*` 脚本事件，网页的 mousemove/click）在指针停在桌面上时都能响应。
-- **做法**：
-  - 位置改成**轮询**：只要有「需要指针」的壁纸在播放，就以渲染帧率（最多 60Hz）读 `NSEvent.mouseLocation`；位置没变就不做命中判断。事件监听只负责唤醒和转发点击。
-  - 只在需要时才轮询：场景用到了 `g_PointerPosition`/`g_PointerPositionLast`、视差，或者脚本用到了 cursor 事件；网页注册了鼠标监听。其他情况不轮询，省电。
-  - 补上 `g_EffectTextureProjectionMatrix` 及其逆矩阵（特效贴图空间 ↔ 屏幕）的真实含义，跟光标相关的特效才会以图层为中心。
-  - 核对 `g_PointerPosition` 的坐标系（原点和 y 轴方向）。
-  - 确认：3287715210、3463692991 的眼睛跟着鼠标转；有视差的场景跟随鼠标；一个网页壁纸能收到 mousemove。命中判断仍然是「指针在桌面上才转发」。
-- **涉及文件**：`Lumen/Engine/Policy/DesktopPointerMonitor.swift`、`WallpaperEngine.swift`、`Scene/SceneRenderer.swift`、`Scene/SceneMaterials.swift`、`Scene/SceneInstance.swift`、`Web/WebRenderer.swift`。
+- 按实测 GPU 时间自适应渲染分辨率。先在 app 里校准阈值：桌面 30fps 时 GPU 不满载、频率偏低，测出来的单帧时间会比连续渲染时偏高，不能直接套用测试工具的数字。
+- 场景加载失败或内存压力大时自动降级：先降分辨率，再不行改用预览图，并在界面上给出原因（文案先用英文）。
+- 在测试工具里加一个「连续播放 N 分钟」的稳定性检查：内存不涨、GPU 时间不漂。
+- 不加新的设置项。现有的「性能预算」档位是上限，自适应只往下调。
 
-### T23 · 原生 Steam 客户端：扫码登录 + 创意工坊下载（GPT，高）
+### T27 · 发布准备（GPT，中）
 
-- **目标**：用户在 Lumen 里**扫码**登录 Steam（不输入密码），能下载自己账号可用的 Wallpaper Engine 创意工坊内容；走 `URLSession`，所以自动跟随系统代理。
-- **分两步**：
-  1. **SteamCMD 兜底先改好**（小）：把 console_log 里的真实错误分类给用户看（密码错误、连不上 Steam 服务器且提示检查代理/网络、Steam Guard、限流）；手机确认时提示在 Steam App 里选「Steam Client」；被拒的密码不自动重试；断线只在登录成功后才重试（最多 3 次，间隔约 2/8/30 秒）。
-  2. **原生客户端**（大）：
-     - 认证：`IAuthenticationService/BeginAuthSessionViaQR`，轮询 `PollAuthSessionStatus`，界面显示二维码；refresh token 存钥匙串（generic password，service 用 `app.lumen.steam-client`）；不记日志、不写别处。
-     - 连接：通过 WebSocket（`URLSessionWebSocketTask`）连 CM，protobuf 消息，用 refresh token 登录。
-     - 下载：先用 `PublishedFileService.GetDetails` 拿到 `hcontent_file`（清单 ID），再取 depot 解密 key 和 CDN 服务器列表，下载清单和分块，做 AES 解密、解压（zip/LZMA/zstd）和 SHA-1 校验，落盘后交给现有的 `importFiles`。
-     - 保留 SteamCMD 作为「高级：用账号密码登录」的兜底入口。
-- **注意**：只参考公开的协议资料和这两个项目的**文档**，不复制 SteamKit2 或 DepotDownloader 的代码（许可证不兼容）。不得替用户输入密码；真实账号测试由用户本人操作。
-- **涉及文件**：新增 `Lumen/Library/Steam/Native/…`；改 `SteamWorkshop.swift`、`UI/Workshop/SteamPanel.swift`（界面先能用，打磨放到最后）。
-- **验收**：协议各层（protobuf 编解码、清单解析、分块解密）都要有单元测试，可以用录好的样本数据；用户扫码登录后，能下载任意一个创意工坊壁纸并导入成功。
+- **能做的**：
+  - Hardened Runtime 和 entitlements（系统音频、网络客户端等，按实际用到的来）。
+  - 一个打包脚本 `Tools/release.sh`：归档 → Developer ID 签名 → `notarytool` 公证 → staple → 生成 DMG。
+  - 开机启动（`SMAppService.mainApp`）。
+  - 自动更新：Sparkle，用 SPM 引入，版本固定。
+  - 本地崩溃和卡顿记录（MetricKit），不上传。
+- **需要用户提供的**：Apple 开发者账号和证书、公证凭据（由用户本人用 `xcrun notarytool store-credentials` 存进钥匙串）、更新源地址、Sparkle 签名私钥的保管方式。这些写进交接日志问用户。**不要**自己注册账号、输入密码，也不要把私钥或凭据提交进仓库。
+- 在用户提供证书之前，脚本要能用临时签名完整跑通，方便之后直接换证书。
+- **和 Gemini 的交集**：设置页里加「开机启动」开关和「检查更新」按钮，做成最朴素的系统控件，放在设置页单独一个分区。不要改其他界面文件。Gemini 打磨设置页时会把它们一起调样式。
 
-### T17 · 场景视觉回归工具（GPT，收尾）
+### T12 · 全局界面打磨（Gemini，高）
 
-- GPT 已经做完但还没提交，提交后合并。之后 T25 就靠它挑问题。
+- **目标**：整体观感更「高级」，颜色和布局都要提升。参考 Wallper 的质感和信息组织，但不照抄。Lumen 自己的识别度要保留：宽体展示字体、紫色强调色、Liquid Glass 按钮、Home 的 "On your displays"、Studio、Smart pause 面板。
+- **先出设计方案，再改代码**：
+  1. 盘点所有界面并截图，存到 `build/ui/before/`。包括：Home、Library、Workshop（含 Steam 面板）、Playlists、Studio、壁纸详情和属性面板、设置的每一页、菜单栏面板、底部 Now Playing 栏、添加网页等弹窗、空状态、加载和错误状态。
+  2. 把 Wallper 的观感拆成可执行的规则，写进 `docs/DESIGN.md`：
+     - 色板：深色中性底，紫色只用在强调处，不要大面积铺。
+     - 字号阶梯和字重。
+     - 间距栅格（4/8 的倍数）。
+     - 圆角和同心圆角。
+     - 卡片和封面图的比例。
+     - 玻璃材质用在哪、不用在哪：不要玻璃叠玻璃，文字对比度要够。
+     - 动效：克制、可打断，遵守「减少动态效果」。
+  3. 规则落到 `Lumen/UI/Components/Theme.swift`。各界面只用 Theme 里的颜色和尺寸，不再写散落的数值。
+  4. 逐个界面改，改完截图存到 `build/ui/after/`，交接时附前后对比。
+- **看 Wallper 的方式**：可以打开 Wallper 看界面，但只看，不导入、不应用壁纸、不改它的设置，看完退出，也可以看它官网的截图。不要复制它的图标、插画或文案。
+- **技术要求**：
+  - macOS 26 的玻璃 API：`glassEffect`、`GlassEffectContainer`、`.buttonStyle(.glass)` / `.glassProminent`；侧栏和工具栏用系统自带的玻璃。
+  - 浅色和深色都要看（如果 app 支持两种外观）。英文和简体中文都不能溢出、截断：中文用 `-AppleLanguages "(zh-Hans)"` 启动检查。
+  - 窗口缩到最小尺寸时布局不坏。
+- **性能**：界面是常驻应用的一部分。窗口不可见时不能有持续动画或定时器；`AmbientBackdrop` 这类背景效果要测 CPU/GPU 占用；缩略图懒加载。
+- **文案**：新增或改动的字符串只写英文，展示性英文标题用 `Text(verbatim:)`。翻译统一在 T11 里补。
+- **范围**：只动 `Lumen/UI/` 和 `Theme`。如果需要改模型或设置键，先在交接日志里写明。
 
-### T25 · 通用场景还原度（Gemini，中；T22 之后）
+### T11 · 补全简体中文翻译（Gemini，T12 之后）
 
-- 不再一个个修壁纸。先用 T17 的报告，再加上「不支持特性统计」（汇总所有场景的 `instance.unsupported`、编译失败的着色器、缺失的纹理），找出**影响场景最多的那几类问题**，按影响面从大到小修。
-- 已知候选：木偶 `MORPHING`、特效投影矩阵（T22 会顺带补上）、文本排版细节、最后 1 个 3D 着色器。T20（海边摩托的白色裂纹）先看它属不属于某个共性类别，不是就暂缓。
+- 按 `STATUS.md` 第 4 节的 UI 规则：展示性标题保留英文；设置、按钮、菜单、状态、提示、错误、说明性副标题都翻成 zh-Hans。
+- 覆盖 T12 改动后的全部界面，以及之前积压的 Workshop、Steam 面板、WE 设置、属性面板、添加网页等。
+- 用中文界面逐页截图检查有没有截断和溢出。
 
-### T26 · 能耗与稳定（未分配，中）
+## 待用户确认
 
-- 按实测 GPU 时间自适应渲染分辨率（先在 app 里校准阈值：桌面 30fps 下 GPU 不满载、频率偏低，测出来的时间会比连续渲染偏高）。
-- 指针和音频都按需开关（T22 和已有的 T04 机制）。
-- 场景加载失败或内存压力大时自动降级（降分辨率，或改用预览图）。
-
-### T27 · 发布准备（未分配，中；UI 打磨之前）
-
-- 开发者证书签名 + 公证 + Hardened Runtime。现在是临时签名，每次重新构建，系统音频、录屏之类的权限都要重新授权。
-- 自动更新、开机启动、崩溃收集（本地）。
-
-### 最后：T11 翻译、T12 全局 UI 打磨
-
-## 待用户验证
-
-- T04 跟着音乐动的手感；T16 清晰度；T05 锁屏（T21 修好之后再测一次）。
-- 用户想自己试 Steam 的话：先确认代理软件开着、系统代理设成 HTTP/HTTPS（不要只开 SOCKS），再用 SteamCMD 登录一次；T23 完成后改用扫码。
+- T23：网络可达时用 Steam Mobile 扫码登录，下载一个创意工坊壁纸（T10）。
+- T04：授权「录制系统音频」后，放音乐看音频响应壁纸的手感。
+- T27 开始后：Apple 开发者账号、证书、更新源等，GPT 会在交接日志里列出来。
