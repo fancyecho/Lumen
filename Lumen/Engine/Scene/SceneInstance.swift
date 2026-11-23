@@ -292,7 +292,25 @@ final class SceneInstance: @unchecked Sendable {
         /// Camera offset in canvas units from parallax.
         var cameraOffset: SIMD2<Float>
         var parallax: SIMD2<Float>
+        /// The system audio spectrum, for audio-reactive shaders, emitters and scripts.
+        var audio: AudioBands = .silent
     }
+
+    /// Whether anything in the scene follows the music, so system audio capture is worth running.
+    private(set) lazy var usesAudio: Bool = {
+        if scripts?.wantsAudio == true { return true }
+        func passUses(_ pass: PreparedPass?) -> Bool { pass?.uniforms.usesAudio ?? false }
+        for drawable in drawables {
+            switch drawable {
+            case .image(let layer):
+                if passUses(layer.base) || passUses(layer.compositePass) { return true }
+                for step in layer.steps { if case .draw(let pass) = step.kind, passUses(pass) { return true } }
+            case .particles(let layer):
+                if layer.systems.contains(where: { $0.usesAudio || $0.pass.uniforms.usesAudio }) { return true }
+            }
+        }
+        return false
+    }()
 
     /// This frame's state of an object: keyframes, then script changes, then what its
     /// parents pass down (visibility and opacity propagate unless a parent opts out).
@@ -358,7 +376,7 @@ final class SceneInstance: @unchecked Sendable {
         compositeTextures.removeAll(keepingCapacity: true)
         if let scripts {
             scriptChanges = scripts.update(time: Double(frame.time), delta: Double(frame.delta), daytime: Double(frame.daytime),
-                                           cursor: frame.pointerCanvas, cursorDown: false)
+                                           cursor: frame.pointerCanvas, cursorDown: false, audio: frame.audio)
         }
         // Evaluate all puppet skeletons up front so bone attachments are ready in any layer order.
         for (_, puppet) in puppetsByID { puppet.evaluate(at: frame.time) }
@@ -375,7 +393,7 @@ final class SceneInstance: @unchecked Sendable {
                 guard let particleState = state(of: particles.object.id) else { continue }
                 particles.parentModel = parentWorld(of: particles.object)
                 particles.localModel = SceneMath.model(origin: particleState.origin, angles: particleState.angles, scale: particleState.scale)
-                particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas)
+                particles.update(delta: frame.delta, pointerCanvas: frame.pointerCanvas, audio: frame.audio)
                 guard particleState.visible else { continue }
                 if let encoder = session.encoder(buffer) {
                     frameCopyValid = false
@@ -605,6 +623,7 @@ final class SceneInstance: @unchecked Sendable {
         state.brightness = object.brightness
         state.ambient = document.ambientColor
         state.skylight = document.skylightColor
+        state.audio = frame.audio
         return state
     }
 

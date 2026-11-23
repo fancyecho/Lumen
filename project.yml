@@ -23,6 +23,7 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.movie]
+        NSAudioCaptureUsageDescription: Audio-reactive wallpapers follow the music your Mac plays. Lumen only measures loudness per frequency and never records or stores audio.
     settings:
       base:
         PRODUCT_NAME: Lumen

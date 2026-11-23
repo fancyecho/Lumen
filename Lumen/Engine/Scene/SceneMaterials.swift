@@ -233,7 +233,8 @@ enum EngineUniform {
     case orientationUp, orientationRight, orientationForward, viewUp, viewRight
     case renderVar0, renderVar1
     case bones, bonesAlpha
-    case audio
+    /// `g_AudioSpectrum16Left`…`g_AudioSpectrum64Right`.
+    case audio(resolution: Int, right: Bool)
     case zero
 
     static func classify(_ name: String) -> EngineUniform? {
@@ -273,7 +274,9 @@ enum EngineUniform {
         case "g_BonesAlpha": return .bonesAlpha
         default: break
         }
-        if name.hasPrefix("g_AudioSpectrum") { return .audio }
+        if let match = name.wholeMatch(of: /g_AudioSpectrum(16|32|64)(Left|Right)/), let resolution = Int(match.1) {
+            return .audio(resolution: resolution, right: match.2 == "Right")
+        }
         if let match = name.wholeMatch(of: /g_Texture(\d+)Resolution/), let index = Int(match.1) { return .textureResolution(index) }
         if let match = name.wholeMatch(of: /g_Texture(\d+)Rotation/), let index = Int(match.1) { return .textureRotation(index) }
         if let match = name.wholeMatch(of: /g_Texture(\d+)Translation/), let index = Int(match.1) { return .textureTranslation(index) }
@@ -309,6 +312,7 @@ struct DrawState {
     var renderVar1 = SIMD4<Float>.zero
     var bones: [simd_float4x4] = []
     var bonesAlpha: [Float] = []
+    var audio = AudioBands.silent
 }
 
 /// A compiled pass with its static uniform values filled in; dynamic engine values are
@@ -377,6 +381,14 @@ struct UniformBlock {
 
     var hasDynamicValues: Bool { !dynamic.isEmpty || !animated.isEmpty }
 
+    /// Whether the shader reads the audio spectrum (so capture should run).
+    var usesAudio: Bool {
+        dynamic.contains { engine, _ in
+            if case .audio = engine { return true }
+            return false
+        }
+    }
+
     mutating func update(_ state: DrawState) {
         for (animation, uniform) in animated { write(animation.values(at: state.time), to: uniform) }
         for (engine, uniform) in dynamic {
@@ -423,7 +435,13 @@ struct UniformBlock {
                 for index in 0..<uniform.count where s + index < slots.count {
                     slots[s + index].x = index < state.bonesAlpha.count ? state.bonesAlpha[index] : 1
                 }
-            case .audio, .zero:
+            case .audio(let resolution, let right):
+                let bands = state.audio.channel(right: right, resolution: resolution)
+                let stride = uniform.kind.slots
+                for index in 0..<uniform.count where s + index * stride < slots.count {
+                    slots[s + index * stride] = SIMD4(index < bands.count ? bands[index] : 0, 0, 0, 0)
+                }
+            case .zero:
                 for index in 0..<(uniform.count * uniform.kind.slots) where s + index < slots.count { slots[s + index] = .zero }
             }
         }

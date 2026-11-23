@@ -22,6 +22,7 @@ Tools/test.sh scenes
 - `magenta%` 表示洋红像素占比，大于 0 通常意味着缺纹理或缺裁剪蒙版。
 - 只跑部分场景：`Tools/test.sh scenes 3808922316,3615984066 2.5`。第 2 个参数是 id 列表，第 3 个是渲染时刻（秒），第 4 个可选，是只加载的对象 id 列表。
 - 设环境变量 `DUMPLAYERS=1` 会打印每层的纹理、uniform、特效步骤。
+- 设 `LUMEN_FAKE_AUDIO=1` 会注入一段假频谱（低音强、高音弱），用来检查音频响应的着色器、粒子和脚本。
 
 ```bash
 Tools/test.sh shaders

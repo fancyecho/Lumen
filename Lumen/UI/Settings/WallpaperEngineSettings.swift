@@ -44,6 +44,12 @@ struct WallpaperEngineSettings: View {
             }
 
             Section {
+                Toggle("Audio-reactive wallpapers follow the music", isOn: $settings.audioReactiveWallpapers)
+            } footer: {
+                Text("Spectrum bars, pulsing effects and beat-driven particles listen to what your Mac is playing. macOS asks once for permission to record system audio. Lumen only measures loudness per frequency, in memory, and listens only while such a wallpaper is on screen.")
+            }
+
+            Section {
                 let workshop = model.workshop
                 ForEach(WorkshopLibrary.defaultSources(custom: workshop.customFolders)) { source in
                     HStack {

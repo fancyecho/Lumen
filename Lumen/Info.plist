@@ -33,5 +33,7 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Audio-reactive wallpapers follow the music your Mac plays. Lumen only measures loudness per frequency and never records or stores audio.</string>
 </dict>
 </plist>

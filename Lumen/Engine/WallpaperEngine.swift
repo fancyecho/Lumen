@@ -227,6 +227,8 @@ final class WallpaperEngine {
             guard let package = wallpaper.package else { return nil }
             var web = settings.webRenderSettings
             web.muted = true
+            // Previews never start system audio capture (or its permission prompt).
+            web.audioReactive = false
             let source: WebRenderer.Source
             if let remote = package.remoteURL.flatMap(URL.init(string:)) {
                 source = .remote(remote, id: wallpaper.id)
