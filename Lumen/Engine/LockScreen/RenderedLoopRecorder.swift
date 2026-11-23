@@ -168,7 +168,7 @@ enum SceneLoopRecorder {
             guard let buffer = queue.makeCommandBuffer() else { throw LockScreenVideoBuilder.Failure.writerFailed("no command buffer") }
             instance.encode(into: buffer, frame: SceneInstance.Frame(
                 time: Float(frame) * delta, delta: delta, pointerCanvas: nil, daytime: daytime,
-                pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero
+                pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: SIMD2(0.5, 0.5)
             ))
             let recorded = frame - warmUpFrames
             guard recorded >= 0 else {

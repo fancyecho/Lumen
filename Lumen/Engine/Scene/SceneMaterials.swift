@@ -305,11 +305,14 @@ struct DrawState {
     /// Lit offscreen passes rasterize in local space but still shade in the scene's world space.
     var worldModel: simd_float4x4?
     var viewProjection = matrix_identity_float4x4
+    /// Maps effect-texture NDC `[-1, 1]^2` to screen NDC `[-1, 1]^2` (and its inverse).
+    var effectTextureProjection = matrix_identity_float4x4
+    var effectTextureProjectionInverse = matrix_identity_float4x4
     var targetSize = SIMD2<Float>(1, 1)
     var screen = SIMD2<Float>(1, 1)
     var pointer = SIMD2<Float>(0.5, 0.5)
     var pointerLast = SIMD2<Float>(0.5, 0.5)
-    var parallax = SIMD2<Float>(0, 0)
+    var parallax = SIMD2<Float>(0.5, 0.5)
     var color = SIMD3<Float>(1, 1, 1)
     var alpha: Float = 1
     var brightness: Float = 1
@@ -413,6 +416,16 @@ struct UniformBlock {
         }
     }
 
+    /// Whether the shader reads pointer or parallax uniforms (so pointer polling should run).
+    var usesPointer: Bool {
+        dynamic.contains { engine, _ in
+            switch engine {
+            case .pointer, .pointerLast, .parallax: return true
+            default: return false
+            }
+        }
+    }
+
     mutating func update(_ state: DrawState) {
         for (animation, uniform) in animated { write(animation.values(at: state.time), to: uniform) }
         for (engine, uniform) in dynamic {
@@ -431,7 +444,8 @@ struct UniformBlock {
             case .viewProjection: setMatrix(state.viewProjection, at: s, kind: uniform.kind)
             case .modelViewProjection, .effectModelViewProjection: setMatrix(state.viewProjection * state.model, at: s, kind: uniform.kind)
             case .modelViewProjectionInverse: setMatrix((state.viewProjection * state.model).inverse, at: s, kind: uniform.kind)
-            case .effectTextureProjection, .effectTextureProjectionInverse: setMatrix(matrix_identity_float4x4, at: s, kind: uniform.kind)
+            case .effectTextureProjection: setMatrix(state.effectTextureProjection, at: s, kind: uniform.kind)
+            case .effectTextureProjectionInverse: setMatrix(state.effectTextureProjectionInverse, at: s, kind: uniform.kind)
             case .eyePosition: slots[s] = SIMD4(state.eye, 1)
             case .screen: slots[s] = SIMD4(state.screen.x, state.screen.y, state.screen.x / max(state.screen.y, 1), 0)
             case .texelSize: slots[s] = SIMD4(1 / state.targetSize.x, 1 / state.targetSize.y, 0, 0)

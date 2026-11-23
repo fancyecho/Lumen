@@ -199,6 +199,9 @@ final class WallpaperEngine {
             guard needsRenderer else { continue }
 
             if let renderer = makeRenderer(for: wallpaper) {
+                if let pointerRenderer = renderer as? PointerAwareRenderer {
+                    pointerRenderer.onPointerNeedChange = { [weak self] in self?.reconcile() }
+                }
                 host.present(renderer, wallpaperID: wallpaper.id, animated: animated && settings.crossfade)
                 if settings.syncStillFrame, !lockManaged.contains(displayID) {
                     stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
@@ -354,9 +357,16 @@ final class WallpaperEngine {
             ))
         }
         if updated != displays { displays = updated }
-        pointer.isEnabled = settings.interactiveWallpapers
-            && hosts.values.contains { $0.renderer is PointerAwareRenderer }
-            && updated.contains(where: \.isPlaying)
+        let pointerDisplays = Set(updated.compactMap { display -> String? in
+            guard display.isPlaying,
+                  let renderer = hosts[display.id]?.renderer as? PointerAwareRenderer,
+                  renderer.needsPointer
+            else { return nil }
+            return display.id
+        })
+        pointer.pollRate = settings.shaderFrameRate > 0 ? settings.shaderFrameRate : 60
+        pointer.activeDisplayIDs = pointerDisplays
+        pointer.isEnabled = settings.interactiveWallpapers && !pointerDisplays.isEmpty
     }
 
     private func recoverAfterWake() {
@@ -397,6 +407,7 @@ final class WallpaperEngine {
             let web = settings.webRenderSettings
             hosts.values.compactMap { $0.renderer as? WebRenderer }.forEach { $0.update(settings: web) }
             hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
+            pointer.pollRate = settings.shaderFrameRate > 0 ? settings.shaderFrameRate : 60
         case .stillFrame:
             let lockManaged = lockScreenManagedDisplayIDs()
             if settings.syncStillFrame {

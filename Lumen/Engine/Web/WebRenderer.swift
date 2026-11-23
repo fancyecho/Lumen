@@ -13,6 +13,10 @@ struct WebRenderSettings: Equatable {
 /// Renderers that react to the pointer while it rests on the desktop.
 @MainActor
 protocol PointerAwareRenderer: AnyObject {
+    /// Whether this wallpaper currently listens to pointer movement or clicks.
+    var needsPointer: Bool { get }
+    /// Called when `needsPointer` changes (after scene load or web listener registration).
+    var onPointerNeedChange: (() -> Void)? { get set }
     /// `point` is in the renderer view's coordinates with a top-left origin; nil when the pointer left.
     func pointerMoved(to point: CGPoint?)
     func pointerPressed(_ isDown: Bool, at point: CGPoint)
@@ -50,6 +54,10 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     private var readyTimeout: Task<Void, Never>?
     private var snapshotGeneration = 0
     private var lastPointerSend: CFTimeInterval = 0
+    /// The page registered a mouse or pointer listener.
+    private var wantsPointer = false
+    var needsPointer: Bool { wantsPointer }
+    var onPointerNeedChange: (() -> Void)?
     /// The page registered an audio listener.
     private var wantsAudio = false
     private var audioTimer: Timer?
@@ -141,6 +149,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     func tearDown() {
         guard !isTornDown else { return }
         isTornDown = true
+        onPointerNeedChange = nil
         updateAudioCapture()
         readyTimeout?.cancel()
         readyHandlers.removeAll()
@@ -237,6 +246,10 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
         case "audio":
             wantsAudio = true
             updateAudioCapture()
+        case "pointer":
+            guard !wantsPointer else { return }
+            wantsPointer = true
+            onPointerNeedChange?()
         case "log":
             #if DEBUG
             Log.engine.debug("web: \(String(describing: message["text"] ?? ""), privacy: .public)")
@@ -356,6 +369,10 @@ extension WebRenderer: WKNavigationDelegate, WKUIDelegate {
         guard !isTornDown else { return }
         Log.engine.info("Web wallpaper's content process ended; reloading")
         propertiesDelivered = false
+        if wantsPointer {
+            wantsPointer = false
+            onPointerNeedChange?()
+        }
         webView.reload()
     }
 
@@ -490,7 +507,41 @@ enum WebBridgeScript {
         }
       };
 
-      function announceReady() { nativeRAF(function () { nativeRAF(function () { post({ type: 'ready' }); }); }); }
+      var pointerReported = false;
+      var pointerEvents = {
+        mousemove: 1, mousedown: 1, mouseup: 1, click: 1,
+        mouseover: 1, mouseenter: 1, mouseleave: 1, mouseout: 1,
+        pointermove: 1, pointerdown: 1, pointerup: 1, pointerover: 1, pointerenter: 1
+      };
+      function reportPointer() {
+        if (pointerReported) return;
+        pointerReported = true;
+        post({ type: 'pointer' });
+      }
+      var nativeAddEventListener = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function (type) {
+        if (typeof type === 'string' && pointerEvents[type.toLowerCase()]) reportPointer();
+        return nativeAddEventListener.apply(this, arguments);
+      };
+      function scanInlinePointerHandlers() {
+        if (pointerReported) return;
+        var props = ['onmousemove', 'onmousedown', 'onmouseup', 'onclick', 'onpointermove', 'onpointerdown', 'onpointerup'];
+        for (var i = 0; i < props.length; i++) {
+          var p = props[i];
+          if (typeof window[p] === 'function' || typeof document[p] === 'function' ||
+              (document.body && typeof document.body[p] === 'function')) {
+            reportPointer();
+            return;
+          }
+        }
+        if (document.querySelector('[onmousemove],[onmousedown],[onclick],[onpointermove]')) reportPointer();
+      }
+
+      function announceReady() {
+        scanInlinePointerHandlers();
+        setTimeout(scanInlinePointerHandlers, 500);
+        nativeRAF(function () { nativeRAF(function () { post({ type: 'ready' }); }); });
+      }
       if (document.readyState === 'complete') announceReady();
       else window.addEventListener('load', announceReady, { once: true });
     })();
