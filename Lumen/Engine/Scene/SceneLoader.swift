@@ -192,7 +192,8 @@ enum SceneLoader {
             let text: String? = object.kind == .text ? (values.resolve(object.raw["text"]).map { "\($0)" }) : nil
             return SceneScriptRuntime.LayerInfo(
                 id: object.id, name: object.name, parent: object.parent, origin: object.origin, scale: object.scale,
-                angles: object.angles, alpha: object.alpha, visible: object.visible, color: object.color, text: text, size: object.size
+                angles: object.angles, alpha: object.alpha, visible: object.visible, color: object.color, text: text, size: object.size,
+                animations: object.animations
             )
         }
         guard let runtime = SceneScriptRuntime(layers: layers, canvas: document.canvas, userProperties: userProperties, storageKey: storageKey) else { return nil }

@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（第二次合并）
+> 最后更新：2026-11-23 · gpt
 
 ## 1. 阶段进度
 
@@ -40,7 +40,7 @@
 | 着色器翻译 + 编译 | 300/316 通过（失败集中在 3D 光照、体积光和少数工坊自带着色器） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 18/18 通过 |
+| 单元测试（`Tools/test.sh unit`） | 23/23 通过（T18 工作树） |
 
 ## 3. 任务板
 
@@ -65,7 +65,7 @@
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
 | T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
 | T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 待认领 | | 只改 `Tools/`，可完全并行；用来自动发现「清风」这类整体偏差 |
-| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 待认领 | | T03 让 `startpaused` 动画停在第 0 帧，但脚本还不能让它播放 |
+| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 完成 | gpt | `gpt/T18-scene-animation-control`。具名及绑定属性时间线支持播放控制，共用轨道同步。23 项 XCTest 和 75/75 场景通过 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -79,6 +79,13 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · gpt · `gpt/T18-scene-animation-control`（独立工作树）
+
+- 完成 T18。`thisLayer.getAnimation(name)` 获取具名时间线，`thisObject.getAnimation()` 获取当前绑定属性的时间线。支持播放、暂停、继续、停止复位、单次重播、读写帧和非负速率。同一图层的关联属性共用播放位置。[Wallpaper Engine IAnimation](https://docs.wallpaperengine.io/en/scene/scenescript/reference/class/IAnimation.html)
+- `SceneLoader` 提供图层时间线声明，`SceneScriptRuntime.Change` 把受控帧交给 `SceneDocument.Object.state`。复用已有场景时钟和暂停策略，CPU 维护脚本控制的播放位置，GPU 沿用原有绘制流程。三个场景的同机 60 帧交替复测，GPU 中位数原版 6.50 ms、T18 6.67 ms。
+- Debug 构建通过，XCTest 23/23，场景 75/75、0 洋红，着色器 300/316。JavaScriptCore 用例验证具名和无参查找、状态、速率及实例隔离。9 帧离屏 Metal 测试验证桌面点击事件经过脚本确实改变了图层位置和透明度。
+- 本次覆盖图层属性时间线。媒体事件回调、特效和木偶动画控制仍待接入，真实桌面交互尚未手测。T07 当前涉及的四份共用源码通过了补丁应用检查，正式合并时应由 xcodegen 重生成工程。
 
 ### 2026-11-23 · claude · 第二次合并到 `main`
 

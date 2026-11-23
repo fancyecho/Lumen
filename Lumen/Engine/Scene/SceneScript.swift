@@ -21,6 +21,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
         let color: SIMD3<Float>
         let text: String?
         let size: SIMD2<Float>?
+        var animations: [String: SceneAnimation] = [:]
     }
 
     /// What scripts changed on a layer this frame.
@@ -32,9 +33,11 @@ final class SceneScriptRuntime: @unchecked Sendable {
         var visible: Bool
         var color: SIMD3<Float>
         var text: String?
+        var animationFrames: [String: Float] = [:]
     }
 
     private let context: JSContext
+    private let animationControls: AnimationControls
     private var hasScripts = false
     private(set) var cursorLayerIDs: Set<Int> = []
     private var failed = false
@@ -43,6 +46,12 @@ final class SceneScriptRuntime: @unchecked Sendable {
     init?(layers: [LayerInfo], canvas: SIMD2<Float>, userProperties: [String: PropertyValue], storageKey: String) {
         guard let context = JSContext() else { return nil }
         self.context = context
+        let animations = AnimationControls(layers: layers)
+        animationControls = animations
+        let timelineCommand: @convention(block) (Int, String, String, Double) -> Double = { layer, property, operation, value in
+            animations.perform(layer: layer, property: property, operation: operation, value: Float(value))
+        }
+        context.setObject(timelineCommand, forKeyedSubscript: "__timelineCommand" as NSString)
         context.exceptionHandler = { _, exception in
             #if DEBUG
             if let message = exception?.toString() { Log.engine.debug("SceneScript: \(message, privacy: .public)") }
@@ -68,6 +77,16 @@ final class SceneScriptRuntime: @unchecked Sendable {
             ]
             if let parent = layer.parent { entry["parent"] = parent }
             if let text = layer.text { entry["text"] = text }
+            if !layer.animations.isEmpty {
+                entry["timelines"] = layer.animations.keys.sorted().compactMap { property -> [String: Any]? in
+                    let timeline = SceneAnimation.timelineProperty(for: property, in: layer.animations)
+                    guard let animation = layer.animations[timeline] else { return nil }
+                    return [
+                        "property": property, "timeline": timeline, "name": animation.name,
+                        "fps": animation.fps, "frameCount": animation.length,
+                    ]
+                }
+            }
             if let size = layer.size { entry["size"] = [size.x, size.y] }
             return entry
         }
@@ -150,6 +169,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
         guard hasScripts, !failed else { return [:] }
         lock.lock()
         defer { lock.unlock() }
+        animationControls.time = Float(time)
         let cursorArgument: Any = cursor.map { [$0.x, $0.y] as Any } ?? NSNull()
         let audioArgument: Any = wantsAudio ? (audio.left + audio.right) as Any : NSNull()
         let screenArgument: Any = cursorScreen.map { [$0.x, $0.y] as Any } ?? NSNull()
@@ -173,7 +193,8 @@ final class SceneScriptRuntime: @unchecked Sendable {
                 alpha: number(10),
                 visible: (entry[11] as? NSNumber)?.boolValue ?? true,
                 color: SIMD3(number(12), entry.count > 13 ? number(13) : 1, entry.count > 14 ? number(14) : 1),
-                text: entry.count > 15 ? entry[15] as? String : nil
+                text: entry.count > 15 ? entry[15] as? String : nil,
+                animationFrames: animationControls.frames(for: id)
             )
         }
         return changes
@@ -191,6 +212,39 @@ final class SceneScriptRuntime: @unchecked Sendable {
         text = text.replacingOccurrences(of: "export default ", with: "")
         text = text.replacing(/\bexport\s+(?=(?:async\s+)?function\b|var\b|let\b|const\b|class\b)/) { _ in "" }
         return text
+    }
+
+    /// Accessed under the runtime lock by the renderer and synchronous JavaScript callbacks.
+    private final class AnimationControls {
+        var time: Float = 0
+        private var definitions: [Int: [String: SceneAnimation]] = [:]
+        private var playbacks: [Int: [String: SceneAnimationPlayback]] = [:]
+
+        init(layers: [LayerInfo]) {
+            for layer in layers where !layer.animations.isEmpty { definitions[layer.id] = layer.animations }
+        }
+
+        func perform(layer: Int, property: String, operation: String, value: Float) -> Double {
+            guard let animation = definitions[layer]?[property] else { return 0 }
+            var playback = playbacks[layer]?[property] ?? SceneAnimationPlayback(animation)
+            switch operation {
+            case "getFrame": return Double(playback.frame(at: time))
+            case "isPlaying": return playback.isPlaying(at: time) ? 1 : 0
+            case "rate": return Double(playback.rate)
+            case "play": playback.play(at: time)
+            case "pause": playback.pause(at: time)
+            case "stop": playback.stop(at: time)
+            case "setFrame": playback.seek(to: value, at: time)
+            case "setRate": playback.setRate(value, at: time)
+            default: return 0
+            }
+            playbacks[layer, default: [:]][property] = playback
+            return 0
+        }
+
+        func frames(for layer: Int) -> [String: Float] {
+            playbacks[layer]?.mapValues { $0.frame(at: time) } ?? [:]
+        }
     }
 
     // MARK: Prelude
@@ -290,15 +344,54 @@ final class SceneScriptRuntime: @unchecked Sendable {
         id: d.id, name: d.name, origin: __vec(d.origin), scale: __vec(d.scale), angles: __vec(d.angles),
         alpha: d.alpha, visible: d.visible, color: __vec(d.color), text: d.text, size: d.size ? new Vec2(d.size[0], d.size[1]) : new Vec2(0, 0),
         font: '', pointsize: 0, horizontalalign: 'center', verticalalign: 'center', parallaxDepth: new Vec2(1, 1),
-        __parent: d.parent, __lastText: d.text,
+        __parent: d.parent, __lastText: d.text, __timelines: d.timelines || [], __timelineHandles: Object.create(null),
         getParent: function () { return this.__parent !== undefined ? (__layers[this.__parent] ? __touch(__layers[this.__parent]) : null) : null; },
         getTextureAnimation: function () { return { play: function () {}, pause: function () {}, stop: function () {}, setFrame: function () {}, getFrame: function () { return 0; }, isPlaying: function () { return true; }, frameCount: 1, rate: 1 }; },
-        getAnimation: function () { return { play: function () {}, pause: function () {}, stop: function () {}, setFrame: function () {}, getFrame: function () { return 0; }, isPlaying: function () { return false; } }; },
+        getAnimation: function (name) { return __getTimeline(this, name, undefined); },
         getEffect: function () { return { visible: true, getMaterial: function () { return { setValue: function () {} }; } }; },
         getChildren: function () { var me = this.id; return __order.filter(function (l) { return l.__parent === me; }).map(__touch); },
         play: function () {}, pause: function () {}, stop: function () {}, isPlaying: function () { return false; }
       };
       return layer;
+    }
+    function __getTimeline(layer, name, property) {
+      var definition = layer.__timelines.find(function (entry) {
+        return name === undefined ? entry.property === property : entry.name && entry.name === name;
+      });
+      if (!definition) {
+        // Incomplete projects may still call the old stub without a corresponding timeline.
+        return { play: function () {}, pause: function () {}, stop: function () {},
+                 setFrame: function () {}, getFrame: function () { return 0; }, isPlaying: function () { return false; } };
+      }
+      var key = definition.timeline;
+      if (!layer.__timelineHandles[key]) {
+        function command(action, value) { return __timelineCommand(layer.id, key, action, value === undefined ? 0 : +value); }
+        layer.__timelineHandles[key] = {
+          get name() { return definition.name; },
+          get fps() { return definition.fps; },
+          get frameCount() { return definition.frameCount; },
+          get duration() { return definition.frameCount / definition.fps; },
+          get rate() { return command('rate'); },
+          set rate(value) { command('setRate', value); },
+          play: function () { command('play'); },
+          pause: function () { command('pause'); },
+          stop: function () { command('stop'); },
+          isPlaying: function () { return !!command('isPlaying'); },
+          getFrame: function () { return command('getFrame'); },
+          setFrame: function (value) { command('setFrame', value); }
+        };
+      }
+      return layer.__timelineHandles[key];
+    }
+
+    function __propertyObject(layer, property) {
+      if (!layer.__timelines.some(function (entry) { return entry.property === property; })) return layer;
+      return new Proxy(layer, {
+        get: function (target, key, receiver) {
+          if (key === 'getAnimation') return function (name) { return __getTimeline(target, name, property); };
+          return Reflect.get(target, key, receiver);
+        }
+      });
     }
     function __touch(layer) { if (layer) __touched[layer.id] = layer; return layer; }
 
@@ -348,7 +441,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
       __pendingScriptProperties = scriptProperties || {};
       var hasCursorHandlers = false;
       try {
-        var api = factory(layer, layer);
+        var api = factory(layer, __propertyObject(layer, property));
         var script = { layer: layer, property: property, api: api, value: __convertIn(property, value), errors: 0 };
         __scripts.push(script);
         hasCursorHandlers = __cursorHandlers.some(function (name) { return typeof api[name] === 'function'; });

@@ -18,6 +18,8 @@ struct SceneAnimation {
     let length: Float
     let mode: Mode
     let startPaused: Bool
+    let name: String
+    let parentProperty: String?
 
     init?(_ raw: Any?) {
         guard let object = raw as? [String: Any], let animation = object["animation"] as? [String: Any] else { return nil }
@@ -42,6 +44,8 @@ struct SceneAnimation {
         let lastFrame = curves.compactMap { $0.last?.frame }.max() ?? 0
         length = max((options["length"] as? NSNumber)?.floatValue ?? lastFrame, 1)
         startPaused = (options["startpaused"] as? Bool) ?? false
+        name = options["name"] as? String ?? ""
+        parentProperty = (options["parent"] as? [String: Any])?["key"] as? String
         switch options["mode"] as? String {
         case "single": mode = .single
         case "mirror": mode = .mirror
@@ -49,21 +53,37 @@ struct SceneAnimation {
         }
     }
 
-    /// Component values at `time` seconds.
-    func values(at time: Float) -> [Float] {
-        // Animations marked `startpaused` wait at frame 0 until a script calls `.play()`.
-        if startPaused { return curves.map { Self.evaluate($0, frame: 0) } }
-        var frame = time * fps
+    /// A combined timeline uses the parent's playhead for its linked properties on this layer.
+    static func timelineProperty(for property: String, in animations: [String: SceneAnimation]) -> String {
+        guard let parent = animations[property]?.parentProperty,
+              parent != property, let root = animations[parent], root.parentProperty == nil
+        else { return property }
+        return parent
+    }
+
+    func frame(at time: Float) -> Float {
+        startPaused ? 0 : frame(forProgress: time * fps)
+    }
+
+    func frame(forProgress progress: Float) -> Float {
         switch mode {
         case .loop:
-            frame = frame.truncatingRemainder(dividingBy: length)
+            return progress.truncatingRemainder(dividingBy: length)
         case .mirror:
-            let cycle = frame.truncatingRemainder(dividingBy: length * 2)
-            frame = cycle > length ? length * 2 - cycle : cycle
+            let cycle = progress.truncatingRemainder(dividingBy: length * 2)
+            return cycle > length ? length * 2 - cycle : cycle
         case .single:
-            frame = min(frame, length)
+            return min(progress, length)
         }
-        return curves.map { Self.evaluate($0, frame: frame) }
+    }
+
+    /// Component values sampled at the scene time.
+    func values(at time: Float) -> [Float] {
+        values(atFrame: frame(at: time))
+    }
+
+    func values(atFrame frame: Float) -> [Float] {
+        curves.map { Self.evaluate($0, frame: frame) }
     }
 
     func value(at time: Float) -> Float { values(at: time).first ?? 0 }
@@ -95,5 +115,74 @@ struct SceneAnimation {
     private static func bezier(_ a: Float, _ b: Float, _ c: Float, _ d: Float, _ t: Float) -> Float {
         let u = 1 - t
         return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d
+    }
+}
+
+/// Scene time freezes during engine pauses. Keep an unwrapped progress so a paused mirror
+/// animation can continue in the same direction when it resumes.
+struct SceneAnimationPlayback {
+    private let animation: SceneAnimation
+    private var baseProgress: Float = 0
+    private var anchorTime: Float = 0
+    private var heldFrame: Float?
+    private var playing: Bool
+    private(set) var rate: Float = 1
+
+    init(_ animation: SceneAnimation) {
+        self.animation = animation
+        playing = !animation.startPaused
+    }
+
+    private func progress(at time: Float) -> Float {
+        baseProgress + (playing ? max(0, time - anchorTime) * animation.fps * rate : 0)
+    }
+
+    func frame(at time: Float) -> Float {
+        let position = progress(at: time)
+        if position == baseProgress, let heldFrame { return heldFrame }
+        return position.isFinite ? animation.frame(forProgress: position) : 0
+    }
+
+    func isPlaying(at time: Float) -> Bool {
+        playing && (animation.mode != .single || progress(at: time) < animation.length)
+    }
+
+    mutating func play(at time: Float) {
+        guard !isPlaying(at: time) else { return }
+        if animation.mode == .single && progress(at: time) >= animation.length {
+            baseProgress = 0
+            heldFrame = nil
+        }
+        anchorTime = time
+        playing = true
+    }
+
+    mutating func pause(at time: Float) {
+        heldFrame = frame(at: time)
+        baseProgress = progress(at: time)
+        anchorTime = time
+        playing = false
+    }
+
+    mutating func stop(at time: Float) {
+        baseProgress = 0
+        heldFrame = nil
+        anchorTime = time
+        playing = false
+    }
+
+    mutating func seek(to frame: Float, at time: Float) {
+        guard frame.isFinite else { return }
+        baseProgress = min(max(0, frame), animation.length)
+        heldFrame = baseProgress
+        anchorTime = time
+    }
+
+    mutating func setRate(_ newRate: Float, at time: Float) {
+        guard newRate.isFinite, newRate >= 0 else { return }
+        heldFrame = frame(at: time)
+        baseProgress = progress(at: time)
+        anchorTime = time
+        rate = newRate
     }
 }

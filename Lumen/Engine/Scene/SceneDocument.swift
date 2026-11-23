@@ -138,11 +138,17 @@ struct SceneDocument {
         var animations: [String: SceneAnimation] = [:]
 
         /// The object's animatable properties at `time`.
-        func state(at time: Float) -> State {
+        func state(at time: Float, animationFrames: [String: Float] = [:]) -> State {
             var state = State(origin: origin, scale: scale, angles: angles, alpha: alpha, color: color, brightness: brightness, visible: visible)
             guard !animations.isEmpty else { return state }
+            func animatedValues(_ property: String) -> [Float]? {
+                guard let animation = animations[property] else { return nil }
+                let timeline = SceneAnimation.timelineProperty(for: property, in: animations)
+                let driver = animations[timeline] ?? animation
+                return animation.values(atFrame: animationFrames[timeline] ?? driver.frame(at: time))
+            }
             func vector(_ key: String, _ current: SIMD3<Float>) -> SIMD3<Float> {
-                guard let values = animations[key]?.values(at: time) else { return current }
+                guard let values = animatedValues(key) else { return current }
                 var result = current
                 for index in 0..<min(3, values.count) { result[index] = values[index] }
                 return result
@@ -151,9 +157,9 @@ struct SceneDocument {
             state.scale = vector("scale", scale)
             state.angles = vector("angles", angles)
             state.color = vector("color", color)
-            if let animation = animations["alpha"] { state.alpha = animation.value(at: time) }
-            if let animation = animations["brightness"] { state.brightness = animation.value(at: time) }
-            if let animation = animations["visible"] { state.visible = animation.value(at: time) > 0.5 }
+            if let alpha = animatedValues("alpha") { state.alpha = alpha.first ?? 0 }
+            if let brightness = animatedValues("brightness") { state.brightness = brightness.first ?? 0 }
+            if let visible = animatedValues("visible") { state.visible = (visible.first ?? 0) > 0.5 }
             return state
         }
 
