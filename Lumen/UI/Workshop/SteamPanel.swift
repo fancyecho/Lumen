@@ -1,3 +1,4 @@
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 import WebKit
 
@@ -10,6 +11,7 @@ struct SteamPanel: View {
     @State private var link = ""
     @State private var guardCode = ""
     @State private var showsBrowser = false
+    @State private var showsSteamCMD = false
 
     var body: some View {
         let steam = model.steam
@@ -24,7 +26,7 @@ struct SteamPanel: View {
 
             account(steam)
 
-            if steam.isSignedIn {
+            if steam.isSignedIn, !steam.isQRSignIn {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Download").font(.system(size: 13, weight: .semibold))
                     HStack {
@@ -51,6 +53,7 @@ struct SteamPanel: View {
         }
         .padding(22)
         .frame(width: 520, height: 560)
+        .onDisappear { steam.cancelQRSignIn() }
         .sheet(isPresented: $showsBrowser) {
             SteamWorkshopBrowser { id in
                 model.steam.download(id)
@@ -61,7 +64,7 @@ struct SteamPanel: View {
     @ViewBuilder
     private func account(_ steam: SteamWorkshop) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let account = steam.account {
+            if let account = steam.account, !steam.isQRSignIn {
                 HStack {
                     Image(systemName: "person.crop.circle.badge.checkmark").foregroundStyle(Theme.playing)
                     Text("Signed in as \(account)")
@@ -69,37 +72,67 @@ struct SteamPanel: View {
                     Button("Sign Out") { steam.signOut() }
                         .disabled(steam.isBusy)
                 }
+                if steam.usesSteamCMD { qrSignInButton(steam) }
             } else {
-                Text("Workshop downloads need a Steam account that owns Wallpaper Engine. Lumen uses Valve's own SteamCMD; your password goes straight to it and isn't saved. SteamCMD remembers the sign-in afterwards.")
+                Text("Workshop downloads need a Steam account that owns Wallpaper Engine.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Form {
-                    TextField("Steam account name", text: $username)
-                    SecureField("Password", text: $password)
-                }
-                .formStyle(.columns)
-                HStack {
-                    if steam.isSigningIn {
+                if let challenge = steam.qrChallenge {
+                    HStack(alignment: .center, spacing: 16) {
+                        SteamSignInCode(url: challenge)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Scan with Steam Guard in the Steam Mobile app, then approve the sign-in.")
+                            Button("Cancel") { steam.cancelQRSignIn() }
+                        }
+                        .font(.system(size: 13))
+                    }
+                } else if steam.isQRSignIn {
+                    HStack {
                         ProgressView().controlSize(.small)
-                        Text(steam.isInstalling ? "Installing SteamCMD…" : "Signing in…")
-                            .foregroundStyle(.secondary)
+                        Text("Requesting a Steam QR code…").foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Cancel") { steam.cancelQRSignIn() }
                     }
-                    if let error = steam.signInError {
-                        Text(error).foregroundStyle(.red).font(.system(size: 12))
+                } else {
+                    qrSignInButton(steam)
+                    DisclosureGroup("Advanced: Sign In with SteamCMD", isExpanded: $showsSteamCMD) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            TextField("Steam account name", text: $username)
+                            SecureField("Password", text: $password)
+                            HStack {
+                                if steam.isSigningIn {
+                                    ProgressView().controlSize(.small)
+                                    Text(steam.isInstalling ? "Installing SteamCMD…" : "Signing in…")
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button("Sign In") {
+                                    steam.signIn(username: username, password: password)
+                                    password = ""
+                                }
+                                .disabled(username.isEmpty || password.isEmpty || steam.isBusy)
+                            }
+                        }
+                        .padding(.top, 8)
                     }
-                    Spacer()
-                    Button("Sign In") {
-                        steam.signIn(username: username, password: password)
-                        password = ""
-                    }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(username.isEmpty || password.isEmpty || steam.isSigningIn)
                 }
+            }
+            if let error = steam.signInError {
+                Text(error).foregroundStyle(.red).font(.system(size: 12))
             }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.surface))
+    }
+
+    private func qrSignInButton(_ steam: SteamWorkshop) -> some View {
+        Button {
+            steam.beginQRSignIn()
+        } label: {
+            Label("Sign In with Steam QR Code", systemImage: "qrcode")
+        }
+        .buttonStyle(.glass)
+        .disabled(steam.isBusy)
     }
 
     @ViewBuilder
@@ -120,13 +153,10 @@ struct SteamPanel: View {
             case .mobileConfirmation:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Approve the sign-in in the Steam Mobile app on your phone.")
+                    Text("Open Steam Guard in the Steam Mobile app, choose Steam Client, and approve the sign-in.")
                         .font(.system(size: 13))
+                    Button("Cancel") { model.steam.cancelPrompt() }
                 }
-            case .password:
-                Text("Steam needs your password again. Sign out and sign in once more.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(14)
@@ -168,6 +198,31 @@ struct SteamPanel: View {
     }
 }
 
+private struct SteamSignInCode: View {
+    let url: URL
+    private static let context = CIContext()
+
+    private var image: CGImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(url.absoluteString.utf8)
+        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 5, y: 5)) else { return nil }
+        return Self.context.createCGImage(output, from: output.extent)
+    }
+
+    var body: some View {
+        if let image {
+            Image(decorative: image, scale: 1)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 128, height: 128)
+                .padding(10)
+                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityLabel(Text("Steam sign-in QR code"))
+        }
+    }
+}
+
 private struct DownloadRow: View {
     let download: SteamWorkshop.Download
     let open: (UUID) -> Void
@@ -200,7 +255,7 @@ private struct DownloadRow: View {
         case .queued:
             Text("Waiting").font(.system(size: 11.5)).foregroundStyle(.secondary)
         case .preparing:
-            Text("Starting SteamCMD…").font(.system(size: 11.5)).foregroundStyle(.secondary)
+            Text("Preparing download…").font(.system(size: 11.5)).foregroundStyle(.secondary)
         case .downloading(let progress):
             if let progress {
                 ProgressView(value: progress).frame(width: 140)

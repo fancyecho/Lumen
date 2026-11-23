@@ -1,0 +1,5 @@
+module LumenArchive [system] {
+    header "LumenArchive.h"
+    link "archive"
+    export *
+}

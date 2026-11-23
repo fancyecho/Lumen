@@ -13,11 +13,13 @@ enum SteamCMD {
 
     static var isInstalled: Bool { FileManager.default.fileExists(atPath: script.path) }
 
-    enum Failure: LocalizedError {
+    enum Failure: LocalizedError, Equatable {
         case installFailed(String)
         case invalidPassword
         case guardCodeRejected
         case rateLimited
+        case connectionFailed
+        case guardRequired
         case accessDenied
         case notSignedIn
         case downloadFailed(String)
@@ -29,12 +31,47 @@ enum SteamCMD {
             case .invalidPassword: String(localized: "Steam didn't accept the password.")
             case .guardCodeRejected: String(localized: "Steam didn't accept the Steam Guard code.")
             case .rateLimited: String(localized: "Steam is limiting sign-in attempts. Wait a while and try again.")
+            case .connectionFailed: String(localized: "Steam couldn't connect. Check your network and system HTTP/HTTPS proxy, then try again.")
+            case .guardRequired: String(localized: "Steam requires Steam Guard verification. Finish the approval or enter a current code and try again.")
             case .accessDenied: String(localized: "This Steam account can't download it. Workshop downloads need an account that owns Wallpaper Engine.")
             case .notSignedIn: String(localized: "Sign in to Steam first.")
             case .downloadFailed(let reason): String(localized: "The download failed: \(reason)")
             case .cancelled: String(localized: "Cancelled.")
             }
         }
+
+        /// SteamCMD uses the same result names in its terminal and console log.
+        static func fromOutput(_ line: String) -> Self? {
+            let text = line.lowercased()
+            if text.contains("invalid password") || text.contains("invalidpassword") { return .invalidPassword }
+            if text.contains("invalid login auth code") || text.contains("two-factor code mismatch")
+                || text.contains("invalid two-factor") || text.contains("twofactormismatch") { return .guardCodeRejected }
+            if text.contains("rate limit") || text.contains("ratelimit") || text.contains("too many login failures") { return .rateLimited }
+            if text.contains("account logon denied") || text.contains("accountlogondenied")
+                || text.contains("accountlogonneedtwofactor") || text.contains("steam guard required") { return .guardRequired }
+            if text.contains("access denied") || text.contains("no subscription") { return .accessDenied }
+            if text.contains("no connection") || text.contains("noconnection") || text.contains("connection failure")
+                || text.contains("connection reset") || text.contains("connection timed out") || text.contains("(timeout)")
+                || text.hasSuffix(": timeout") || text.hasSuffix(" timeout") || text == "timeout" {
+                return .connectionFailed
+            }
+            return nil
+        }
+
+        fileprivate var diagnosticPriority: Int {
+            switch self {
+            case .downloadFailed: 0
+            case .connectionFailed: 1
+            default: 2
+            }
+        }
+    }
+
+    /// Pauses before up to three retries, only once the download run has authenticated.
+    static func retryDelay(attempt: Int, authenticated: Bool, failure: Failure, cancelled: Bool) -> Duration? {
+        let seconds = [2, 8, 30]
+        guard !cancelled, authenticated, failure == .connectionFailed, seconds.indices.contains(attempt) else { return nil }
+        return .seconds(seconds[attempt])
     }
 
     /// Downloads and unpacks SteamCMD (about 3 MB; it updates itself on first run).
@@ -65,10 +102,9 @@ enum SteamCMD {
     }
 }
 
-/// One SteamCMD run, reading its output line by line from a pseudo-terminal.
+/// One SteamCMD run. The result includes diagnostics collected before the caller resumes.
 final class SteamCMDSession: @unchecked Sendable {
     enum Event {
-        case output(String)
         case needsPassword
         case needsGuardCode(email: Bool)
         case needsMobileConfirmation
@@ -78,9 +114,19 @@ final class SteamCMDSession: @unchecked Sendable {
         case failed(SteamCMD.Failure)
     }
 
+    struct Result {
+        var status: Int32 = -1
+        var loggedIn = false
+        var downloads: [String: String] = [:]
+        var failure: SteamCMD.Failure?
+    }
+
     private let process = Process()
+    private let logURL: URL
     private var master: Int32 = -1
     private var buffer = ""
+    private var result = Result()
+    private var stopReason: SteamCMD.Failure?
     private let queue = DispatchQueue(label: "app.lumen.steamcmd")
     private var source: DispatchSourceRead?
     var onEvent: (@Sendable (Event) -> Void)?
@@ -89,105 +135,183 @@ final class SteamCMDSession: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = [script.path] + arguments
         let home = script.deletingLastPathComponent()
+        logURL = home.appending(path: "logs/console_log.txt")
         process.currentDirectoryURL = home
         var environment = ProcessInfo.processInfo.environment
         environment["HOME"] = home.path
         process.environment = environment
     }
 
-    /// Starts SteamCMD and returns its exit status when it finishes.
-    func run() async -> Int32 {
+    func run() async -> Result {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                queue.async { self.launch(continuation) }
+            }
+        } onCancel: {
+            cancel()
+        }
+    }
+
+    private func launch(_ continuation: CheckedContinuation<Result, Never>) {
+        if let stopReason {
+            continuation.resume(returning: Result(failure: stopReason))
+            return
+        }
         var masterFD: Int32 = 0, slaveFD: Int32 = 0
-        guard openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else { return -1 }
+        guard openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
+            continuation.resume(returning: Result())
+            return
+        }
         master = masterFD
+        _ = fcntl(masterFD, F_SETFL, O_NONBLOCK)
+        var tty = termios()
+        if tcgetattr(slaveFD, &tty) == 0 {
+            tty.c_lflag &= ~tcflag_t(ECHO)
+            tcsetattr(slaveFD, TCSANOW, &tty)
+        }
         let slave = FileHandle(fileDescriptor: slaveFD, closeOnDealloc: true)
         process.standardInput = slave
         process.standardOutput = slave
         process.standardError = slave
 
+        let logBefore = ConsoleLogPosition(url: logURL)
         let source = DispatchSource.makeReadSource(fileDescriptor: masterFD, queue: queue)
         source.setEventHandler { [weak self] in self?.readAvailable() }
+        source.setCancelHandler { close(masterFD) }
         source.resume()
         self.source = source
 
-        return await withCheckedContinuation { continuation in
-            process.terminationHandler = { [weak self] process in
-                self?.queue.async {
-                    self?.readAvailable()
-                    self?.source?.cancel()
-                    if let master = self?.master, master >= 0 { close(master) }
-                    self?.master = -1
-                    continuation.resume(returning: process.terminationStatus)
+        process.terminationHandler = { [self] process in
+            queue.async {
+                self.readAvailable()
+                if !self.buffer.isEmpty { _ = self.interpret(self.buffer, complete: true) }
+                self.result.status = process.terminationStatus
+                if let stopReason = self.stopReason {
+                    self.result.failure = stopReason
+                } else if process.terminationStatus != 0 || self.result.failure != nil || !self.result.loggedIn {
+                    self.readNewDiagnostics(after: logBefore)
                 }
-            }
-            do {
-                try process.run()
-                try? slave.close()
-            } catch {
-                continuation.resume(returning: -1)
+                self.closePTY()
+                self.process.terminationHandler = nil
+                continuation.resume(returning: self.result)
             }
         }
+        do {
+            try process.run()
+        } catch {
+            process.terminationHandler = nil
+            closePTY()
+            continuation.resume(returning: result)
+        }
+        try? slave.close()
     }
 
-    /// Answers a prompt (password, Steam Guard code).
     func send(_ line: String) {
         queue.async { [weak self] in
-            guard let self, self.master >= 0 else { return }
-            let data = Array((line + "\n").utf8)
-            _ = data.withUnsafeBytes { write(self.master, $0.baseAddress, $0.count) }
+            guard let self, self.stopReason == nil, self.master >= 0 else { return }
+            let bytes = Array((line + "\n").utf8)
+            _ = bytes.withUnsafeBytes { write(self.master, $0.baseAddress, $0.count) }
         }
     }
 
     func cancel() {
-        if process.isRunning { process.terminate() }
+        stop(.cancelled)
+    }
+
+    func stop(_ reason: SteamCMD.Failure) {
+        queue.async {
+            self.stopReason = reason
+            if self.process.isRunning { self.process.terminate() }
+        }
+    }
+
+    private func closePTY() {
+        master = -1
+        source?.cancel()
+        source = nil
     }
 
     private func readAvailable() {
         guard master >= 0 else { return }
         var bytes = [UInt8](repeating: 0, count: 8192)
-        let count = read(master, &bytes, bytes.count)
-        guard count > 0 else { return }
-        buffer += String(decoding: bytes[0..<count], as: UTF8.self)
-        // Prompts don't end with a newline, so check the unfinished line too.
-        var lines = buffer.components(separatedBy: CharacterSet(charactersIn: "\r\n"))
-        let pending = lines.removeLast()
-        for line in lines where !line.isEmpty { interpret(line, complete: true) }
-        buffer = pending
-        if !pending.isEmpty, interpret(pending, complete: false) { buffer = "" }
+        while true {
+            let count = read(master, &bytes, bytes.count)
+            guard count > 0 else { break }
+            buffer += String(decoding: bytes[0..<count], as: UTF8.self)
+            let lines = buffer.components(separatedBy: CharacterSet(charactersIn: "\r\n"))
+            buffer = String((lines.last ?? "").suffix(8192))
+            for line in lines.dropLast() where !line.isEmpty { _ = interpret(line, complete: true) }
+            if !buffer.isEmpty, interpret(buffer, complete: false) { buffer = "" }
+        }
     }
 
-    /// Returns true when an unfinished line was a prompt that has been handled.
-    @discardableResult
     private func interpret(_ raw: String, complete: Bool) -> Bool {
         let line = raw.trimmingCharacters(in: .whitespaces)
         let lower = line.lowercased()
-        if complete { onEvent?(.output(line)) }
         if lower.hasSuffix("password:") {
-            onEvent?(.needsPassword)
+            if result.failure != .invalidPassword { onEvent?(.needsPassword) }
             return true
         }
-        if lower.contains("steam guard code") || lower.contains("two-factor code") || lower.contains("two factor code") {
-            if lower.hasSuffix(":") || complete {
-                onEvent?(.needsGuardCode(email: lower.contains("email")))
-                return !complete
-            }
+        if lower.hasSuffix(":"), lower.contains("steam guard code") || lower.contains("two-factor code") || lower.contains("two factor code") {
+            onEvent?(.needsGuardCode(email: lower.contains("email")))
+            return true
         }
         guard complete else { return false }
+
         if lower.contains("confirm the login in the steam mobile app") { onEvent?(.needsMobileConfirmation) }
-        if lower.contains("logged in ok") || lower.contains("waiting for user info...ok") { onEvent?(.loggedIn) }
-        if lower.contains("invalid password") { onEvent?(.failed(.invalidPassword)) }
-        if lower.contains("invalid login auth code") || lower.contains("two-factor code mismatch") || lower.contains("invalid two-factor") {
-            onEvent?(.failed(.guardCodeRejected))
+        if !result.loggedIn, lower.contains("logged in ok") || lower.contains("waiting for user info...ok") {
+            result.loggedIn = true
+            onEvent?(.loggedIn)
         }
-        if lower.contains("rate limit exceeded") { onEvent?(.failed(.rateLimited)) }
-        if lower.contains("access denied") || lower.contains("no subscription") { onEvent?(.failed(.accessDenied)) }
+        if let failure = SteamCMD.Failure.fromOutput(line) {
+            record(failure)
+            // Some SteamCMD releases leave the login prompt open after a rejected password.
+            if failure == .invalidPassword, process.isRunning { process.terminate() }
+            return false
+        }
         if let match = line.firstMatch(of: /\[\s*(\d+)%\]/), let percent = Double(match.1) { onEvent?(.progress(percent / 100)) }
         if let match = line.firstMatch(of: /Success\. Downloaded item (\d+) to "(.+)"/) {
-            onEvent?(.downloaded(id: String(match.1), path: String(match.2)))
-        } else if let match = line.firstMatch(of: /ERROR! Download item \d+ failed \((.+)\)/) {
-            let reason = String(match.1)
-            onEvent?(.failed(reason.lowercased().contains("access denied") ? .accessDenied : .downloadFailed(reason)))
+            let id = String(match.1), path = String(match.2)
+            result.downloads[id] = path
+            onEvent?(.downloaded(id: id, path: path))
+        } else if line.firstMatch(of: /ERROR! Download item \d+ failed \((.+)\)/) != nil {
+            record(.downloadFailed(String(localized: "SteamCMD reported a Workshop download error.")))
         }
         return false
+    }
+
+    private func record(_ failure: SteamCMD.Failure) {
+        guard result.failure != failure else { return }
+        if (result.failure?.diagnosticPriority ?? -1) <= failure.diagnosticPriority { result.failure = failure }
+        onEvent?(.failed(failure))
+    }
+
+    private struct ConsoleLogPosition {
+        let inode: UInt64?
+        let size: UInt64
+
+        init(url: URL) {
+            let values = try? FileManager.default.attributesOfItem(atPath: url.path)
+            inode = (values?[.systemFileNumber] as? NSNumber)?.uint64Value
+            size = (values?[.size] as? NSNumber)?.uint64Value ?? 0
+        }
+    }
+
+    private func readNewDiagnostics(after before: ConsoleLogPosition) {
+        let now = ConsoleLogPosition(url: logURL)
+        guard now.inode != nil, let file = try? FileHandle(forReadingFrom: logURL) else { return }
+        defer { try? file.close() }
+        let since = now.inode == before.inode && now.size >= before.size ? before.size : 0
+        let start = max(since, now.size > 65_536 ? now.size - 65_536 : 0)
+        guard now.size > start else { return }
+        do {
+            try file.seek(toOffset: start)
+            let data = try file.read(upToCount: Int(now.size - start)) ?? Data()
+            for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
+                if let failure = SteamCMD.Failure.fromOutput(String(line)) { record(failure) }
+            }
+        } catch {
+            // Terminal diagnostics remain authoritative when SteamCMD can't write its log.
+        }
     }
 }

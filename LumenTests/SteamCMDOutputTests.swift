@@ -49,20 +49,64 @@ final class SteamCMDOutputTests: XCTestCase {
         guard case .failed(.invalidPassword) = events[0],
               case .failed(.guardCodeRejected) = events[1],
               case .failed(.rateLimited) = events[2],
-              case .failed(.downloadFailed(let reason)) = events[3] else {
+              case .failed(.connectionFailed) = events[3] else {
             return XCTFail("Unexpected SteamCMD failures: \(events)")
         }
 
-        XCTAssertEqual(reason, "Timeout")
     }
 
-    private func runTranscript(_ transcript: String) async throws -> (status: Int32, events: [SteamCMDSession.Event]) {
-        let script = try makeFixtureDirectory().appending(path: "fake-steamcmd.sh")
+    func testReadsOnlyNewConsoleDiagnosticsWhenTheTerminalIsGeneric() async throws {
+        let output = try await runTranscript(#"""
+        printf '[fixture] Steam login failed: No Connection\n' >> logs/console_log.txt
+        printf 'SteamCMD could not complete the request.\n'
+        exit 5
+        """#, previousLog: "FAILED (Invalid Password)\n")
+        XCTAssertEqual(output.result.failure, .connectionFailed)
+        XCTAssertFalse(output.result.loggedIn)
+
+        let silent = try await runTranscript("exit 5", previousLog: "FAILED (Rate Limit Exceeded)\n")
+        XCTAssertNil(silent.result.failure)
+    }
+
+    func testSignalsGuardAndRetriesOnlyNetworkFailuresAfterLogin() {
+        XCTAssertEqual(SteamCMD.Failure.fromOutput("FAILED (AccountLogonDenied)"), .guardRequired)
+        XCTAssertEqual(SteamCMD.Failure.fromOutput("FAILED (RateLimitExceeded)"), .rateLimited)
+        for (attempt, seconds) in [2, 8, 30].enumerated() {
+            XCTAssertEqual(SteamCMD.retryDelay(attempt: attempt, authenticated: true, failure: .connectionFailed,
+                                               cancelled: false), .seconds(seconds))
+        }
+        XCTAssertNil(SteamCMD.retryDelay(attempt: 3, authenticated: true, failure: .connectionFailed, cancelled: false))
+        XCTAssertNil(SteamCMD.retryDelay(attempt: 0, authenticated: false, failure: .connectionFailed, cancelled: false))
+        XCTAssertNil(SteamCMD.retryDelay(attempt: 0, authenticated: true, failure: .invalidPassword, cancelled: false))
+        XCTAssertNil(SteamCMD.retryDelay(attempt: 0, authenticated: true, failure: .connectionFailed, cancelled: true))
+    }
+
+    func testStopsAfterRejectedPassword() async throws {
+        let output = try await runTranscript(#"""
+        printf 'Password: '
+        IFS= read -r -t 5 password || exit 10
+        printf '\nFAILED (Invalid Password)\nPassword: '
+        IFS= read -r -t 5 second || exit 5
+        exit 20
+        """#)
+        XCTAssertEqual(output.result.failure, .invalidPassword)
+        let requests = output.events.filter { if case .needsPassword = $0 { true } else { false } }
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    private func runTranscript(_ transcript: String, previousLog: String? = nil) async throws
+        -> (status: Int32, result: SteamCMDSession.Result, events: [SteamCMDSession.Event]) {
+        let folder = try makeFixtureDirectory()
+        let script = folder.appending(path: "fake-steamcmd.sh")
+        if let previousLog {
+            let logs = folder.appending(path: "logs")
+            try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+            try previousLog.write(to: logs.appending(path: "console_log.txt"), atomically: true, encoding: .utf8)
+        }
         try transcript.write(to: script, atomically: true, encoding: .utf8)
         let session = SteamCMDSession(arguments: [], script: script)
         let events = OSAllocatedUnfairLock(initialState: [SteamCMDSession.Event]())
         session.onEvent = { [weak session] event in
-            if case .output = event { return }
             events.withLock { $0.append(event) }
             switch event {
             case .needsPassword: session?.send("fixture-password")
@@ -71,7 +115,7 @@ final class SteamCMDOutputTests: XCTestCase {
             }
         }
 
-        let status = await session.run()
-        return (status, events.withLock { $0 })
+        let result = await session.run()
+        return (result.status, result, events.withLock { $0 })
     }
 }
