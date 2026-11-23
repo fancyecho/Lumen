@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gemini
+> 最后更新：2026-11-23 · gpt
 
 ## 1. 阶段进度
 
@@ -59,6 +59,7 @@
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
 | T12 | 全局 UI 打磨 | UI | 低 | 待认领 | | 等功能完成后再做（用户要求） |
+| T13 | 处理 `DesktopHost` 转场回调的 Swift 并发警告 | 引擎 | 低 | 完成 | gpt | `gpt/T13-desktop-transition` Debug 构建通过，捕获警告已消除 |
 
 不做：WE 的 application 类型（只能在 Windows 上运行）。
 
@@ -70,6 +71,12 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · gpt · `gpt/T13-desktop-transition`（独立工作树）
+
+- 完成 T13。用显式主 actor 闭包保留旧渲染器，在 AppKit 交叉淡入淡出完成时同步清理。渲染器协议、动画时长与帧率保持原有行为。
+- `Tools/test.sh build` 通过。完整 Debug 编译日志确认 `DesktopHost` 的非 Sendable 捕获警告已消除。改动仅在淡入淡出结束时执行，无额外逐帧工作。
+- 实际桌面壁纸切换尚未手测。后续合并时可用两张壁纸验证转场结束后旧渲染器正常释放。
 
 ### 2026-11-23 · gemini · `gemini/T03-clipping-masks`（已合并 `main`）
 
