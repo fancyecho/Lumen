@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · claude（T19）
+> 最后更新：2026-11-23 · claude（第三次合并）
 
 ## 1. 阶段进度
 
@@ -36,11 +36,11 @@
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
 | 加载耗时（着色器缓存命中） | 中位 0.39s，最大 1.4s |
-| GPU 帧时间（原生约 4.7MP） | 中位 4.7ms，p90 9.1ms，最大 14.8ms；`LUMEN_BENCH=1` 连续 60 帧：中位约 4.9ms、均值约 5.6ms |
-| 着色器翻译 + 编译 | 310/316 通过（剩下 6 个是 3D 模型用的：fur4、chroma4、generic4、foliage4、volumetricsfront、puppettexturechannels） |
+| GPU 帧时间（原生约 4.7MP） | 中位 4.3ms，p90 9.8ms，最大 17.2ms |
+| 着色器翻译 + 编译 | 315/316 通过 |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 18/18 通过 |
+| 单元测试（`Tools/test.sh unit`） | 23/23 通过 |
 
 ## 3. 任务板
 
@@ -52,10 +52,10 @@
 | T02 | 木偶变形（puppet warp）：MDL 解析、骨骼蒙皮（genericimage4 `SKINNING` / `g_Bones`）、animationlayers、MDL 内嵌裁剪蒙版（`clippingmaskimage4`） | 场景 | 高 | 完成 | gemini | 已合并 `main`（`ca5ee70`）：MDL 网格、骨骼蒙皮、animationlayers、MDL 内嵌裁剪蒙版；Chisa 眼睛错位已修复。未做：`MORPHING` |
 | T03 | 图层裁剪蒙版（clipping masks） | 场景 | 高 | 完成 | gemini | 已合并 `main`：跨层合成目标 `_rt_imageLayerComposite_*`、链式 `colorBlendMode` 最终合成、目标清空同步、`startpaused` 及相关着色器翻译修复；3808922316/3615984066/3397287008/2983846453 均已修复 |
 | T04 | 音频响应：系统音频频谱（`g_AudioSpectrum*`、脚本 audio buffer） | 场景/Web | 中 | 待验证 | claude | 已合并 `main`（`cc2990e`）。需用户授权「录制系统音频」后用真实音乐验收手感 |
-| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 分支 `claude/T05-lockscreen-rendered`：场景离屏录 30 秒、网页快照录 12 秒，末尾溶回首帧做无缝循环，再走原有一小时编辑列表。只缺真机安装验证（会改系统锁屏，需用户开启） |
+| T05 | 场景/Web 壁纸的锁屏：录一段循环视频交给 `LockScreenVideoBuilder` | 锁屏 | 中 | 待验证 | claude | 已合并 `main`（`e079a73`）：场景离屏录 30 秒、网页快照录 12 秒做锁屏循环。待用户开启锁屏实测 |
 | T06 | SceneScript 鼠标事件（cursorClick/Down/Up/Move 等） | 场景 | 中 | 完成 | gpt | 已合并 `main`（`144ffe7`）：2D 图层六种鼠标事件 |
-| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 进行中 | gemini | 分支 `gemini/T07-timeline-and-layout`（工作树 `build/worktrees/gemini-T07`）：核查 3436945972 片头/时间线与视差下拉框（`2`=关），以及 3463692991 多画幅布局 |
-| T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 待认领 | | 对应 18 个编译失败的着色器中的大部分 |
+| T07 | 片头/时间线类场景（如 3436945972），以及 3463692991 的布局问题 | 场景 | 中 | 完成 | gemini | 分支 `gemini/T07-timeline-and-layout`（工作树 `build/worktrees/gemini-T07`，待提交）：实现 `thisScene.destroyLayer` 与帧时钟 `setTimeout`/`clearTimeout`；支持二选一开/关下拉框直绑布尔与嵌套用户属性回退；实现文本层 `limitwidth`/`limitrows`/省略号自动换行、对齐锚点偏移及 4096 纹理缩放一致性修复。3436945972 片头淡出与视差开关、3463692991/2867182492 文本布局均已修复 |
+| T08 | 3D 模型与光照（`PerformLighting_V1`）、体积光 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`c0a0e7f`）。`gpt/T08-scene-lighting`。静态单网格、点光照与正交点光体积通过应用预览和真实桌面验证，已提交 |
 | T09 | 为解析器补 XCTest：pkg、tex、project.json、着色器预处理、SteamCMD 输出 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`3f51c54`）：14 项 XCTest，`Tools/test.sh unit` |
 | T10 | 真实 Steam 登录和下载的端到端验证 | Steam | 中 | 待认领 | 需用户 | 必须用户本人登录，助手不得代输密码 |
 | T11 | 新界面文案翻译（Workshop、Steam 面板、WE 设置、属性面板、添加网页） | UI | 低 | 待认领 | | 放到阶段 5 |
@@ -65,8 +65,8 @@
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
 | T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
 | T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 完成 | gpt | `gpt/T17-visual-regression`。CLI 对本轮渲染做 0–100 相似度排序，输出 JSON 与最差 N 张对比拼图。全库 75/75 配对成功，待提交 |
-| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 进行中 | gpt | `gpt/T18-scene-animation-control`，接入命名和属性绑定的时间线动画 |
-| T19 | 修复仍编译失败的 10 个工坊特效着色器（翻译层）：数组初始化、`clamp` 歧义、向量隐式截断、`sample`/`currentColor` 等未声明标识符、宏展开语法 | 场景 | 中 | 待验证 | claude | 分支 `claude/T19-shader-translation`：10 个工坊特效全部能编译（着色器 300→310/316），剩下 6 个都是 3D 用的（归 T08）。全库渲染与 main 对比无回归 |
+| T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`640bb08`）。`gpt/T18-scene-animation-control`。具名及绑定属性时间线支持播放控制，共用轨道同步。23 项 XCTest 和 75/75 场景通过 |
+| T19 | 修复仍编译失败的 10 个工坊特效着色器（翻译层）：数组初始化、`clamp` 歧义、向量隐式截断、`sample`/`currentColor` 等未声明标识符、宏展开语法 | 场景 | 中 | 完成 | claude | 已合并 `main`（`a5b0c5e`）：10 个工坊特效能编译 |
 | T20 | 3347416586（海边摩托）画面上有大片白色「裂纹」图层，作者预览里没有：查明是哪层、为什么可见（可能是条件可见、遮罩或混合模式） | 场景 | 中 | 待认领 |  | T19 修好该场景的模糊特效后发现；对照 `build/tools/scenes/3347416586-ref.png` |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
@@ -82,7 +82,20 @@
 
 ## 5. 交接日志（新的写在最上面）
 
-### 2026-11-23 · claude · 分支 `claude/T19-shader-translation`（未合并）
+### 2026-11-23 · claude · 第三次合并到 `main`
+
+- 合并了 `claude/T19-shader-translation`、`claude/T05-lockscreen-rendered`、`gpt/T08-scene-lighting`、`gpt/T18-scene-animation-control`；代码无冲突。未提交的 `gemini/T07`、`gpt/T17` 没有合并。
+- 合并后验证：build 通过；`unit` 23/23；`shaders` 315/316；`scenes` 75/75、0 洋红；`steam` 通过。
+- **之后开工请从最新 `main` 拉新分支**（T07、T17 需要先合并/变基到最新 `main`）。
+
+### 2026-11-23 · gpt · `gpt/T18-scene-animation-control`（独立工作树）
+
+- 完成 T18。`thisLayer.getAnimation(name)` 获取具名时间线，`thisObject.getAnimation()` 获取当前绑定属性的时间线。支持播放、暂停、继续、停止复位、单次重播、读写帧和非负速率。同一图层的关联属性共用播放位置。[Wallpaper Engine IAnimation](https://docs.wallpaperengine.io/en/scene/scenescript/reference/class/IAnimation.html)
+- `SceneLoader` 提供图层时间线声明，`SceneScriptRuntime.Change` 把受控帧交给 `SceneDocument.Object.state`。复用已有场景时钟和暂停策略，CPU 维护脚本控制的播放位置，GPU 沿用原有绘制流程。三个场景的同机 60 帧交替复测，GPU 中位数原版 6.50 ms、T18 6.67 ms。
+- Debug 构建通过，XCTest 23/23，场景 75/75、0 洋红，着色器 300/316。JavaScriptCore 用例验证具名和无参查找、状态、速率及实例隔离。9 帧离屏 Metal 测试验证桌面点击事件经过脚本确实改变了图层位置和透明度。
+- 本次覆盖图层属性时间线。媒体事件回调、特效和木偶动画控制仍待接入，真实桌面交互尚未手测。T07 当前涉及的四份共用源码通过了补丁应用检查，正式合并时应由 xcodegen 重生成工程。
+
+### 2026-11-23 · claude · 分支 `claude/T19-shader-translation`（已合并 `main`）
 
 - **做了什么**：修好仍编译失败的 10 个工坊特效着色器（影响 8 个场景，之前这些特效被静默跳过），全部是 `WEShaderTranslator`/`WEShaderPreprocessor` 的问题：
   - **Swift 正则的 `\b` 默认按 Unicode 规则**，`fragment.x` 被当成一个词，保留字 `fragment` 没改名（test_shader）。保留字替换改用 `.wordBoundaryKind(.simple)`。其他用 `\b` 的正则检查过，不受影响。
@@ -95,6 +108,32 @@
 - **验证**：`shaders` 300→310/316；`scenes` 75/75、0 洋红；全库用 main 和本分支各渲染一遍逐图对比，只有修好的场景有变化（另有两个场景本身每次渲染都不一样，属正常）；`unit` 18/18；build 通过。
 - **发现**：3347416586 修好模糊后，画面上仍有大片白色「裂纹」图层，作者预览里没有，已记为 T20。
 - **建议下一步**：剩下 6 个 3D 着色器缺 `PerformLighting_V1` 等光照函数，留给 T08。
+
+### 2026-11-23 · claude · 分支 `claude/T05-lockscreen-rendered`（已合并 `main`）
+
+- **做了什么**：场景和网页壁纸现在也能当锁屏（以前保留上一个视频）。
+  - 场景（`SceneLoopRecorder`）：离屏加载场景，先预热 3 秒（片头、粒子、脚本稳定下来），再按 30fps 录 30 秒；最后 1.5 秒溶回第一帧，所以一小时的重复没有跳变。画面按壁纸的 framing/缩放放置，和桌面一致。场景里有视频纹理时按真实时间录（视频跟墙钟走），否则全速录。声音不播放。
+  - 网页（`WebLoopRecorder`）：在屏幕外窗口里打开页面，用 WebKit 私有开关 `_setWindowOcclusionDetectionEnabled:` 让它在不可见时继续动画；每秒最多 30 张快照、按实际时间戳编码，录 12 秒，最后 1 秒溶回首帧。
+  - `LoopVideoWriter`：从 Metal 纹理或 CGImage 写 HEVC，场景、网页共用。
+  - `LockScreenManager`：场景缺包文件或缺 WE assets、网页缺文件时才保留旧锁屏（`.keepingPrevious`），设置页文案相应改了（英文，待翻译）。缓存键加入用户属性值，改了属性会重录。
+  - `WebRenderer` 新增 `keepRenderingWhenOccluded()` 和 `snapshot()`，只给录制用。
+- **验证**：build 通过。`Tools/test.sh lockloop`（新命令，不安装）实测：Chisa 30 秒录制用时 18 秒、41MB，首尾帧 0% 差异；清风 18 秒、38MB；网页「樱花」12 秒、20fps、11.5MB，花瓣在动，首尾帧 0% 差异。
+- **没验证**：真正安装到系统锁屏（会改用户的锁屏设置），需要用户在「设置 › 锁屏」开启后看一眼。
+- **代价**：录制只在锁屏的跟随壁纸变化时跑一次，场景约 20 秒 GPU 负载、网页约 15 秒；产物每个 10–40MB，沿用原来「只保留最新 4 个」的缓存清理。
+
+### 2026-11-23 · gpt · `gpt/T08-scene-lighting` · `c0a0e7f`（桌面验证通过）
+
+- 用隔离 Debug 构建在 2940×1912 的登录桌面验证原版球体、工坊 `3287715210` 体积光开关和 `3652110998` Galaxy。详情页、桌面和暂停恢复共 9 帧通过 Metal 呈现确认，各帧均采用 30 fps 设置。读回与日志保存在工作树的 `build/tools/t08-native`。
+- 球体中心与背景在两条呈现路径的采样一致。体积光开启后灯心附近 RGB 中位数各增加 23，范围外四处采样一致。目视确认两条路径都显示球体高光、角色周围的体积光和 Galaxy 星空。
+- 已撤下测试覆盖层、删除四个测试导入及隔离版的偏好键。真实 Lumen 资源库、偏好与系统桌面和锁屏记录的测试前后校验值一致。
+- 当前支持范围通过验收。多网格、蒙皮及带阴影的体积光仍待扩展，后续可用对应的真实模型样本继续验证。
+
+### 2026-11-23 · gpt · `gpt/T08-scene-lighting`（待验证，未提交）
+
+- 新增静态单网格 `.mdl` 模型绘制，支持正交与透视相机、材质深度测试和写入。四个内置材质可通过 `PerformLighting_V1` 接收场景点光，光源跟随场景变换和可见性。正交点光体积按光源范围做加法混合。
+- Build 通过，XCTest 18/18，场景 75/75、0 洋红，着色器 305/316（主分支 300/316）。Metal 像素验证覆盖原版球体、透视远裁剪、遮挡与跨 2D 绘制深度、点光半径内衰减、半径外不变和脚本可见性。工坊 `3287715210` 开关体积光时，灯心附近 RGB 中位各增加 23，范围外采样一致。工坊 `3652110998` 恢复原先因光照着色器编译失败而跳过的 Galaxy 层。
+- 深度附件仅分配给需要深度的模型目标，每盏体积光最多四次积分采样，无额外全屏缓冲。工坊 `3287715210` 的 2844×1600、60 帧比较中位约增加 0.49ms。全库串行复测 GPU 中位 5.20ms、p90 9.38ms、最大 16.02ms，加载中位 0.50s。同环境重跑 `main` 的 GPU 中位 4.34ms、p90 8.96ms、最大 16.27ms，加载中位 0.41s。按场景配对的单帧差值中位 +0.02ms。波动最大的三个样本补跑 60 帧，差值为 −0.99、+0.09、−0.03ms。恢复 Galaxy 的场景为 +2.39ms，体积光场景为 +0.55ms。
+- 待桌面画面对照。当前范围为静态单网格、点光与无阴影的正交体积光。蒙皮、多网格、模型特效、其他光源和透视体积光仍待扩展。剩余 11 个编译失败项为 10 个工坊特效（T19）和内置 `puppettexturechannels`。
 
 ### 2026-11-23 · claude · 第二次合并到 `main`
 
