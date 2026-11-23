@@ -51,6 +51,12 @@ enum SceneLoadError: LocalizedError {
     case missingFile(String)
     case unsupported(String)
     case noAssets
+    case renderTargetAllocation
+
+    var canRetryAtLowerResolution: Bool {
+        if case .renderTargetAllocation = self { return true }
+        return false
+    }
 
     var errorDescription: String? {
         switch self {
@@ -58,6 +64,7 @@ enum SceneLoadError: LocalizedError {
         case .missingFile(let name): String(localized: "The scene needs “\(name)”, which isn't in the package or Wallpaper Engine's assets.")
         case .unsupported(let what): String(localized: "This scene uses \(what), which Lumen can't draw yet.")
         case .noAssets: String(localized: "Scenes need Wallpaper Engine's shared assets. Choose them in Settings › Wallpaper Engine.")
+        case .renderTargetAllocation: String(localized: "Lumen could not allocate the scene’s render targets.")
         }
     }
 }

@@ -15,6 +15,7 @@
 		094C53F09802B412D3E705FA /* WallpaperDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF80FEA1BD104EEFFA747879 /* WallpaperDetailView.swift */; };
 		0ED7940764A2A5CD2C83C349 /* DesktopPointerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E7C04D868C99F22094E91DF /* DesktopPointerMonitor.swift */; };
 		0FE35F7F808D88BF63AE2325 /* SteamWorkshop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A386460131D1C0DDF521B11 /* SteamWorkshop.swift */; };
+		131FA0FA5A6AA7AD1BEC0887 /* SceneResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9016D8F2536A223A8CC3D9BD /* SceneResolutionPolicy.swift */; };
 		137D3832EB26376356DCC1B2 /* NowPlayingBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C63CF187C4E862FB3FCB35 /* NowPlayingBar.swift */; };
 		14054500F5EADD2BE253861F /* PackageArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */; };
 		173DB01F2084478E5DB025E9 /* SceneValuesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E75E28C5A1DC04D996B3AE /* SceneValuesTests.swift */; };
@@ -60,6 +61,7 @@
 		66AD082C3B13A55B4C233150 /* SceneTextures.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5FFE7FCECB1E90C2B81F6A /* SceneTextures.swift */; };
 		6E71C3E48E0DB59B7EA8FDEB /* StudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FDDF22F86AD5CE72F399C7 /* StudioView.swift */; };
 		6FBF643940644EA3228599D7 /* LumenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068315FBE2E5B50B64DDFC0C /* LumenApp.swift */; };
+		71EB5F2C1E48C9C12F7E0340 /* SceneResolutionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777CE69E6D032644455C93BC /* SceneResolutionPolicyTests.swift */; };
 		78A71F0685250309A6BD666A /* WallpaperEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A8A05087F50BE21AF67935 /* WallpaperEngine.swift */; };
 		7CBE090D868EF178B7100A54 /* SteamCMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */; };
 		80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */; };
@@ -90,6 +92,7 @@
 		B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */; };
 		BB72D947572DB7EB720ECDD7 /* SteamNativeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */; };
 		BC452D9C051B3A4EEBA544CF /* WebRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D608A66374789D934A1E4C0B /* WebRenderer.swift */; };
+		BCAE5E3F1145328D0037747C /* SceneResolutionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9016D8F2536A223A8CC3D9BD /* SceneResolutionPolicy.swift */; };
 		BE3FC4814B9F9DF6E0B833AD /* SteamNativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */; };
 		BF81AAA72F88EFF9D0A5AFDC /* WallpaperRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */; };
 		C086B78155FD8DD67DE526A4 /* LocalContentSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A440091108727012FE21D5 /* LocalContentSchemeHandler.swift */; };
@@ -180,6 +183,7 @@
 		73A15438D98A68DE986D91F0 /* MenuBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPanel.swift; sourceTree = "<group>"; };
 		742E87EC609779C7783C9EC5 /* Framing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Framing.swift; sourceTree = "<group>"; };
 		77634FB81764312077A0248D /* OcclusionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OcclusionMonitor.swift; sourceTree = "<group>"; };
+		777CE69E6D032644455C93BC /* SceneResolutionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneResolutionPolicyTests.swift; sourceTree = "<group>"; };
 		796508CF82781CECA422D840 /* AmbientBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackdrop.swift; sourceTree = "<group>"; };
 		7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperEngineProject.swift; sourceTree = "<group>"; };
 		7AA846667F3CFACF39D18E8E /* SceneParticles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneParticles.swift; sourceTree = "<group>"; };
@@ -193,6 +197,7 @@
 		8A386460131D1C0DDF521B11 /* SteamWorkshop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshop.swift; sourceTree = "<group>"; };
 		8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageArchiveTests.swift; sourceTree = "<group>"; };
 		8F04135342AFE926DE366351 /* ScenePointLight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePointLight.swift; sourceTree = "<group>"; };
+		9016D8F2536A223A8CC3D9BD /* SceneResolutionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneResolutionPolicy.swift; sourceTree = "<group>"; };
 		9BF2D45011297ED2AEBCFD8D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		9C496F5B621D9D90208BB740 /* AddWebPageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddWebPageSheet.swift; sourceTree = "<group>"; };
 		A1925E15F5611478F76DDCD5 /* Artwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artwork.swift; sourceTree = "<group>"; };
@@ -419,6 +424,7 @@
 				8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */,
 				458923F6348C7E22B0926E6C /* ParserFixtures.swift */,
 				FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */,
+				777CE69E6D032644455C93BC /* SceneResolutionPolicyTests.swift */,
 				47E75E28C5A1DC04D996B3AE /* SceneValuesTests.swift */,
 				A876A698B804682C4154BDBE /* SteamCMDOutputTests.swift */,
 				B5C0398E2C1DEF838E9AE39D /* SteamNativeProtocolTests.swift */,
@@ -553,6 +559,7 @@
 				C67B6B3E218D521CC6DBB20E /* ScenePointVolume.swift */,
 				88D3A6CF2142522C342D3CEC /* ScenePuppet.swift */,
 				B7CC1C825DB34072D9717DC7 /* SceneRenderer.swift */,
+				9016D8F2536A223A8CC3D9BD /* SceneResolutionPolicy.swift */,
 				0BAE6B222A45E9B85E7049C8 /* SceneScript.swift */,
 				40FAD20AD6D740C31FF87167 /* SceneSound.swift */,
 				66C351152D3506D1AA07C165 /* SceneText.swift */,
@@ -750,6 +757,7 @@
 				E16EBF982E5A6920C8E600C7 /* ScenePointVolume.swift in Sources */,
 				E466DCC80511F72DC8089EE7 /* ScenePuppet.swift in Sources */,
 				8C8D624ECF831DC0E516E073 /* SceneRenderer.swift in Sources */,
+				131FA0FA5A6AA7AD1BEC0887 /* SceneResolutionPolicy.swift in Sources */,
 				64E35083EB6146B4B365E15A /* SceneScript.swift in Sources */,
 				85CD160709AE05B072BBC67B /* SceneSound.swift in Sources */,
 				C7C387DDB35AF2ADFF09E1D9 /* SceneText.swift in Sources */,
@@ -804,6 +812,8 @@
 				B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */,
 				41B33403FF16F7150091CC5C /* SceneDocument.swift in Sources */,
 				439395E160363268AA32C005 /* SceneFileSystem.swift in Sources */,
+				BCAE5E3F1145328D0037747C /* SceneResolutionPolicy.swift in Sources */,
+				71EB5F2C1E48C9C12F7E0340 /* SceneResolutionPolicyTests.swift in Sources */,
 				173DB01F2084478E5DB025E9 /* SceneValuesTests.swift in Sources */,
 				003E759CEFC3F5C879D6C280 /* SteamCM.swift in Sources */,
 				7CBE090D868EF178B7100A54 /* SteamCMD.swift in Sources */,

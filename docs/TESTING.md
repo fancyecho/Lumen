@@ -35,6 +35,12 @@ Tools/test.sh scenes
 
 
 ```bash
+Tools/test.sh stability 3808922316 5
+```
+
+连续按 30 fps 节奏播放一个场景，默认 5 分钟。跳过前 5 秒热身，定期记录 GPU 帧时间中位数及 p90、进程内存和 Metal 分配量。比较最早和最后一个采样窗口，容许进程内存增长 32 MiB 或 10%、Metal 增长 16 MiB 或 10%、GPU 中位数增长 2 ms 或 25%，各取较大值。超出任一阈值或渲染失败时退出码为 1。日志为 `build/tools/stability.log`。桌面自适应阈值仍需用真实桌面帧校准，工具不经过窗口合成。
+
+```bash
 Tools/test.sh visual 10
 ```
 

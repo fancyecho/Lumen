@@ -80,6 +80,13 @@ struct WallpaperDetailView: View {
                 }
             }
 
+            ForEach(showing) { display in
+                if let notice = display.sceneNotice {
+                    Label(String(localized: "\(display.name) — \(notice.message)"), systemImage: "exclamationmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             HStack(spacing: 10) {
                 SetWallpaperButton { target in model.setWallpaper(wallpaper, on: target) }
                     .controlSize(.large)

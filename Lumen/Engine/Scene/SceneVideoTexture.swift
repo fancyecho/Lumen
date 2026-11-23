@@ -72,8 +72,15 @@ final class SceneVideoTexture: @unchecked Sendable {
 
     /// AVFoundation needs a file; the movie is written once per content hash.
     private static func cachedFile(for movie: Data) -> URL? {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let defaultCache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appending(path: "app.lumen.Lumen/SceneVideos", directoryHint: .isDirectory)
+        #if DEBUG
+        let caches = ProcessInfo.processInfo.environment["LUMEN_SCENE_VIDEO_CACHE"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        } ?? defaultCache
+        #else
+        let caches = defaultCache
+        #endif
         let prefix = movie.prefix(65_536) + movie.suffix(65_536)
         let name = StableHash.hex(prefix) + "-\(movie.count).mp4"
         let url = caches.appending(path: name)

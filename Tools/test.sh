@@ -3,6 +3,7 @@
 #   Tools/test.sh unit                          run the parser XCTest suite
 #   Tools/test.sh build                         build the app (Debug)
 #   Tools/test.sh scenes [ids] [time] [layers]  render scenes in the corpus to PNG
+#   Tools/test.sh stability <id> [minutes]      play a scene continuously at 30 fps and check trends
 #   Tools/test.sh visual [N]                    rank the latest scene renders against author previews
 #   Tools/test.sh shaders [v|<name>|dump:<name>] translate + compile every WE shader
 #   Tools/test.sh steam                         check SteamCMD prompt parsing with a fake steamcmd
@@ -23,6 +24,12 @@ scene_sources() {
   echo "$SRC/Support/Support.swift"
 }
 
+build_scene_harness() {
+  scene_sources | xargs swiftc -O -D DEBUG -enable-bare-slash-regex -o "$OUT/scene-harness" \
+    "$ROOT/Tools/SceneHarness/main.swift" "$ROOT/Tools/SceneHarness/SceneStability.swift" \
+    "$ROOT/Tools/SceneVisualRegression/SceneVisualRun.swift"
+}
+
 case "${1:-}" in
   build|unit)
     cd "$ROOT"
@@ -39,10 +46,18 @@ case "${1:-}" in
   scenes)
     mkdir -p "$OUT/scenes"
     rm -f -- "$OUT/scenes/visual-inputs.json"
-    scene_sources | xargs swiftc -O -D DEBUG -enable-bare-slash-regex -o "$OUT/scene-harness" \
-      "$ROOT/Tools/SceneHarness/main.swift" "$ROOT/Tools/SceneVisualRegression/SceneVisualRun.swift"
-    "$OUT/scene-harness" "$CORPUS" "$ASSETS" "$OUT/scenes" "${2:-}" "${3:-2}" ${4:+"$4"} | tee "$OUT/scenes.log" | awk '/ OK | FAIL /'
+    build_scene_harness
+    LUMEN_SCENE_VIDEO_CACHE="$OUT/scene-videos" "$OUT/scene-harness" "$CORPUS" "$ASSETS" "$OUT/scenes" "${2:-}" "${3:-2}" ${4:+"$4"} | tee "$OUT/scenes.log" | awk '/ OK | FAIL /'
     echo "PNGs: $OUT/scenes   log: $OUT/scenes.log"
+    ;;
+  stability)
+    if [[ $# -lt 2 || $# -gt 3 || "$2" == *,* || -z "$2" ]]; then
+      echo "Usage: Tools/test.sh stability <scene-id> [minutes]" >&2
+      exit 2
+    fi
+    build_scene_harness
+    LUMEN_SCENE_VIDEO_CACHE="$OUT/scene-videos" LUMEN_STABILITY_MINUTES="${3:-5}" \
+      "$OUT/scene-harness" "$CORPUS" "$ASSETS" "$OUT" "$2" | tee "$OUT/stability.log"
     ;;
   visual)
     if [[ $# -gt 2 ]]; then
@@ -70,5 +85,5 @@ case "${1:-}" in
     echo "movie: $OUT/lockloop.mov"
     ;;
   *)
-    sed -n '2,10p' "$0"; exit 1 ;;
+    sed -n '2,11p' "$0"; exit 1 ;;
 esac
