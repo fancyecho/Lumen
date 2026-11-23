@@ -539,12 +539,16 @@ enum WEShaderTranslator {
             }
             // Array constructors: float[3](a, b, c) -> {a, b, c}
             text = Self.replaceArrayConstructors(text)
-            // HLSL lets a wider vector initialise or assign a narrower one; Metal wants it explicit.
+            // HLSL lets a wider vector initialise, assign or return into a narrower one; Metal wants it explicit.
+            let types = knownTypes(in: text)
+            text = Self.narrowVec4TexCoordVaryings(text, stage: stage, varyings: varyings)
             text = Self.widenVectorInitialisers(text)
-            text = Self.wrapAssignments(text, types: knownTypes(in: text))
-            // HLSL accepts float array subscripts and float `%`.
-            text = Self.integerSubscripts(text)
+            text = Self.wrapAssignments(text, types: types)
+            text = Self.wrapReturns(text)
+            // HLSL accepts float `%`, float array subscripts, and packed 2D `[i/4][i%4]` on 1D scalar uniform arrays.
             text = Self.rewriteModulo(text)
+            text = Self.flattenPackedScalarArrays(text, uniforms: uniforms)
+            text = Self.integerSubscripts(text)
             text = Self.templateVectorParameters(text)
             return text
         }
@@ -566,6 +570,23 @@ enum WEShaderTranslator {
             }
             for name in conflicting { types[name] = nil }
             return types
+        }
+
+        /// Fragment shaders sometimes declare `varying vec4 v_TexCoord;` from a template and then
+        /// use `v_TexCoord` unswizzled in `vec2` arithmetic (valid in HLSL via implicit truncation).
+        /// When `.z`/`.w` are never read, rewriting unswizzled occurrences to `.xy` preserves exact semantics.
+        static func narrowVec4TexCoordVaryings(_ text: String, stage: Stage, varyings: [WEVarying]) -> String {
+            guard stage == .fragment else { return text }
+            var result = text
+            for varying in varyings where varying.type == "vec4" && varying.count == 1 && varying.name.lowercased().contains("texcoord") {
+                let name = varying.name
+                guard let zwRegex = try? Regex("\\b\(name)\\.[xyzwrgba]*[zwba]"),
+                      result.firstMatch(of: zwRegex) == nil,
+                      let bareRegex = try? Regex("\\b\(name)\\b(?!\\.)")
+                else { continue }
+                result = result.replacing(bareRegex) { _ in "\(name).xy" }
+            }
+            return result
         }
 
         static func widenVectorInitialisers(_ text: String) -> String {
@@ -646,12 +667,65 @@ enum WEShaderTranslator {
             return i - 1
         }
 
-        static func integerSubscripts(_ text: String) -> String {
-            text.replacing(/(\w|\])\s*\[(?!\[)(?!int\()([^\[\]\n]+)\]/) { match in
-                let inner = match.output.2.trimmingCharacters(in: .whitespaces)
-                if inner.allSatisfy(\.isNumber) { return String(match.output.0) }
-                return "\(match.output.1)[int(\(inner))]"
+        /// Some HLSL shaders index 1D float uniform arrays (e.g. `g_AudioSpectrum64Left`) as packed float4s (`[i/4][i%4]`).
+        static func flattenPackedScalarArrays(_ text: String, uniforms: [WEUniform]) -> String {
+            let names = Set(uniforms.filter { $0.count > 1 && $0.kind == .float }.map(\.name))
+            guard !names.isEmpty else { return text }
+            return text.replacing(/\b([A-Za-z_]\w*)\s*\[([^\[\]\n]+)\]\s*\[([^\[\]\n]+)\]/) { match in
+                let name = String(match.output.1)
+                guard names.contains(name) else { return String(match.output.0) }
+                let a = match.output.2.trimmingCharacters(in: .whitespaces)
+                let b = match.output.3.trimmingCharacters(in: .whitespaces)
+                return "\(name)[int(\(a)) * 4 + int(\(b))]"
             }
+        }
+
+        /// Wraps `return expr;` in vector/scalar-returning functions so wider vectors truncate like HLSL.
+        static func wrapReturns(_ text: String) -> String {
+            let headers = text.matches(of: /(?m)^[ \t]*((?:vec[234]|ivec[234]|uvec[234]|float))\s+[A-Za-z_]\w*\s*\([^()]*\)\s*\{/)
+            guard !headers.isEmpty else { return text }
+            var result = text
+            for header in headers.reversed() {
+                let returnType = String(header.output.1)
+                let openBrace = result.index(before: header.range.upperBound)
+                guard let closeBrace = matchingBrace(in: result, from: openBrace) else { continue }
+                let bodyRange = result.index(after: openBrace)..<closeBrace
+                let body = String(result[bodyRange])
+                let wrapped = body.replacing(/\breturn\s+([^;{}]+);/) { match in
+                    let expr = match.output.1.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return "return we_\(returnType)(\(expr));"
+                }
+                result.replaceSubrange(bodyRange, with: wrapped)
+            }
+            return result
+        }
+
+        private static func matchingBrace(in text: String, from open: String.Index) -> String.Index? {
+            var depth = 0
+            var index = open
+            while index < text.endIndex {
+                if text[index] == "{" { depth += 1 }
+                if text[index] == "}" {
+                    depth -= 1
+                    if depth == 0 { return index }
+                }
+                index = text.index(after: index)
+            }
+            return nil
+        }
+
+        static func integerSubscripts(_ text: String) -> String {
+            var result = text
+            for _ in 0..<3 {
+                let next = result.replacing(/(\w|\])\s*\[(?!\[)(?!int\()([^\[\]\n]+)\]/) { match in
+                    let inner = match.output.2.trimmingCharacters(in: .whitespaces)
+                    if inner.allSatisfy(\.isNumber) { return String(match.output.0) }
+                    return "\(match.output.1)[int(\(inner))]"
+                }
+                if next == result { break }
+                result = next
+            }
+            return result
         }
 
         /// Turns by-value vector parameters of non-overloaded functions into templates, so a call
@@ -881,6 +955,12 @@ enum WEShaderTranslator {
     template<typename A, typename B, typename = enable_if_t<is_integral_v<B> && !is_integral_v<A>>> inline A pow(A a, B b) { return pow(a, A(b)); }
     template<typename A, typename B, typename = enable_if_t<is_integral_v<A> && !is_integral_v<B>>> inline B step(A a, B b) { return step(B(a), b); }
     template<typename A, typename B, typename = enable_if_t<is_integral_v<B> && !is_integral_v<A>>, typename = void> inline A step(A a, B b) { return step(a, A(b)); }
+    inline float2 mix(float2 a, float3 b, float t) { return mix(a, b.xy, t); }
+    inline float2 mix(float2 a, float4 b, float t) { return mix(a, b.xy, t); }
+    inline float3 mix(float3 a, float4 b, float t) { return mix(a, b.xyz, t); }
+    inline float2 mix(float3 a, float2 b, float t) { return mix(a.xy, b, t); }
+    inline float2 mix(float4 a, float2 b, float t) { return mix(a.xy, b, t); }
+    inline float3 mix(float4 a, float3 b, float t) { return mix(a.xyz, b, t); }
     template<typename A, typename B> inline auto we_mod_(A a, B b, int) -> decltype(a % b) { return a % b; }
     template<typename A, typename B> inline auto we_mod_(A a, B b, uint) { using R = decltype(a + b); return fmod(R(a), R(b)); }
     template<typename A, typename B> inline auto we_mod(A a, B b) { return we_mod_(a, b, 0); }

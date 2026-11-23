@@ -17,6 +17,7 @@ struct SceneAnimation {
     let fps: Float
     let length: Float
     let mode: Mode
+    let startPaused: Bool
 
     init?(_ raw: Any?) {
         guard let object = raw as? [String: Any], let animation = object["animation"] as? [String: Any] else { return nil }
@@ -40,6 +41,7 @@ struct SceneAnimation {
         fps = max((options["fps"] as? NSNumber)?.floatValue ?? 30, 1)
         let lastFrame = curves.compactMap { $0.last?.frame }.max() ?? 0
         length = max((options["length"] as? NSNumber)?.floatValue ?? lastFrame, 1)
+        startPaused = (options["startpaused"] as? Bool) ?? false
         switch options["mode"] as? String {
         case "single": mode = .single
         case "mirror": mode = .mirror
@@ -49,6 +51,8 @@ struct SceneAnimation {
 
     /// Component values at `time` seconds.
     func values(at time: Float) -> [Float] {
+        // Animations marked `startpaused` wait at frame 0 until a script calls `.play()`.
+        if startPaused { return curves.map { Self.evaluate($0, frame: 0) } }
         var frame = time * fps
         switch mode {
         case .loop:

@@ -36,8 +36,22 @@ enum SceneLoader {
         let textures = SceneTextureCache(device: request.device, files: files, maxDimension: maxDimension)
         let shaders = SceneShaderLibrary(device: request.device, files: files)
         let textScale = min(3, Float(renderSize.x) / max(document.canvas.x, 1) * 1.5)
+        // Layers whose rendered composite buffer is read by another layer (clipping masks, blend frames).
+        var compositeSources: Set<Int> = []
+        for object in document.objects {
+            for effect in object.effects where effect.visible {
+                for pass in effect.passes {
+                    for case let name? in pass.textures {
+                        if let sourceID = Self.compositeTargetID(name), sourceID != object.id {
+                            compositeSources.insert(sourceID)
+                        }
+                    }
+                }
+            }
+        }
         let builder = Builder(files: files, values: values, textures: textures, shaders: shaders,
-                              assetsAvailable: request.assets != nil, textScale: textScale)
+                              assetsAvailable: request.assets != nil, textScale: textScale,
+                              compositeSources: compositeSources)
 
         var models: [Int: simd_float4x4] = [:]
         var parents: [Int: simd_float4x4] = [:]
@@ -104,9 +118,15 @@ enum SceneLoader {
         let sounds = SceneSoundPlayer(document: document, files: files, values: values)
         return try SceneInstance(
             document: document, renderSize: renderSize, drawables: drawables, textures: textures,
-            utility: utility, unsupported: Array(Set(unsupported)).sorted(), scripts: scripts,
+            utility: utility, queue: request.queue, unsupported: Array(Set(unsupported)).sorted(), scripts: scripts,
             sounds: sounds.isEmpty ? nil : sounds
         )
+    }
+
+    /// Parses `_rt_imageLayerComposite_<id>_a` / `_b` into its layer id.
+    static func compositeTargetID(_ name: String) -> Int? {
+        guard let match = name.wholeMatch(of: /_rt_imageLayerComposite_(\d+)_[ab]/) else { return nil }
+        return Int(match.1)
     }
 
     /// Collects every `{"script": …}` property and starts them in one runtime.
@@ -159,6 +179,7 @@ enum SceneLoader {
         let shaders: SceneShaderLibrary
         let assetsAvailable: Bool
         let textScale: Float
+        let compositeSources: Set<Int>
 
         /// Text layers draw a Core Text texture with Wallpaper Engine's image shader, so
         /// colour, opacity and effects work as on image layers.
@@ -195,18 +216,25 @@ enum SceneLoader {
             let rendered = SceneTextTexture(device: textures.device, text: text, size: size, scale: textScale, style: style)
             let sceneTexture = SceneTexture(texture: rendered.texture() ?? textures.clear.texture,
                                             sampler: textures.samplers.state(nearest: false, clamp: true), dynamic: rendered)
-            let material = MaterialPass(shader: "genericimage2", blend: .translucent, textures: [], constants: [:], combos: ["VERSION": 2])
-            let base = try prepare(material, overrides: nil, combos: [:], base: nil, effect: false, textureOverrides: [0: sceneTexture])
             var steps: [EffectStep] = []
             var targetScales: [String: Float] = [:]
             for effect in object.effects where effect.visible {
-                if let built = try? effectSteps(effect) {
+                if let built = try? effectSteps(effect, ownerID: object.id) {
                     steps += built.steps
                     targetScales.merge(built.targets) { a, _ in a }
                 }
             }
+            let isCompositeSource = compositeSources.contains(object.id)
+            let needsChain = !steps.isEmpty || isCompositeSource
+            let material = MaterialPass(shader: "genericimage2", blend: .translucent, textures: [], constants: [:], combos: ["VERSION": 2])
+            var baseCombos: [String: Int] = [:]
+            if !needsChain, object.colorBlendMode != 0 { baseCombos["BLENDMODE"] = object.colorBlendMode }
+            let base = try prepare(material, overrides: nil, combos: baseCombos, base: nil, effect: false,
+                                   textureOverrides: [0: sceneTexture], ownerID: object.id)
+            let compositePass = needsChain && object.colorBlendMode != 0 ? blendCompositePass(mode: object.colorBlendMode, ownerID: object.id) : nil
             let layer = ImageLayer(object: object, size: size, base: base, steps: steps, blend: .translucent,
-                                   isPassthrough: false, isFullscreen: false, imageExtent: SIMD2(1, 1), targetScales: targetScales)
+                                   isPassthrough: false, isFullscreen: false, isCompositeSource: isCompositeSource,
+                                   compositePass: compositePass, imageExtent: SIMD2(1, 1), targetScales: targetScales)
             layer.text = rendered
             return layer
         }
@@ -220,7 +248,8 @@ enum SceneLoader {
             }
             // Solid colour layers draw with the flat shader so the object's colour applies.
             var materialPath = model["material"] as? String
-            if model["solidlayer"] as? Bool == true, files.exists("materials/util/solidlayer.json") {
+            let isSolid = model["solidlayer"] as? Bool == true
+            if isSolid, files.exists("materials/util/solidlayer.json") {
                 materialPath = "materials/util/solidlayer.json"
             }
             guard let materialPath,
@@ -229,11 +258,32 @@ enum SceneLoader {
 
             let isFullscreen = model["fullscreen"] as? Bool ?? false
             let isPassthrough = model["passthrough"] as? Bool ?? false
+            let isCompositeSource = compositeSources.contains(object.id)
+
+            var steps: [EffectStep] = []
+            var targetScales: [String: Float] = [:]
+            for effect in object.effects where effect.visible {
+                do {
+                    let built = try effectSteps(effect, ownerID: object.id)
+                    steps += built.steps
+                    targetScales.merge(built.targets) { a, _ in a }
+                } catch {
+                    Log.engine.info("Effect \(effect.file, privacy: .public) skipped: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            // A composition layer without effects copies the background and paints it back
+            // unchanged; keep it only when another layer samples its composite target.
+            if isPassthrough, steps.isEmpty, !isCompositeSource { return nil }
+
+            // Solid layers use `flat` (which lacks BLENDMODE), and chained layers must apply
+            // `colorBlendMode` at final composite rather than baking the scene into Pass 0.
+            let needsChain = !steps.isEmpty || isPassthrough || isCompositeSource || (isSolid && object.colorBlendMode != 0)
 
             // The base pass: the object's own material.
             var baseCombos: [String: Int] = [:]
-            if object.colorBlendMode != 0 { baseCombos["BLENDMODE"] = object.colorBlendMode }
-            let base = try prepare(pass, overrides: nil, combos: baseCombos, base: nil, effect: false)
+            if !needsChain, object.colorBlendMode != 0 { baseCombos["BLENDMODE"] = object.colorBlendMode }
+            let base = try prepare(pass, overrides: nil, combos: baseCombos, base: nil, effect: false, ownerID: object.id)
+            let compositePass = needsChain && object.colorBlendMode != 0 ? blendCompositePass(mode: object.colorBlendMode, ownerID: object.id) : nil
 
             let mainTexture: SceneTexture? = {
                 if case .texture(let texture)? = base.textures[0] { return texture }
@@ -244,25 +294,25 @@ enum SceneLoader {
                 size = SIMD2(max(size.x, 1), max(size.y, 1))
             }
 
-            var steps: [EffectStep] = []
-            var targetScales: [String: Float] = [:]
-            for effect in object.effects where effect.visible {
-                do {
-                    let built = try effectSteps(effect)
-                    steps += built.steps
-                    targetScales.merge(built.targets) { a, _ in a }
-                } catch {
-                    Log.engine.info("Effect \(effect.file, privacy: .public) skipped: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-            // A composition layer without effects copies the background and paints it back
-            // unchanged; Wallpaper Engine projects use them as group markers.
-            if isPassthrough, steps.isEmpty { return nil }
             return ImageLayer(
                 object: object, size: size, base: base, steps: steps, blend: pass.blend,
                 isPassthrough: isPassthrough, isFullscreen: isFullscreen,
+                isCompositeSource: isCompositeSource, compositePass: compositePass,
                 imageExtent: mainTexture?.imageExtent ?? SIMD2(1, 1), targetScales: targetScales
             )
+        }
+
+        /// Final composite pass for chained layers that use Wallpaper Engine's `colorBlendMode`.
+        private func blendCompositePass(mode: Int, ownerID: Int) -> PreparedPass? {
+            let material = MaterialPass(
+                shader: "genericimage4",
+                blend: .opaque,
+                textures: [],
+                constants: [:],
+                combos: ["BLENDMODE": mode, "LIGHTING": 0, "REFLECTION": 0, "FOG": 0, "VERSION": 2]
+            )
+            return try? prepare(material, overrides: nil, combos: [:], base: nil, effect: false,
+                                binds: [0: "previous"], ownerID: ownerID)
         }
 
         func particleLayer(_ object: SceneDocument.Object) throws -> ParticleLayer? {
@@ -315,7 +365,7 @@ enum SceneLoader {
             return system
         }
 
-        func effectSteps(_ effect: SceneDocument.Effect) throws -> (steps: [EffectStep], targets: [String: Float]) {
+        func effectSteps(_ effect: SceneDocument.Effect, ownerID: Int) throws -> (steps: [EffectStep], targets: [String: Float]) {
             guard let json = files.json(effect.file) else { throw SceneLoadError.missingFile(effect.file) }
             let base = (effect.file as NSString).deletingLastPathComponent
             // Render targets are named per effect; prefix them so two effects can't collide.
@@ -344,7 +394,7 @@ enum SceneLoader {
                     guard let name = bind["name"] as? String, let slot = (bind["index"] as? NSNumber)?.intValue else { continue }
                     binds[slot] = name == "previous" ? name : prefix + name
                 }
-                let pass = try prepare(material, overrides: override, combos: [:], base: base, effect: true, binds: binds)
+                let pass = try prepare(material, overrides: override, combos: [:], base: base, effect: true, binds: binds, ownerID: ownerID)
                 steps.append(EffectStep(kind: .draw(pass), target: target))
             }
             return (steps, targets)
@@ -352,7 +402,8 @@ enum SceneLoader {
 
         /// Resolves textures and combos for a material pass and compiles it.
         func prepare(_ material: MaterialPass, overrides: SceneDocument.PassOverride?, combos extra: [String: Int],
-                     base: String?, effect: Bool, binds: [Int: String] = [:], textureOverrides: [Int: SceneTexture] = [:]) throws -> PreparedPass {
+                     base: String?, effect: Bool, binds: [Int: String] = [:], textureOverrides: [Int: SceneTexture] = [:],
+                     ownerID: Int = -1) throws -> PreparedPass {
             let source = try shaders.source(for: material.shader, near: base)
             let samplerDefaults = WEShaderTranslator.textureDefaults(in: source.flattened)
             let samplerCombos = WEShaderTranslator.textureCombos(in: source.flattened)
@@ -375,12 +426,12 @@ enum SceneLoader {
                 } else if let bind = binds[slot] {
                     resolved = bind == "previous" ? .previous : .named(bind)
                 } else if let name = names[slot] {
-                    resolved = textureSource(name)
+                    resolved = textureSource(name, ownerID: ownerID)
                     if resolved != nil, let combo = samplerCombos[slot] { combos[combo] = 1 }
                 } else if effect, slot == 0 {
                     resolved = .previous
                 } else if let fallback = samplerDefaults[slot] {
-                    resolved = textureSource(fallback)
+                    resolved = textureSource(fallback, ownerID: ownerID)
                 }
                 guard let resolved else { continue }
                 sources[slot] = resolved
@@ -404,8 +455,11 @@ enum SceneLoader {
             return PreparedPass(program: program, pipeline: pipeline, uniforms: uniforms, textures: sources, spriteSheet: sheet)
         }
 
-        private func textureSource(_ name: String) -> TextureSource? {
+        private func textureSource(_ name: String, ownerID: Int) -> TextureSource? {
             if name.hasPrefix("_rt_FullFrameBuffer") || name == "_rt_MipMappedFrameBuffer" { return .frameBuffer }
+            if let sourceID = SceneLoader.compositeTargetID(name) {
+                return sourceID == ownerID ? .previous : .layerComposite(sourceID)
+            }
             if name.hasPrefix("_rt_") || name.hasPrefix("_alias_") { return nil }
             return textures.texture(named: name).map { .texture($0) }
         }
