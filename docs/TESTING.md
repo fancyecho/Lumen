@@ -1,6 +1,6 @@
 # Lumen · 测试与验证
 
-目前没有 XCTest target（见任务板 T09），验证靠 `Tools/test.sh` 里的命令行工具，再加上在 app 里实际看效果。
+用 XCTest 验证解析器，用命令行工具跑场景和着色器语料，并在 app 里验证实际效果。
 工具编译产物和输出都在 `build/tools/`，已被 gitignore。
 
 ## 命令
@@ -10,6 +10,12 @@ Tools/test.sh build
 ```
 
 用 xcodegen 重新生成工程，然后构建 Debug 版。产物在 `build/DerivedData/Build/Products/Debug/Lumen.app`。
+
+```bash
+Tools/test.sh unit
+```
+
+用 `LumenTests` scheme 运行解析器 XCTest，覆盖 `scene.pkg`、`.tex`、`project.json`、着色器预处理和 SteamCMD 输出。测试复用生产源码，不启动 Lumen，也不需要 WallpaperMachine 语料、网络或 Steam 账号。在 Xcode 中也可以选中 `LumenTests` scheme 后按 ⌘U。
 
 ```bash
 Tools/test.sh scenes

@@ -44,3 +44,27 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: YES
         COMBINE_HIDPI_IMAGES: YES
         DEAD_CODE_STRIPPING: YES
+  LumenTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: LumenTests
+      # Compile the production parsers without starting the app or its desktop engine.
+      - path: Lumen/Engine/Scene/SceneFileSystem.swift
+      - path: Lumen/Engine/Scene/TexDecoder.swift
+      - path: Lumen/Engine/Scene/Shaders/WEShaderPreprocessor.swift
+      - path: Lumen/Library/WallpaperEngineProject.swift
+      - path: Lumen/Library/Steam/SteamCMD.swift
+      - path: Lumen/Support/Support.swift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_STRICT_CONCURRENCY: minimal
+schemes:
+  LumenTests:
+    build:
+      targets:
+        LumenTests: [test]
+    test:
+      targets:
+        - LumenTests

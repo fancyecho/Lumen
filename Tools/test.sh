@@ -1,5 +1,6 @@
 #!/bin/bash
 # Lumen regression tools. Builds into build/tools (gitignored). See docs/TESTING.md.
+#   Tools/test.sh unit                          run the parser XCTest suite
 #   Tools/test.sh build                         build the app (Debug)
 #   Tools/test.sh scenes [ids] [time] [layers]  render scenes in the corpus to PNG
 #   Tools/test.sh shaders [v|<name>|dump:<name>] translate + compile every WE shader
@@ -21,10 +22,17 @@ scene_sources() {
 }
 
 case "${1:-}" in
-  build)
+  build|unit)
     cd "$ROOT"
     xcodegen generate >/dev/null
-    xcodebuild -project Lumen.xcodeproj -scheme Lumen -configuration Debug -derivedDataPath build/DerivedData build 2>&1 | grep -E "error:|warning: unre|BUILD" || true
+    scheme=Lumen
+    action=build
+    if [[ "$1" == unit ]]; then
+      scheme=LumenTests
+      action=test
+    fi
+    xcodebuild -project Lumen.xcodeproj -scheme "$scheme" -configuration Debug \
+      -destination 'platform=macOS' -derivedDataPath build/DerivedData "$action"
     ;;
   scenes)
     scene_sources | xargs swiftc -O -D DEBUG -enable-bare-slash-regex -o "$OUT/scene-harness" "$ROOT/Tools/SceneHarness/main.swift"
@@ -42,5 +50,5 @@ case "${1:-}" in
     "$OUT/steamcmd-fake" "$ROOT/Tools/SteamCMDFake/fake-steamcmd.sh" "$OUT/steam-out"
     ;;
   *)
-    sed -n '2,7p' "$0"; exit 1 ;;
+    sed -n '2,8p' "$0"; exit 1 ;;
 esac
