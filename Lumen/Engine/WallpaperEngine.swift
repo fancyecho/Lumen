@@ -14,6 +14,7 @@ final class WallpaperEngine {
         var isPrimary: Bool
         var wallpaperID: UUID?
         var pauseReason: PauseReason?
+        var sceneNotice: SceneRenderer.Notice?
         /// Share of the usable desktop hidden by windows, while coverage is being watched.
         var coverage: Double?
 
@@ -202,6 +203,9 @@ final class WallpaperEngine {
                 if let pointerRenderer = renderer as? PointerAwareRenderer {
                     pointerRenderer.onPointerNeedChange = { [weak self] in self?.reconcile() }
                 }
+                if let scene = renderer as? SceneRenderer {
+                    scene.onNoticeChange = { [weak self] in self?.reconcile() }
+                }
                 host.present(renderer, wallpaperID: wallpaper.id, animated: animated && settings.crossfade)
                 if settings.syncStillFrame, !lockManaged.contains(displayID) {
                     stills.sync(wallpaper, on: screen, library: library, scaling: settings.videoScaling)
@@ -353,6 +357,7 @@ final class WallpaperEngine {
                 isPrimary: displayID == primaryID,
                 wallpaperID: host?.wallpaperID,
                 pauseReason: reason,
+                sceneNotice: (host?.renderer as? SceneRenderer)?.notice,
                 coverage: occlusion.isEnabled ? occlusion.coverage[displayID] : nil
             ))
         }

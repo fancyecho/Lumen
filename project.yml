@@ -63,6 +63,7 @@ targets:
       - path: Lumen/Engine/Scene/SceneAnimation.swift
       - path: Lumen/Engine/Scene/SceneDocument.swift
       - path: Lumen/Engine/Scene/SceneFileSystem.swift
+      - path: Lumen/Engine/Scene/SceneResolutionPolicy.swift
       - path: Lumen/Engine/Scene/TexDecoder.swift
       - path: Lumen/Engine/Scene/Shaders/WEShaderPreprocessor.swift
       - path: Lumen/Library/WallpaperEngineProject.swift

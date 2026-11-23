@@ -12,7 +12,9 @@ struct SceneRenderSettings: Equatable {
     /// Follow the music the Mac is playing (needs the System Audio Recording permission).
     var audioReactive = false
 
-    static let preview = SceneRenderSettings(frameRate: 30, pixelBudget: 1_600_000, scaling: .fill)
+    var showsNoticeInView = false
+
+    static let preview = SceneRenderSettings(frameRate: 30, pixelBudget: 1_600_000, scaling: .fill, showsNoticeInView: true)
 }
 
 /// Draws a Wallpaper Engine scene with Metal.
@@ -32,8 +34,34 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         case failed(String)
     }
 
+    enum Notice: Equatable {
+        case gpuLoad
+        case memoryPressure
+        case allocation
+        case preview(String)
+        case unavailable(String)
+
+        var message: String {
+            switch self {
+            case .gpuLoad: String(localized: "Scene resolution reduced to keep playback smooth.")
+            case .memoryPressure: String(localized: "Scene resolution reduced due to memory pressure.")
+            case .allocation: String(localized: "Scene resolution reduced after a render target could not be allocated.")
+            case .preview(let reason): String(localized: "Showing the preview image. \(reason)")
+            case .unavailable(let reason): reason
+            }
+        }
+    }
+
     var view: NSView { container }
     private(set) var state: State = .loading
+    private(set) var notice: Notice? {
+        didSet {
+            guard notice != oldValue else { return }
+            if settings.showsNoticeInView { updateNoticeLabel() }
+            onNoticeChange?()
+        }
+    }
+    var onNoticeChange: (() -> Void)?
     /// Scene features Lumen skipped (particles, text…), for the details page.
     private(set) var skippedFeatures: [String] = []
 
@@ -41,6 +69,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     private let container = NSView()
     private let metalView: BudgetedMetalView
     private let fallbackView = NSImageView()
+    private var noticeLabel: NSTextField?
     private let commandQueue: MTLCommandQueue
     private let device: MTLDevice
     private var instance: SceneInstance?
@@ -49,6 +78,11 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     private var values: [String: PropertyValue]
     private var loadTask: Task<Void, Never>?
     private var loadGeneration = 0
+    private var resolution: SceneResolutionPolicy
+    private var memoryPressure: DispatchSourceMemoryPressure?
+    private var pendingPressureReload = false
+    private var framesUntilSample = 0
+    private var samplingGeneration = 0
 
     private var isActive = false
     private var isReady = false
@@ -73,6 +107,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         self.source = source
         self.values = values
         self.settings = settings
+        resolution = SceneResolutionPolicy(ceiling: settings.pixelBudget)
         self.framing = framing
         self.device = device
         commandQueue = queue
@@ -104,6 +139,12 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         metalView.delegate = self
         metalView.isHidden = true
         container.addSubview(metalView)
+        let pressure = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        pressure.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.reduceForMemoryPressure() }
+        }
+        memoryPressure = pressure
+        pressure.activate()
         load()
     }
 
@@ -111,27 +152,40 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
 
     private func load() {
         loadGeneration += 1
+        resetSampling()
         let generation = loadGeneration
         let display = NSScreen.screens.map(\.pixelSize).max { $0.width * $0.height < $1.width * $1.height } ?? CGSize(width: 3840, height: 2160)
         let request = SceneLoader.Request(
             folder: source.folder, entry: source.entry, assets: source.assets, values: values,
             displaySize: SIMD2(Float(display.width), Float(display.height)),
-            pixelBudget: settings.pixelBudget, device: device, queue: commandQueue
+            pixelBudget: resolution.budget, device: device, queue: commandQueue
         )
-        loadTask?.cancel()
+        let previous = loadTask
+        previous?.cancel()
         loadTask = Task { [weak self] in
+            // The detached loader uses Metal and decoders synchronously. Wait for its allocations
+            // to settle before starting any superseding request.
+            await previous?.value
+            guard !Task.isCancelled else { return }
             let result: Result<SceneInstance, Error> = await Task.detached(priority: .userInitiated) {
                 Result { try SceneLoader.load(request) }
             }.value
             guard let self, !self.isTornDown, generation == self.loadGeneration else { return }
+            self.loadTask = nil
             switch result {
             case .success(let instance):
+                self.instance?.setPlaying(false)
                 self.instance = instance
+                self.lastFrame = nil
                 self.cursorInput = SceneCursorInput(reset: true)
                 self.skippedFeatures = instance.unsupported
                 self.state = .ready
                 self.fallbackView.isHidden = true
+                self.fallbackView.image = nil
+                if case .preview = self.notice { self.notice = nil }
+                if case .unavailable = self.notice { self.notice = nil }
                 self.metalView.isHidden = false
+                self.metalView.pixelBudget = self.resolution.budget * 1.5
                 self.layoutScene()
                 self.metalView.isPaused = !self.isActive
                 instance.sounds?.configure(muted: self.settings.muted, volume: Float(self.settings.volume))
@@ -141,19 +195,89 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
                 if !self.isActive { self.metalView.draw() }
             case .failure(let error):
                 Log.engine.error("Scene failed to load: \(error.localizedDescription, privacy: .public)")
-                self.state = .failed(error.localizedDescription)
-                if self.instance == nil { self.showFallback() }
+                if (error as? SceneLoadError)?.canRetryAtLowerResolution == true,
+                   self.resolution.reduce() {
+                    self.releaseScene()
+                    self.notice = .allocation
+                    self.load()
+                    return
+                }
+                self.useFallback(reason: error.localizedDescription)
             }
             self.markReady()
         }
     }
 
-    private func showFallback() {
+    private func releaseScene() {
+        let neededPointer = needsPointer
+        instance?.setPlaying(false)
+        instance = nil
+        lastFrame = nil
+        metalView.isPaused = true
         metalView.isHidden = true
-        guard let preview = source.preview, let image = NSImage(contentsOf: preview) else { return }
-        fallbackView.image = image
+        if fallbackView.image == nil, let preview = source.preview {
+            fallbackView.image = NSImage(contentsOf: preview)
+        }
         fallbackView.frame = container.bounds
-        fallbackView.isHidden = false
+        fallbackView.isHidden = fallbackView.image == nil
+        updateAudioCapture()
+        if neededPointer { onPointerNeedChange?() }
+    }
+
+    private func useFallback(reason: String) {
+        state = .failed(reason)
+        releaseScene()
+        skippedFeatures = []
+        notice = fallbackView.isHidden ? .unavailable(reason) : .preview(reason)
+        markReady()
+    }
+
+    private func reduceForMemoryPressure() {
+        guard !isTornDown, state == .ready || state == .loading else { return }
+        let pixels = instance.map { Double($0.renderSize.x * $0.renderSize.y) }
+        if resolution.reduce(renderedPixels: pixels) {
+            state = .loading
+            notice = .memoryPressure
+            releaseScene()
+            if isActive {
+                load()
+            } else {
+                pendingPressureReload = true
+                invalidateLoad()
+                markReady()
+            }
+        } else {
+            pendingPressureReload = false
+            invalidateLoad()
+            useFallback(reason: String(localized: "The scene needs more memory than is available."))
+        }
+    }
+
+    private func invalidateLoad() {
+        loadGeneration += 1
+        loadTask?.cancel()
+        resetSampling()
+    }
+
+    private func updateNoticeLabel() {
+        noticeLabel?.removeFromSuperview()
+        noticeLabel = nil
+        guard let notice else { return }
+        let label = NSTextField(wrappingLabelWithString: notice.message)
+        label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        label.textColor = .white
+        label.backgroundColor = .black.withAlphaComponent(0.75)
+        label.drawsBackground = true
+        label.maximumNumberOfLines = 3
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        noticeLabel = label
     }
 
     private func markReady() {
@@ -169,6 +293,11 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     func setActive(_ active: Bool) {
         guard !isTornDown, active != isActive else { return }
         isActive = active
+        resetSampling()
+        if active, pendingPressureReload {
+            pendingPressureReload = false
+            load()
+        }
         cursorInput = SceneCursorInput(reset: true)
         lastFrame = nil
         metalView.isPaused = !active || instance == nil
@@ -189,11 +318,15 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     func tearDown() {
         guard !isTornDown else { return }
         isTornDown = true
-        loadTask?.cancel()
+        invalidateLoad()
+        memoryPressure?.cancel()
+        memoryPressure = nil
         metalView.isPaused = true
         metalView.delegate = nil
         readyHandlers.removeAll()
         onPointerNeedChange = nil
+        onNoticeChange = nil
+        instance?.setPlaying(false)
         instance = nil
         updateAudioCapture()
         container.removeFromSuperview()
@@ -206,9 +339,13 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         instance?.sounds?.configure(muted: newSettings.muted, volume: Float(newSettings.volume))
         updateAudioCapture()
         metalView.preferredFramesPerSecond = newSettings.frameRate
-        metalView.pixelBudget = newSettings.pixelBudget * 1.5
+        resetSampling()
         layoutScene()
-        if needsReload { load() }
+        if needsReload {
+            resolution = SceneResolutionPolicy(ceiling: newSettings.pixelBudget)
+            notice = nil
+            reloadAfterChange()
+        }
     }
 
     /// Property changes can switch layers, effects and combos, so the scene is rebuilt; the
@@ -216,7 +353,40 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     func update(values newValues: [String: PropertyValue]) {
         guard newValues != values else { return }
         values = newValues
+        reloadAfterChange()
+    }
+
+    private func reloadAfterChange() {
+        state = .loading
+        if pendingPressureReload, !isActive { return }
         load()
+    }
+
+    private func resetSampling() {
+        framesUntilSample = 0
+        samplingGeneration += 1
+        resolution.resetSamples()
+    }
+
+    private func sampleGPU(_ buffer: MTLCommandBuffer) {
+        guard isActive, loadTask == nil, resolution.canReduce else { return }
+        guard framesUntilSample == 0 else { framesUntilSample -= 1; return }
+        framesUntilSample = max(0, settings.frameRate / 4 - 1)
+        let generation = samplingGeneration
+        buffer.addCompletedHandler { [weak self] command in
+            let time = command.gpuEndTime - command.gpuStartTime
+            guard command.status == .completed else { return }
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.samplingGeneration, let instance = self.instance,
+                      self.resolution.isSustainedLoad(gpuTime: time, frameRate: self.settings.frameRate)
+                else { return }
+                let size = instance.renderSize
+                if self.resolution.reduce(renderedPixels: Double(size.x * size.y)) {
+                    self.notice = .gpuLoad
+                    self.load()
+                }
+            }
+        }
     }
 
     // MARK: Audio
@@ -348,6 +518,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
             encoder.endEncoding()
         }
         buffer.present(drawable)
+        sampleGPU(buffer)
         buffer.commit()
     }
 

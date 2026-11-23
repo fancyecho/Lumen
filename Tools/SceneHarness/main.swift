@@ -71,6 +71,29 @@ func savePNG(_ texture: MTLTexture, to url: URL) throws {
 }
 
 let items = ids.isEmpty ? ((try? FileManager.default.contentsOfDirectory(atPath: library.path)) ?? []).sorted() : ids
+if let rawMinutes = environment["LUMEN_STABILITY_MINUTES"] {
+    guard let minutes = Double(rawMinutes), (0.25...120).contains(minutes),
+          ids.count == 1, let id = ids.first else {
+        fputs("Usage: Tools/test.sh stability <scene-id> [minutes from 0.25 to 120]\n", stderr)
+        exit(2)
+    }
+    do {
+        let folder = library.appending(path: id)
+        let project = try WEProject.load(folder: folder)
+        guard project.kind == .scene else { throw CocoaError(.featureUnsupported) }
+        let values = Dictionary(project.properties.map { ($0.id, $0.defaultValue) },
+                                uniquingKeysWith: { first, _ in first })
+        let instance = try SceneLoader.load(.init(folder: folder, entry: project.entry, assets: assets,
+                                                values: values, displaySize: harnessDisplay,
+                                                pixelBudget: harnessBudget, device: device, queue: queue))
+        print("Playing \(id) at \(instance.renderSize.x)×\(instance.renderSize.y) for \(minutes) minutes")
+        exit(try SceneStability.run(instance, minutes: minutes, queue: queue, audio: fakeAudio) ? 0 : 1)
+    } catch {
+        fputs("Stability check failed: \(error.localizedDescription)\n", stderr)
+        exit(1)
+    }
+}
+
 var visualScenes: [SceneVisualRun.Scene] = []
 for id in items {
     let folder = library.appending(path: id)

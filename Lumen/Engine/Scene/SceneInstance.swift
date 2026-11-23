@@ -330,7 +330,7 @@ final class SceneInstance: @unchecked Sendable {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: max(1, size.x), height: max(1, size.y), mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
-        guard let texture = device.makeTexture(descriptor: descriptor) else { throw SceneLoadError.unsupported("a render target this large") }
+        guard let texture = device.makeTexture(descriptor: descriptor) else { throw SceneLoadError.renderTargetAllocation }
         return texture
     }
 
@@ -340,7 +340,7 @@ final class SceneInstance: @unchecked Sendable {
         descriptor.usage = .renderTarget
         descriptor.storageMode = .private
         guard let depth = device.makeTexture(descriptor: descriptor) else {
-            throw SceneLoadError.unsupported("a 3D depth target this large")
+            throw SceneLoadError.renderTargetAllocation
         }
         return depth
     }
