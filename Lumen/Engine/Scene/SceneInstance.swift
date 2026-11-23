@@ -389,8 +389,9 @@ final class SceneInstance: @unchecked Sendable {
     func state(of id: Int) -> SceneDocument.State? {
         if let cached = frameStates[id] { return cached }
         guard let object = objects[id] else { return nil }
-        var state = object.state(at: frameTime)
-        if let change = scriptChanges[id] {
+        let change = scriptChanges[id]
+        var state = object.state(at: frameTime, animationFrames: change?.animationFrames ?? [:])
+        if let change {
             // Only take what the script actually changed, so keyframes keep running.
             if change.origin != object.origin { state.origin = change.origin }
             if change.scale != object.scale { state.scale = change.scale }

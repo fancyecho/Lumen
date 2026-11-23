@@ -77,6 +77,7 @@
 		B323056511CC2322443C169B /* Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBB1CF76C83A7FA2D245B08 /* Support.swift */; };
 		B724420C3553E117937464BF /* PlaylistsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C8B284BC7A52178D617C09B /* PlaylistsView.swift */; };
 		B78A9867644D1154DD8E962E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF2D45011297ED2AEBCFD8D /* AppModel.swift */; };
+		B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */; };
 		BC452D9C051B3A4EEBA544CF /* WebRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D608A66374789D934A1E4C0B /* WebRenderer.swift */; };
 		BF81AAA72F88EFF9D0A5AFDC /* WallpaperRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */; };
 		C086B78155FD8DD67DE526A4 /* LocalContentSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A440091108727012FE21D5 /* LocalContentSchemeHandler.swift */; };
@@ -210,6 +211,7 @@
 		F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		F9A0E10328A0020DA6E66474 /* DesktopHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHost.swift; sourceTree = "<group>"; };
 		FB69623C5BC7D5FECD47DBA0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAnimationPlaybackTests.swift; sourceTree = "<group>"; };
 		FF74219320866283D5E10984 /* AerialSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AerialSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -374,6 +376,7 @@
 			children = (
 				8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */,
 				458923F6348C7E22B0926E6C /* ParserFixtures.swift */,
+				FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */,
 				47E75E28C5A1DC04D996B3AE /* SceneValuesTests.swift */,
 				A876A698B804682C4154BDBE /* SteamCMDOutputTests.swift */,
 				10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */,
@@ -728,6 +731,7 @@
 				14054500F5EADD2BE253861F /* PackageArchiveTests.swift in Sources */,
 				9759F3CEFD065C9F2DB7833D /* ParserFixtures.swift in Sources */,
 				EFE158DCF125FECC6CABC791 /* SceneAnimation.swift in Sources */,
+				B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */,
 				41B33403FF16F7150091CC5C /* SceneDocument.swift in Sources */,
 				439395E160363268AA32C005 /* SceneFileSystem.swift in Sources */,
 				173DB01F2084478E5DB025E9 /* SceneValuesTests.swift in Sources */,
