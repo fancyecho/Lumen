@@ -8,21 +8,22 @@ struct SceneValues {
 
     /// Unwraps `{"value": …}` wrappers, applying a user-property binding when present.
     func resolve(_ raw: Any?) -> Any? {
+        resolve(raw, matching: nil)
+    }
+
+    private func resolve(_ raw: Any?, matching destination: Any?) -> Any? {
         guard let object = raw as? [String: Any] else { return raw }
-        guard object["value"] != nil || object["user"] != nil else { return raw }
-        if let user = object["user"] {
-            if let name = user as? String, let bound = properties[name] {
-                return bound.anyValue(matching: object["value"])
-            }
-            if let binding = user as? [String: Any], let name = binding["name"] as? String, let bound = properties[name] {
-                // `{"name": "style", "condition": "2"}`: true while the property equals the condition.
-                if let condition = binding["condition"] {
-                    return bound.stringValue == PropertyValue(json: condition).stringValue
-                }
-                return bound.anyValue(matching: object["value"])
-            }
+        let fallback = object["value"]
+        let user = object["user"]
+        guard fallback != nil || user != nil else { return raw }
+        let binding = user as? [String: Any]
+        let name = user as? String ?? binding?["name"] as? String
+        guard let name, let bound = properties[name] else { return fallback }
+        if let condition = binding?["condition"] {
+            // Option IDs are compared before converting values to the field's type.
+            return bound.stringValue == PropertyValue(json: condition).stringValue
         }
-        return object["value"]
+        return bound.anyValue(matching: destination ?? fallback)
     }
 
     func float(_ raw: Any?, default fallback: Float) -> Float {
@@ -34,7 +35,7 @@ struct SceneValues {
     }
 
     func bool(_ raw: Any?, default fallback: Bool) -> Bool {
-        switch resolve(raw) {
+        switch resolve(raw, matching: false) {
         case let number as NSNumber: return number.boolValue
         case let string as String: return ["true", "1"].contains(string.lowercased())
         default: return fallback
@@ -81,7 +82,10 @@ extension PropertyValue {
     func anyValue(matching template: Any?) -> Any {
         switch template {
         case let number as NSNumber where CFGetTypeID(number) == CFBooleanGetTypeID():
-            return boolValue
+            guard case .string(let value) = self else { return boolValue }
+            let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Parse the whole string so an RGB color is not read as a single scalar.
+            return Double(text).map { $0 != 0 } ?? !text.isEmpty
         case is NSNumber:
             return doubleValue
         default:
