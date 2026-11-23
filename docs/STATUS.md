@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-23 · gpt（T17 完成）
+> 最后更新：2026-11-23 · claude（合并 T17 / T21 / T22 / T23 / T25）
 
 ## 1. 阶段进度
 
@@ -32,17 +32,17 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-23 合并 T14/T15/T16 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景）
+**回归基线**（2026-11-23 合并 T17/T21/T22/T23/T25 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景）
 
 | 项目 | 基线 |
 |---|---|
 | 场景加载/渲染 | 75/75 OK，0 FAIL |
-| 加载耗时（着色器缓存命中） | 中位 0.39s，最大 1.4s |
-| GPU 帧时间（原生约 4.7MP） | 中位 4.3ms，p90 9.8ms，最大 17.2ms |
-| 着色器翻译 + 编译 | 315/316 通过 |
+| 加载耗时（着色器缓存命中） | 中位 0.46s，最大 1.4s |
+| GPU 帧时间（原生约 4.7MP） | 中位 4.3ms，p90 9.5ms，最大约 16ms（3808922316 全量跑时偶发 25.8ms，单独重跑 15–16ms，属测量噪声） |
+| 着色器翻译 + 编译 | 316/316 通过 |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 25/25 通过 |
+| 单元测试（`Tools/test.sh unit`） | 40/40 通过 |
 
 ## 3. 任务板
 
@@ -66,14 +66,14 @@
 | T14 | 组合层（composelayer）分组：子图层先画进父组合层的缓冲（`copybackground` 缺省为 true，先拷贝背景），再跑父层特效、按父层混合合成；子图层不再直接画到场景 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`d8663af`）：组合层子图层画进父层缓冲，支持 `copybackground`；「清风」背景字列已正常 |
 | T15 | 场景用户属性绑定的类型转换 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`89373a8`）：直接绑定到布尔字段时数字按非零、字符串按非空；「清风」白色底图已恢复 |
 | T16 | 场景清晰度：渲染分辨率按屏幕实际像素覆盖、上限为画布尺寸；低于屏幕时用 MetalFX 空间放大（`MTLFXSpatialScaler`）代替双线性；详情页预览预算提高；纹理上限跟随屏幕 | 场景 | 高 | 待验证 | claude | 已合并 `main`（`7303cc0`）：原生分辨率渲染、纹理不再砍半、放大用 Catmull-Rom。待用户在桌面上看效果 |
-| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 完成 | gpt | `gpt/T17-visual-regression`。CLI 对本轮渲染做 0–100 相似度排序，输出 JSON 与最差 N 张对比拼图。全库 75/75 配对成功，已提交 |
+| T17 | 场景视觉回归：回归工具把渲染结果和作者预览图（preview.gif/jpg 首帧）做感知相似度打分，输出最差的 N 个场景和对比拼图 | 测试 | 中 | 完成 | gpt | 已合并 `main`（`1ea4e5b`）。`Tools/test.sh visual [N]`：0–100 相似度排序，输出 JSON 与最差 N 张对比拼图 |
 | T18 | SceneScript 动画控制：`layer.getAnimation()` 的 `play/pause/stop/isPlaying`，配合 `startpaused` 关键帧动画 | 场景 | 低 | 完成 | gpt | 已合并 `main`（`640bb08`）。`gpt/T18-scene-animation-control`。具名及绑定属性时间线支持播放控制，共用轨道同步。23 项 XCTest 和 75/75 场景通过 |
 | T19 | 修复仍编译失败的 10 个工坊特效着色器（翻译层）：数组初始化、`clamp` 歧义、向量隐式截断、`sample`/`currentColor` 等未声明标识符、宏展开语法 | 场景 | 中 | 完成 | claude | 已合并 `main`（`a5b0c5e`）：10 个工坊特效能编译 |
-| T20 | 3347416586（海边摩托）画面上有大片白色「裂纹」图层，作者预览里没有：查明是哪层、为什么可见（可能是条件可见、遮罩或混合模式） | 场景 | 中 | 暂缓 |  | 用户要求先修共性问题；由 T25 判断它是否属于某个共性类别 |
-| T21 | 锁屏改为写 Desktop 选择（免去系统设置里手动选），协调 StillFrameSync，扩展备份/恢复 | 锁屏 | 高 | 待开始 | gemini | 已分配。根因与做法见 `PLAN.md` |
-| T22 | 鼠标输入管线：位置改为轮询、按需开启；补 `g_EffectTextureProjectionMatrix`；核对坐标系 | 场景/Web | 高 | 待开始 | gemini | 已分配，T21 之后做。见 `PLAN.md` |
-| T23 | 原生 Steam 客户端：扫码登录（钥匙串存 token）+ CM/CDN 下载创意工坊；先改好 SteamCMD 的错误分类和重试 | Steam | 高 | 待开始 | gpt | 已分配。见 `PLAN.md` |
-| T25 | 通用场景还原度：用 T17 报告和「不支持特性统计」找影响面最大的共性问题，逐类修 | 场景 | 中 | 待开始 | gemini | 已分配，T22 之后做 |
+| T20 | 3347416586（海边摩托）画面上有大片白色「裂纹」图层，作者预览里没有：查明是哪层、为什么可见（可能是条件可见、遮罩或混合模式） | 场景 | 中 | 完成 | gemini | 随 T25 合并：离屏 Pass 0 投影没缩放 Z，木偶骨骼 Z 偏移被深度裁剪出空洞。属共性缺陷，已统一修复 |
+| T21 | 锁屏改为写 Desktop 选择（免去系统设置里手动选），协调 StillFrameSync，扩展备份/恢复 | 锁屏 | 高 | 待验证 | gemini | 已合并 `main`（`1654110`）：同时写 Desktop/Idle 全部容器，新增「也用作屏保」开关，关闭时按备份原样恢复；锁屏开启时主屏不再写静态图。待用户开锁屏后按 `⌃⌘Q` 目测 |
+| T22 | 鼠标输入管线：位置改为轮询、按需开启；补 `g_EffectTextureProjectionMatrix`；核对坐标系 | 场景/Web | 高 | 待验证 | gemini | 已合并 `main`（`0eba484`）：只在有交互壁纸播放时按帧率轮询（≤60Hz，静止时跳过）；补特效投影矩阵及逆矩阵，`g_ParallaxPosition` 改为 [0,1] 居中。待用户在桌面实测鼠标跟随 |
+| T23 | 原生 Steam 客户端：扫码登录（钥匙串存 token）+ CM/CDN 下载创意工坊；先改好 SteamCMD 的错误分类和重试 | Steam | 高 | 待验证 | gpt | 已合并 `main`（`72b575b`）：Steam 面板二维码登录、CM/CDN 下载与校验；SteamCMD 分类报错并对网络失败重试。新增 SPM 依赖 zstd 1.5.7。待用户网络可达时扫码实测 |
+| T25 | 通用场景还原度：用 T17 报告和「不支持特性统计」找影响面最大的共性问题，逐类修 | 场景 | 中 | 完成 | gemini | 已合并 `main`（`6135397`）：离屏/组合层 Z 深度映射、`rope`/`ropetrail` 粒子、场景全局 bloom、最后一个着色器。着色器 316/316 |
 | T26 | 能耗与稳定：按 GPU 实测自适应分辨率、指针/音频按需、加载失败与内存压力降级 | 引擎 | 中 | 待认领 |  | 未分配 |
 | T27 | 发布准备：Developer ID 签名、公证、Hardened Runtime、自动更新、开机启动 | 发布 | 中 | 待认领 |  | 未分配；在 UI 打磨之前 |
 
@@ -89,6 +89,106 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-23 · claude · 合并第 6 阶段到 `main`
+
+- 先在各自分支上提交未提交的改动：T21 `1654110`、T22 `0eba484`、T25 `6135397`、T23 `72b575b`；T17 已由 gpt 提交（`1ea4e5b`）。
+- 依次合并 T17、T21、T22、T25、T23 到 `main`。只有 `project.pbxproj` 冲突（T21 和 T23 都改了 `project.yml`），按约定重新 `xcodegen generate`。T22 与 T25 都改了 `SceneInstance`/`SceneParticles`，自动合并无冲突。
+- 验证：build 通过（首次需要拉取 SPM 依赖 zstd）；`unit` 40/40（新增 5 项锁屏、10 项 Steam）；`shaders` 316/316；`scenes` 75/75、0 洋红；`steam` 通过。3808922316 在全量跑时 GPU 25.8ms，单独重跑 15–16ms，与 T25 分支一致，属噪声。
+- 待用户实测：T21 锁屏（开启后不再需要去系统设置里手动选）、T22 鼠标跟随、T23 扫码登录（需 Steam 网络可达）。T05 需要随 T21 重新验收。
+- 下一步：按用户实测反馈分派；T26（能耗）、T27（发布）仍未分配。
+
+### 2026-11-23 · gemini · `gemini/T25-scene-fidelity`（已合并 `main`）
+
+- **做了什么**：
+  - 先对全库 75 个场景做特性普查（发现：0 个场景用 `MDLM` morphing；25 个用木偶骨骼；16 个场景共 24 个可见层用 `rope`/`ropetrail` 粒子；7 个用全局 `general.bloom`；仅剩 1 个着色器编译失败 `puppettexturechannels`），并结合 T17 视觉回归报告（75/75 评分）定位了 **4 类影响面最大的共性问题**，全部改动在 `build/worktrees/gemini-T25`（分支 `gemini/T25-scene-fidelity`，基于 `main` `e79429e`）：
+    1. **离屏 Pass 0 与 `composelayer` 组投影 Z 深度裁剪修复（`SceneInstance.swift`）**：
+       - 原 `encodeChain` Pass 0 与 `groupVP` 使用 `SceneMath.scale(SIMD2(...))`（`zScale = 1`），导致任何具有非零局部 Z（`|z| > 1`）的木偶骨骼顶点或 3D 倾斜子层被 Metal 深度平面裁剪出空洞。
+       - 新增 `SceneMath.localOrthographic(center:size:)`（`zScale = -0.0001`，与 `orthographic` 一致，经翻译层 `(z + w) * 0.5` 映射 `[-10000, 10000]` 至 Metal `[0, 1]`）。
+       - **一并查实并解决 T20（`3347416586` 海边摩托）**：所谓「白色裂纹层」实为 `SunFragment4_1_puppet.mdl` 骨骼 24 位移至 `z = -529.57` 被裁剪出大片空洞、露出 `0.7` 灰色 `clearcolor`；修复后整片夕阳海面、波浪、镜头光晕完整恢复。
+    2. **`rope` 与 `ropetrail` 粒子渲染器（`SceneParticles.swift`、`SceneLoader.swift`、`SceneInstance.swift`）**：
+       - 覆盖 16 个场景共 24 个此前完全不可见的流星/拖尾/闪电/轨迹粒子层。
+       - `ropetrail` 区分于 `spritetrail`：按 `duration` 秒数与粒子速度/年龄计算实际世界尾长（不被 `particle.size` 重复放大，修复 `3652110998`/`3613963197` 过长光线），从粒子头部向后延伸并尾部平滑淡出；`rope` 连接相邻存活粒子形成连续丝带，并规避零速度 `NaN`。
+    3. **场景全局 `general.bloom` 后处理（`SceneDocument.swift`、`SceneInstance.swift`）**：
+       - 解析 `bloom`、`bloomstrength`、`bloomthreshold`、`bloomtint`（支持用户属性绑定）。
+       - 仅在 `bloomEnabled && bloomStrength > 0.001` 的 7 个场景上分配两张 1/4 分辨率 `.rgba16Float` 纹理，执行软阈值亮部提取 → 水平/垂直 9-tap 可分离高斯模糊 → 加法合成；其余 68 个场景零内存、零 GPU 开销。
+    4. **最后 1 个着色器编译失败修复（`WEShaderTranslator.swift`）**：
+       - `WEUniform` 新增 `isArray` 标记，保留符号长度数组（如 `g_BlendMap[BLENDROWCOUNT]` 缺省为 `1` 时仍声明为数组）；`wrapAssignments` 扩展支持 `*=` 和 `/=`（修复 `puppettexturechannels.frag` 的 `albedo.rgb *= g_Color4 * ...`）。
+       - 着色器编译通过率从 315/316 提升至 **316/316（100%）**。
+  - **性能/能耗评估**：
+    - `localOrthographic` 零额外开销；
+    - `rope`/`ropetrail` 复用现有粒子顶点缓冲和 `genericparticle` 管线，无新增 pass；
+    - `bloom` 仅在开启 bloom 的 7 个场景运行 1/4 分辨率 4 pass（约 +0.3ms），68 个非 bloom 场景完全跳过；全库 75 场景 GPU 中位 4.81ms、p90 10.75ms、最大 17.11ms（持平基线）。
+  - **验证**（均在 `build/worktrees/gemini-T25` 中执行）：
+    - `Tools/test.sh build`：**BUILD SUCCEEDED**
+    - `Tools/test.sh unit`：**25/25** 通过（持平基线）
+    - `Tools/test.sh shaders`：**316/316（0 失败，100%）**
+    - `Tools/test.sh scenes`：**75/75 OK，0 FAIL，0 洋红**（加载中位 0.42s / 最大 1.39s；GPU 中位 4.81ms / p90 10.75ms / 最大 17.11ms）
+    - **视觉抽检**：`3347416586`（海边摩托）海面完全恢复无灰白空洞；`3652110998`、`3613963197`、`3356432625` 流星拖尾长度与尾端淡出自然；`3690417937`、`3000562427` 全局泛光柔和无过曝。
+- **没做完**：
+  - 改动在独立工作树 `build/worktrees/gemini-T25`（分支 `gemini/T25-scene-fidelity`），按约定未 commit/merge。
+  - 合并提示：T22 与 T25 均改了 `SceneInstance.swift`（T22 在 `usesPointer` 和 `effectTextureProjection`，T25 在 `bloomTargets`、`localOrthographic` 和 `encodeParticles`），以及 `SceneParticles.swift`（T22 加了 `usesPointer`，T25 加了 `.rope`/`.ropeTrail`），位置基本不重叠，合并时两边保留即可。
+
+### 2026-11-23 · gemini · `gemini/T22-pointer-input`（已合并 `main`）
+
+- **做了什么**：
+  - 完成 **T22（鼠标输入管线）**，改动位于独立工作树 `build/worktrees/gemini-T22`（分支 `gemini/T22-pointer-input`，基于 `main` `e79429e`）：
+    1. **轮询 + 按需开启（`DesktopPointerMonitor.swift`、`WallpaperEngine.swift`、`WebRenderer.swift`、`SceneRenderer.swift`、`SceneInstance.swift`、`SceneMaterials.swift`、`SceneParticles.swift`、`SceneScript.swift`）**：
+       - `DesktopPointerMonitor` 位置改为按渲染帧率（`pollRate` 限制在 `15...60 Hz`）定时轮询 `NSEvent.mouseLocation`，解决鼠标停在桌面或 `ignoresMouseEvents` 窗口上方时 macOS 不再派发全局 `mouseMoved` 的问题；位置未变时直接短路跳过命中判断与 `CGWindowListCopyWindowInfo`，全局/本地监听负责唤醒与点击转发；支持按 `activeDisplayIDs` 跳过无需指针的显示器。
+       - 扩展 `PointerAwareRenderer` 协议增加 `needsPointer` 与 `onPointerNeedChange`，`WallpaperEngine.reconcile()` 仅在有正在播放且 `needsPointer == true` 的壁纸时才开启轮询。
+       - 场景按需判定（`SceneInstance.usesPointer`）覆盖：视差开关、`g_PointerPosition`/`g_PointerPositionLast`/`g_ParallaxPosition` uniform、cursor 脚本回调或 `input.cursor*` 读取、以及锁定鼠标的粒子控制点。
+       - 网页按需判定（`WebBridgeScript`）拦截 `EventTarget.prototype.addEventListener` 鼠标/指针事件类型并扫描 `onmouse*`/`onpointer*`/`onclick` 句柄，注册后才开启轮询。
+    2. **补全 `g_EffectTextureProjectionMatrix` 及其逆矩阵，并核对坐标系（`SceneInstance.swift`、`SceneMaterials.swift`、`SceneRenderer.swift`、`RenderedLoopRecorder.swift`、`Tools/SceneHarness/main.swift`）**：
+       - 计算每层的真实特效贴图投影矩阵 `screenViewProjection * model * translation(chainCenter) * scale(chainSize / 2)` 及其安全逆矩阵（即使位于 `composelayer` 子分组内也投影至屏幕 NDC），写入 `DrawState` 并填充至 `g_EffectTextureProjectionMatrix` / `g_EffectTextureProjectionMatrixInverse`。
+       - 核对 WE 原版 `cursorripple`、`fluidsimulation`、`xray`、`iris_follow_cursor`、`iris_movement__`、`dot_matrix` 与 `depthparallax` 着色器：确认 `g_PointerPosition` 为左上角原点 `[0, 1]^2`（完全一致），同时修复 `g_ParallaxPosition` 此前以 `(0, 0)` 为中心偏移过小的错误，改为 `[0, 1]^2` 左下角原点、以 `(0.5, 0.5)` 为中心的平滑指针位置（与 `depthparallax.vert` 一致），并同步更新离屏录屏与回归工具默认帧值。
+  - **跨模块接口改动**：`PointerAwareRenderer` 新增 `var needsPointer: Bool { get }` 和 `var onPointerNeedChange: (() -> Void)? { get set }`（仅 `SceneRenderer`、`WebRenderer` 实现）。
+  - **性能/能耗评估**：非交互壁纸或暂停状态下轮询定时器与事件监听完全关闭（零 CPU/零唤醒）；交互壁纸播放且指针静止时每帧仅做一次 `NSEvent.mouseLocation == lastLocation` 比较（微秒级），不做窗口查询；`effectTextureProjection` 仅对当前可见图层每帧算一次 4×4 矩阵乘与求逆，实测 75 场景 GPU 中位 4.67ms、p90 8.98ms（与基线持平）。
+  - **验证**（均在 `build/worktrees/gemini-T22` 中执行）：
+    - `Tools/test.sh build`：**BUILD SUCCEEDED**
+    - `Tools/test.sh unit`：**25/25** 通过（持平基线）
+    - `Tools/test.sh shaders`：**315/316** 通过（持平基线）
+    - `Tools/test.sh scenes`：**75/75 OK，0 FAIL，0 洋红**（加载中位 0.42s、最大 1.36s；GPU 中位 4.67ms、p90 8.98ms、最大 16.35ms）
+    - **专项验证**：`3287715210`（`iris_follow_cursor`，`usesPointer=true`，左右/上下指针变化 ~2.25 万像素）、`3463692991`（`iris_movement__`，`usesPointer=true`，眼球跟随移动）、`3373818743`（`depthparallax` + `cursorripple` + 视差，上下/左右均响应）、`3436945972`（跳过片头后视差显著响应）、`3821868213`（无交互，`usesPointer=false` 不轮询）；`WebRenderer` 监听 `mousemove` 页面 `needsPointer=true` 并准确收到 `[[123, 45]]`，静态页面保持 `needsPointer=false`。
+- **没做完**：
+  - 改动在独立工作树 `build/worktrees/gemini-T22`（分支 `gemini/T22-pointer-input`），按约定未 commit/merge；合并提示：与 `gemini/T21` 仅在 `WallpaperEngine.swift` 不同方法有邻近修改，无逻辑冲突。
+  - 接下来直接开工 **T25（通用场景还原度）**。
+
+### 2026-11-23 · gpt · `gpt/T23-native-steam`（已合并 `main`，待 Steam 真机验收）
+
+- 按分工先提交 T17（`1ea4e5b`）。同步到阶段 6 的 `main` 后，构建通过，75/75 场景渲染与评分，T25 可直接读取 JSON 和拼图。
+- SteamCMD 解析终端和本轮追加的日志，区分密码、Steam Guard、限流、拒绝访问及网络失败。只在下载已登录后重试网络失败，最多三次，间隔 2、8、30 秒。手机确认提示选择 Steam Client。
+- 原生入口在 Steam 面板显示二维码，用户确认后将 refresh token 写入钥匙串。使用系统网络配置的 URLSession 连接 CM 和 CDN，验证清单范围及分块、文件的 SHA-1，再导入资源库。ZIP 用 zlib，LZMA 用 macOS 的 libarchive，Zstandard 锁定 1.5.7。空闲时无轮询；下载逐块解密、解压和校验。[Steam 消息结构](https://github.com/SteamTracking/Protobufs/tree/master/steam) · [Zstandard 1.5.7](https://github.com/facebook/zstd/releases/tag/v1.5.7)
+- 正式构建、35/35 XCTest 与 SteamCMD 假进程通过。英文及简体中文环境的隔离测试版均可显示并解出测试二维码。夹具覆盖认证请求和轮询、CM 帧、路径校验、三种解压格式和文件落盘。
+- 本机公开 CM 目录请求超时（`NSURLErrorDomain -1001`），二维码接口连接失败。真实扫码、账号访问权限、CDN 下载和最终导入待验收。网络可达后，由用户本人在 Steam Mobile 扫码，再下载有权限的工坊壁纸。T23 改动留在本地分支，等待验收。
+
+### 2026-11-23 · gemini · `gemini/T21-lockscreen-desktop`（已合并 `main`）
+
+- **做了什么**：
+  - 完成 **T21（锁屏改为写 Desktop 选择，免去系统设置手动选）**，改动位于独立工作树 `build/worktrees/gemini-T21`（分支 `gemini/T21-lockscreen-desktop`，基于 `main` `e79429e`）：
+    1. **`AerialSystem.swift`（Desktop + Idle 全覆盖与完整备份/恢复）**：
+       - `select(assetID:includeIdle:excludedDesktopDisplayIDs:backup:)` 同时写入 `Desktop`（锁屏）与可选 `Idle`（屏保），覆盖 `SystemDefault`、`AllSpacesAndDisplays`、`Displays/<id>`、`Spaces/<id>/Default` 和 `Spaces/<id>/Displays/<id>`。保证每个含 `Desktop` 的容器都同时携带 `Idle` 与合法 `Type`（如 `AllSpacesAndDisplays` 从 `"idle"` 升为 `"individual"`），避免 macOS 拒绝存储。
+       - 扩展 `backup` 记录所有 Desktop/Idle 原内容、原先不存在的槽位（`__lumenAbsent` 标记）及容器 `Type`；关闭锁屏或关闭屏保开关时按原样恢复，新增 Space 自动借用同类型原备份（Desktop 借 Desktop、Idle 借 Idle，不串槽）。
+       - 用 `isSelectionActive` 替代原 `selectedIdleAssetIDs`（修复某 Space 被静态图覆盖时因 `assetIDs` 返回空数组而漏检的问题），并将纯字典变换提取为可单测方法。
+    2. **`LockScreenManager.swift`、`AppSettings.swift`、`LockScreenSettings.swift`**：
+       - 新增 `AppSettings.lockScreenScreenSaver`（键 `"lockScreenScreenSaver"`，默认 `true`，设置页新增 `"Also use as screen saver"` 开关），关闭时仅还原 `Idle`、保留 `Desktop` 锁屏播放。
+       - `disable()` 还原 `Index.plist` 并重启 `WallpaperAgent` 完成后，回调 `WallpaperEngine.syncStillFramesAfterLockScreenDisabled()`，确保恢复静态图或原壁纸无竞态。
+    3. **`StillFrameSync.swift`、`WallpaperEngine.swift`（与静态图同步协调）**：
+       - 锁屏开启时，主显示器（`lockScreenManagedDisplayIDs`）不再写入 `StillFrameSync` 静态图，且立即取消在途静态图任务（`StillFrameSync.cancel(for:)`）；其他副屏照旧走 `StillFrameSync`，并通过 `stillFrameManagedDisplayIDs()` 传给 `AerialSystem` 避免互相覆盖。
+    4. **单元测试（`LumenTests/AerialSystemTests.swift`、`project.yml`）**：
+       - 新增 5 项 XCTest，覆盖全容器 Desktop/Idle 写入与无损还原、副屏排除、仅 Desktop 模式下恢复屏保、单 Space 静态图覆盖检测、以及启用后新建 Space 的恢复借用；已用 `xcodegen generate` 重生成工程。
+  - **接口/配置改动**：新增 `AppSettings` 键 `"lockScreenScreenSaver"`（Bool，默认 `true`）；`StillFrameSync` 新增 `cancel(for:)`；`WallpaperEngine` 新增 `lockScreenManagedDisplayIDs()`、`stillFrameManagedDisplayIDs()`、`syncStillFramesAfterLockScreenDisabled()`。
+  - **性能/能耗评估**：纯事件驱动（开启/切换/关闭/15 分钟自检时才读写 `Index.plist`），关闭主屏 `StillFrameSync` 后反而省去主屏静态图生成与磁盘写入，无额外常驻开销。
+  - **验证**：
+    - `Tools/test.sh build`：**BUILD SUCCEEDED**
+    - `Tools/test.sh unit`：**30/30** 通过（较基线 25/25 新增 5 项 `AerialSystemTests`）
+    - **本机 `Index.plist` + `WallpaperAgent` 实测**：测试前备份原 `Index.plist`；执行 `select` + `restartWallpaperAgent()` 后等待 3 秒复读，`isSelectionActive == true`，全部 11 个容器（`AllSpacesAndDisplays`、`SystemDefault`、`Displays/<id>`、4 个 `Spaces/*/Default` 及 `Displays/<id>`）均保持 Lumen 资产 ID 未被系统回退；执行 `restoreSelection` 后 `AllSpacesAndDisplays` 恢复为 `Type=idle` 且无 `Desktop`，全部 Space 恢复原静态图；最后已用原备份完整复原。
+- **没做完**：
+  - 按约定未 commit/merge；需用户在开启锁屏后按 `⌃⌘Q` 目测锁屏实际播放效果。
+  - 接下来直接开工 **T22（鼠标输入管线）**。
+
+### 2026-11-23 · gpt · `gpt/T23-native-steam`（进行中）
+
+- 先完成 T17，已提交 `1ea4e5b`。T23 将扩展 `SteamWorkshop` 与 `SteamPanel` 的认证和下载状态。先验证 SteamCMD 的失败分类与重试，再接入原生认证、钥匙串和内容下载。
 
 ### 2026-11-23 · gpt · `gpt/T17-visual-regression`（已提交）
 
