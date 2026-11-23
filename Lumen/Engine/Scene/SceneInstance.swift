@@ -366,6 +366,25 @@ final class SceneInstance: @unchecked Sendable {
         var cursorInput = SceneCursorInput()
     }
 
+    /// Whether anything in the scene reacts to the pointer (parallax, pointer shaders, cursor scripts, or mouse particles).
+    private(set) lazy var usesPointer: Bool = {
+        if document.parallaxEnabled { return true }
+        if scripts?.usesPointer == true { return true }
+        func passUses(_ pass: PreparedPass?) -> Bool { pass?.uniforms.usesPointer ?? false }
+        for drawable in drawables {
+            switch drawable {
+            case .image(let layer):
+                if passUses(layer.base) || passUses(layer.compositePass) { return true }
+                for step in layer.steps { if case .draw(let pass) = step.kind, passUses(pass) { return true } }
+            case .particles(let layer):
+                if layer.systems.contains(where: { $0.usesPointer || $0.pass.uniforms.usesPointer }) { return true }
+            case .model(let layer):
+                if layer.passes.contains(where: { passUses($0.draw) }) { return true }
+            }
+        }
+        return false
+    }()
+
     /// Whether anything in the scene follows the music, so system audio capture is worth running.
     private(set) lazy var usesAudio: Bool = {
         if scripts?.wantsAudio == true { return true }
@@ -553,16 +572,22 @@ final class SceneInstance: @unchecked Sendable {
         let parentTransform = parentWorld(of: layer.object)
         // Parallax moves each layer by its depth (background layers usually less than 1).
         let offset = document.parallaxEnabled ? frame.cameraOffset * layer.object.parallaxDepth : .zero
-        let layerVP = viewProjectionOverride ?? SceneMath.orthographic(canvas: canvas, offset: offset)
+        let screenVP = SceneMath.orthographic(canvas: canvas, offset: offset)
+        let layerVP = viewProjectionOverride ?? screenVP
         if layer.needsChain {
             encodeChain(layer, state: objectState, parent: parentTransform, buffer: buffer, session: &session,
-                        viewProjection: layerVP, targetSize: targetSize, frame: frame, compositeToTarget: drawsToTarget)
+                        viewProjection: layerVP, screenViewProjection: screenVP, targetSize: targetSize,
+                        frame: frame, compositeToTarget: drawsToTarget)
         } else {
             let needsFB = layer.base.usesFrameBuffer || (layer.puppetClipping?.clippedBase.usesFrameBuffer == true)
             if needsFB { session.end(); copyFrame(buffer) }
             var state = drawState(frame: frame, object: objectState)
-            state.model = layer.model(for: objectState, parent: parentTransform)
+            let model = layer.model(for: objectState, parent: parentTransform)
+            let (etp, etpInv) = Self.effectTextureProjection(for: layer, model: model, screenViewProjection: screenVP)
+            state.model = model
             state.viewProjection = layerVP
+            state.effectTextureProjection = etp
+            state.effectTextureProjectionInverse = etpInv
             state.targetSize = targetSize
             encodeImageBase(
                 layer: layer, state: state, buffer: buffer,
@@ -675,12 +700,30 @@ final class SceneInstance: @unchecked Sendable {
         }
     }
 
+    /// Maps a layer's effect-texture NDC `[-1, 1]^2` into screen NDC `[-1, 1]^2`, and its inverse.
+    /// Pointer-driven effects (`iris_movement`, `xray`, `cursorripple`, `depthparallax`) unproject
+    /// screen-space cursor NDC through the inverse so the effect centers on the layer's true screen rect.
+    private static func effectTextureProjection(
+        for layer: ImageLayer,
+        model: simd_float4x4,
+        screenViewProjection: simd_float4x4
+    ) -> (simd_float4x4, simd_float4x4) {
+        let projection = screenViewProjection
+            * model
+            * SceneMath.translation(layer.chainCenter)
+            * SceneMath.scale(layer.chainSize / 2)
+        let det = simd_determinant(projection)
+        let inverse = det.isFinite && abs(det) > 1e-12 ? projection.inverse : matrix_identity_float4x4
+        return (projection, inverse)
+    }
+
     private func encodeChain(_ layer: ImageLayer, state objectState: SceneDocument.State, parent: simd_float4x4, buffer: MTLCommandBuffer,
-                             session: inout SceneSession, viewProjection: simd_float4x4, targetSize: SIMD2<Float>,
-                             frame: Frame, compositeToTarget: Bool) {
+                             session: inout SceneSession, viewProjection: simd_float4x4, screenViewProjection: simd_float4x4,
+                             targetSize: SIMD2<Float>, frame: Frame, compositeToTarget: Bool) {
         let isSceneTarget = (session.target === sceneTexture)
         let model = layer.model(for: objectState, parent: parent)
         guard layer.buffers.count == 2 else { return }
+        let (etp, etpInv) = Self.effectTextureProjection(for: layer, model: model, screenViewProjection: screenViewProjection)
         let base = layer.base
         // The chain renders into its own buffers, so the caller's encoder has to close first.
         session.end()
@@ -692,6 +735,8 @@ final class SceneInstance: @unchecked Sendable {
         // a composition layer opts out of `copybackground`).
         var state = drawState(frame: frame, object: objectState)
         if base.uniforms.usesPointLighting { state.worldModel = model }
+        state.effectTextureProjection = etp
+        state.effectTextureProjectionInverse = etpInv
         state.targetSize = SIMD2(Float(layer.bufferSize.x), Float(layer.bufferSize.y))
         if layer.isPassthrough {
             state.model = model
@@ -766,6 +811,8 @@ final class SceneInstance: @unchecked Sendable {
                 effectState.targetSize = SIMD2(Float(destination.width), Float(destination.height))
                 effectState.model = matrix_identity_float4x4
                 effectState.viewProjection = matrix_identity_float4x4
+                effectState.effectTextureProjection = etp
+                effectState.effectTextureProjectionInverse = etpInv
                 if let encoder = beginPass(buffer, target: destination) {
                     draw(pass, encoder: encoder, vertices: SceneVertex.quad(halfSize: SIMD2(1, 1)), state: effectState,
                          previous: layer.buffers[current], layer: layer)
@@ -793,6 +840,8 @@ final class SceneInstance: @unchecked Sendable {
             compState.brightness = 1
             compState.model = model
             compState.viewProjection = viewProjection
+            compState.effectTextureProjection = etp
+            compState.effectTextureProjectionInverse = etpInv
             compState.targetSize = targetSize
             draw(composite, encoder: encoder, vertices: compositeQuad,
                  state: compState, previous: layer.buffers[current], layer: layer)

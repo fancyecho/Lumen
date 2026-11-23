@@ -257,6 +257,8 @@ final class ParticleSystem {
 
     /// Whether any emitter's rate follows the music.
     var usesAudio: Bool { emitters.contains { $0.audioMode > 0 } }
+    /// Whether any particle control point is locked to the mouse pointer.
+    var usesPointer: Bool { !mouseControlPoints.isEmpty }
 
     private static func bandRange(_ start: Int, _ end: Int) -> ClosedRange<Int> {
         let low = min(max(min(start, end), 0), 15), high = min(max(max(start, end), 0), 15)

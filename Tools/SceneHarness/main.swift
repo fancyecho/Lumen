@@ -87,7 +87,7 @@ for id in items {
         for i in 0..<frames {
             t = time + Float(i) / 30
             let cb = queue.makeCommandBuffer()!
-            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero, audio: fakeAudio))
+            instance.encode(into: cb, frame: .init(time: t, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: SIMD2(0.5, 0.5), audio: fakeAudio))
             cb.commit(); cb.waitUntilCompleted()
             gpu = cb.gpuEndTime - cb.gpuStartTime
         }
@@ -98,7 +98,7 @@ for id in items {
             var last: MTLCommandBuffer?
             for i in 0..<60 {
                 let cb = queue.makeCommandBuffer()!
-                instance.encode(into: cb, frame: .init(time: time + Float(3 + i) / 30, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: .zero, audio: fakeAudio))
+                instance.encode(into: cb, frame: .init(time: time + Float(3 + i) / 30, delta: 1.0 / 30, pointerCanvas: nil, daytime: 0.5, pointer: SIMD2(0.5, 0.5), pointerLast: SIMD2(0.5, 0.5), cameraOffset: .zero, parallax: SIMD2(0.5, 0.5), audio: fakeAudio))
                 cb.addCompletedHandler { times[i] = $0.gpuEndTime - $0.gpuStartTime }
                 cb.commit()
                 last = cb

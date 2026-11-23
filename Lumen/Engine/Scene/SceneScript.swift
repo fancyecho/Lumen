@@ -132,6 +132,9 @@ final class SceneScriptRuntime: @unchecked Sendable {
             .call(withArguments: [id, property, factory, value ?? NSNull(), scriptProperties])?.toBool() == true {
             cursorLayerIDs.insert(id)
         }
+        if source.contains("cursorWorldPosition") || source.contains("cursorScreenPosition") || source.contains("cursorLeftDown") {
+            readsCursorInput = true
+        }
         hasScripts = true
     }
 
@@ -146,6 +149,9 @@ final class SceneScriptRuntime: @unchecked Sendable {
 
     /// Whether a script called `engine.registerAudioBuffers` (so capture should run).
     private(set) var wantsAudio = false
+    private var readsCursorInput = false
+    /// Whether any script handles cursor callbacks or reads `input.cursor*`.
+    var usesPointer: Bool { !cursorLayerIDs.isEmpty || readsCursorInput }
 
     func applyUserProperties(_ changed: [String: PropertyValue]) {
         guard hasScripts else { return }

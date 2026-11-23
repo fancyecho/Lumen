@@ -61,7 +61,12 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
     private var cursorInput = SceneCursorInput()
     private var pointerLast = SIMD2<Float>(0.5, 0.5)
     private var parallax = SIMD2<Float>(0, 0)
+    /// Smoothed `[0, 1]` Y-up pointer position for `g_ParallaxPosition` (centered at `0.5, 0.5`).
+    private var parallaxPosition = SIMD2<Float>(0.5, 0.5)
     private var presentRect = SIMD4<Float>(-1, -1, 2, 2)
+
+    var needsPointer: Bool { instance?.usesPointer == true }
+    var onPointerNeedChange: (() -> Void)?
 
     init(source: Source, values: [String: PropertyValue], settings: SceneRenderSettings, framing: WallpaperFraming) throws {
         guard let device = MetalContext.shared.device, let queue = MetalContext.shared.commandQueue else { throw ShaderError.noDevice }
@@ -132,6 +137,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
                 instance.sounds?.configure(muted: self.settings.muted, volume: Float(self.settings.volume))
                 instance.setPlaying(self.isActive)
                 self.updateAudioCapture()
+                self.onPointerNeedChange?()
                 if !self.isActive { self.metalView.draw() }
             case .failure(let error):
                 Log.engine.error("Scene failed to load: \(error.localizedDescription, privacy: .public)")
@@ -187,6 +193,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         metalView.isPaused = true
         metalView.delegate = nil
         readyHandlers.removeAll()
+        onPointerNeedChange = nil
         instance = nil
         updateAudioCapture()
         container.removeFromSuperview()
@@ -317,7 +324,7 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
             pointer: pointer,
             pointerLast: pointerLast,
             cameraOffset: parallax,
-            parallax: parallax / max(instance.canvas, SIMD2(1, 1)),
+            parallax: parallaxPosition,
             audio: capturesAudio ? AudioSpectrumService.shared.bands : .silent
         )
         frame.cursorInput = cursorInput
@@ -363,11 +370,17 @@ final class SceneRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Pr
         let target = pointerTarget ?? SIMD2(0.5, 0.5)
         let ease = min(1, delta * 8)
         pointer += (target - pointer) * ease
-        guard document.parallaxEnabled else { return }
+        // `g_ParallaxPosition` is normalized in [0, 1] with a bottom-left origin, centered at (0.5, 0.5).
+        let follow = min(1, delta / max(document.parallaxDelay, 0.02))
+        let parallaxGoal = SIMD2(pointer.x, 1 - pointer.y)
+        parallaxPosition += (parallaxGoal - parallaxPosition) * follow
+        guard document.parallaxEnabled else {
+            parallax = .zero
+            return
+        }
         let centred = SIMD2(pointer.x - 0.5, 0.5 - pointer.y) * 2
         let reach = document.canvas.x * 0.025 * document.parallaxAmount * max(document.parallaxMouseInfluence, 0.2) * 2
         let goal = -centred * reach
-        let follow = min(1, delta / max(document.parallaxDelay, 0.02))
         parallax += (goal - parallax) * follow
     }
 }
