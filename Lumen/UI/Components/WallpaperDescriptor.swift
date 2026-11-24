@@ -9,6 +9,7 @@ enum WallpaperDescriptor {
         case .scene: String(localized: "Scene")
         case .web: String(localized: "Web")
         case .shader: wallpaper.isBuiltin ? String(localized: "Rendered Live") : String(localized: "Your Shader")
+        case .native: String(localized: "Rendered Live")
         }
     }
 
@@ -17,7 +18,7 @@ enum WallpaperDescriptor {
         case .video: "film"
         case .scene: "square.3.layers.3d"
         case .web: "globe"
-        case .shader: "sparkles"
+        case .shader, .native: "sparkles"
         }
     }
 

@@ -43,6 +43,7 @@ AppModel (@MainActor, 全局状态)
 | `Lumen/Engine/LockScreen` | 锁屏视频生成与安装；场景离屏录制、网页快照录制（`RenderedLoopRecorder.swift`） |
 | `Lumen/Engine/Audio` | 系统音频采集（Core Audio process tap）与频谱分析，供音频响应壁纸使用 |
 | `Lumen/Engine/Web` | Web 渲染器、`lumen-web://` 本地协议、注入的桥接脚本 |
+| `Lumen/Engine/Native` | 内置渲染代码的「原生壁纸」：用户自己做的代码海（`CodeSea/`）和 PRO 光丝（`PROStrands/`），从各自的独立 app 移植。`NativeWallpaper` 负责识别项目文件夹、导入资源、给出属性；着色器是 `.msl` 资源，运行时编译 |
 | `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（见下节） |
 | `Lumen/Library` | 资源库、导入（视频、WE 项目、网页）、缩略图、HEVC 转码、播放列表 |
 | `Lumen/Library/Steam` | SteamCMD 安装与驱动（伪终端）、创意工坊下载队列；`WorkshopCatalog.swift` 免登录浏览创意工坊：公开浏览页按排序、搜索、标签返回结果，并把这一页的结果（标题、预览、大小、标签、订阅/收藏、星级、总页数）以 JSON 嵌在页面里，一次请求即可；解析不到时退回「页面里的条目链接 + `GetPublishedFileDetails`（无需 key）」。`WorkshopBrowser` 是挂在 `AppModel` 上的浏览状态（按页码加载，每页 30 条，最近 24 页缓存，侧边栏选中项）；`WorkshopPreviews` 负责预览图的磁盘缓存（`~/Library/Caches/app.lumen.Lumen/WorkshopPreviews`，上限 300MB）和首帧解码 |

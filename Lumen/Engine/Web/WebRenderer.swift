@@ -54,6 +54,8 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     private var readyTimeout: Task<Void, Never>?
     private var snapshotGeneration = 0
     private var lastPointerSend: CFTimeInterval = 0
+    /// The page last saw the pointer over it, so leaving must be reported.
+    private var pointerInside = false
     /// The page registered a mouse or pointer listener.
     private var wantsPointer = false
     var needsPointer: Bool { wantsPointer }
@@ -183,7 +185,16 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
     // MARK: PointerAwareRenderer
 
     func pointerMoved(to point: CGPoint?) {
-        guard isReady, wantsActive, let point else { return }
+        guard isReady, wantsActive else { return }
+        guard let point else {
+            // A browser reports the pointer leaving the window; pages rely on it to end hover
+            // effects, and a press that began on the desktop never gets its mouseup otherwise,
+            // leaving the page "held" (and animating) after the pointer moved onto a window.
+            if pointerInside { evaluate("window.__lumen && __lumen.leave()") }
+            pointerInside = false
+            return
+        }
+        pointerInside = true
         // A desktop doesn't need more than ~60 pointer updates a second.
         let now = CACurrentMediaTime()
         guard now - lastPointerSend > 1.0 / 60 else { return }
@@ -193,6 +204,7 @@ final class WebRenderer: NSObject, WallpaperRenderer, PointerAwareRenderer, Prop
 
     func pointerPressed(_ isDown: Bool, at point: CGPoint) {
         guard isReady, wantsActive else { return }
+        pointerInside = true
         evaluate("window.__lumen && __lumen.pointer('\(isDown ? "mousedown" : "mouseup")', \(point.x), \(point.y), \(isDown ? 1 : 0))")
     }
 
@@ -453,6 +465,7 @@ enum WebBridgeScript {
       };
 
       var pendingProperties = null;
+      var last = null, held = false;
       function listener() { return window.wallpaperPropertyListener; }
       function deliver(props) {
         var l = listener();
@@ -495,6 +508,8 @@ enum WebBridgeScript {
         pointer: function (type, x, y, buttons) {
           var target = document.elementFromPoint(x, y) || document.body || document.documentElement;
           if (!target) return;
+          last = { x: x, y: y, target: target };
+          if (type === 'mousedown') held = true; else if (type === 'mouseup') held = false;
           var init = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y,
                        screenX: x, screenY: y, buttons: buttons, button: 0 };
           var pointerType = { mousemove: 'pointermove', mousedown: 'pointerdown', mouseup: 'pointerup' }[type];
@@ -504,6 +519,26 @@ enum WebBridgeScript {
           }
           target.dispatchEvent(new MouseEvent(type, init));
           if (type === 'mouseup') target.dispatchEvent(new MouseEvent('click', init));
+        },
+        // The pointer left the desktop: release a press still held, then report the exit.
+        leave: function () {
+          if (!last) return;
+          var x = last.x, y = last.y, target = last.target.isConnected ? last.target : (document.body || document.documentElement);
+          if (held) {
+            held = false;
+            var up = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, screenX: x, screenY: y, buttons: 0, button: 0 };
+            if (window.PointerEvent) target.dispatchEvent(new PointerEvent('pointerup', Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true }, up)));
+            target.dispatchEvent(new MouseEvent('mouseup', up));
+          }
+          var out = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, screenX: x, screenY: y, relatedTarget: null };
+          if (window.PointerEvent) {
+            var pout = Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true }, out);
+            target.dispatchEvent(new PointerEvent('pointerout', pout));
+            document.documentElement.dispatchEvent(new PointerEvent('pointerleave', Object.assign({}, pout, { bubbles: false })));
+          }
+          target.dispatchEvent(new MouseEvent('mouseout', out));
+          document.documentElement.dispatchEvent(new MouseEvent('mouseleave', Object.assign({}, out, { bubbles: false })));
+          last = null;
         }
       };
 

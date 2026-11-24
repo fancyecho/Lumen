@@ -1,0 +1,294 @@
+// PRO 光丝 · 原生版 —— 光丝合成着色器（运行时编译，无需 Metal 工具链）
+//
+// 画面由原图逐列拆出的独立光丝组成。每根丝在每一行有自己的横向位移 d、扭转 θ、
+// 斜率和深度 z（来自 CPU 模拟，存在 sim 纹理里）。每个像素找出覆盖它的几根丝，
+// 按深度从前到后合成。静止时所有丝首尾相接、各自采样原图同一点，所以输出与原图
+// 逐像素一致；不需要任何连续底图来填缝。
+
+#include <metal_stdlib>
+using namespace metal;
+
+struct Uniforms {
+    float2 viewSize;    // 目标像素尺寸
+    float2 srcSize;     // 原图尺寸（源像素）
+    float2 offset;      // 原图左上角在目标中的像素位置
+    float  scale;       // 目标像素 / 源像素
+    float  footprint;   // 源像素 / 目标像素
+    float  time;
+    float  simActive;
+    float  flow;        // 空闲流光 0…1
+    float  glow;        // 金属反光 0…1
+    float  lod;
+    float  reach;       // 二分查找窗口半宽（源像素）
+    float  depth;       // 分层深度 0…1
+    float  maxWidth;    // 最宽的丝（源像素）
+    int    strandCount;
+    int    rows;
+    int    srcWidth;
+    int    activeLo;    // 模拟中非零的丝索引范围；范围外的像素直接采样原图
+    int    activeHi;
+    int    blocks;      // 活动格每行的格数（每格 8 根丝）
+};
+
+struct Strand {
+    float restL;
+    float width;
+    float z0;
+    float phase;
+    float speed;
+    float glint;
+    float seed;
+    float section;   // 所属光区
+};
+
+struct VOut { float4 pos [[position]]; };
+
+vertex VOut vmain(uint vid [[vertex_id]]) {
+    float2 p = float2(float((vid << 1) & 2), float(vid & 2));
+    VOut o;
+    o.pos = float4(p * 2.0 - 1.0, 0.0, 1.0);
+    return o;
+}
+
+constexpr sampler imgSampler(coord::normalized, filter::linear, mip_filter::linear, address::clamp_to_edge);
+constexpr sampler simSampler(coord::normalized, filter::linear, address::clamp_to_edge);
+
+// 沿丝方向（行之间）用三次 B 样条插值：丝的弯曲是平滑曲线，不会在模拟节点处折成直线和尖角。
+// B 样条的权重全为非负，同一行上各丝左边缘的先后顺序仍然保持；静止时全零，原图不变。
+// 用两次硬件线性采样拼出四个节点的加权（GPU Gems 2 第 20 章的做法）。
+struct RowTap {
+    float v0, v1;   // 两次采样的纵向纹理坐标
+    float g0, g1;   // 两次采样的权重
+};
+
+static inline RowTap rowTap(float sy, constant Uniforms &u) {
+    float rows = float(u.rows);
+    float r = clamp(sy / u.srcSize.y, 0.0, 1.0) * (rows - 1.0);
+    float i = floor(r), f = r - i;
+    float f2 = f * f, f3 = f2 * f;
+    float w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    float w1 = (3.0 * f3 - 6.0 * f2 + 4.0) / 6.0;
+    float w2 = (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0) / 6.0;
+    float w3 = f3 / 6.0;
+    RowTap t;
+    t.g0 = w0 + w1;
+    t.g1 = w2 + w3;
+    t.v0 = (i - 1.0 + w1 / t.g0 + 0.5) / rows;
+    t.v1 = (i + 1.0 + w3 / t.g1 + 0.5) / rows;
+    return t;
+}
+
+static inline float4 simAt(texture2d<half> sim, int j, RowTap t, int n) {
+    float x = (float(j) + 0.5) / float(n);
+    return t.g0 * float4(sim.sample(simSampler, float2(x, t.v0)))
+         + t.g1 * float4(sim.sample(simSampler, float2(x, t.v1)));
+}
+
+// 原图里的纯黑背景是“没有光丝”的地方：透明，露出后面的丝或黑色。
+static inline float materialAlpha(float3 c) {
+    return smoothstep(0.0003, 0.0025, max(c.r, max(c.g, c.b)));
+}
+
+// 空闲流光（按发布会画面）：每一束丝（光区）轮流被点亮。光从这一束的一端（顶、底或 R 的腰部）
+// 灌进丝里，靠近光源处几乎全白，沿丝渐暗；没被点亮的光区压得很暗。
+// 光是一张平滑的场：光区之间按黑缝中线做羽化过渡，顶部拱形、R 腰部尖角这些跨区的丝
+// 会渐变而不是被一刀切开。整束亮度一致，不给单根丝加随机明暗，成束区不会出现细黑线。
+struct FlowParams {
+    // 第 k 个光区：s[3k] = (x0, x1, y0, y1)，x 边界在黑缝中线；
+    // s[3k+1] = (光源 y, 方向 ±1, 亮度包络, 灌入长度)；s[3k+2] = (0 普通 / 1 腰上 / 2 腰下, 腰部 y, 0, 0)
+    float4 s[24];
+    float4 misc;    // (0, 0, 0, 光区数)
+};
+
+static inline float flowLight(float x, float sy, constant FlowParams &fp) {
+    const float featherX = 70.0, featherWaist = 90.0;
+    float sum = 0.0, weight = 0.0;
+    int count = int(fp.misc.w);
+    for (int k = 0; k < count; ++k) {
+        float4 g = fp.s[3 * k];
+        if (x < g.x - featherX || x > g.y + featherX) continue;
+        float4 l = fp.s[3 * k + 1], m = fp.s[3 * k + 2];
+        float wx = smoothstep(g.x - featherX, g.x + featherX, x) * (1.0 - smoothstep(g.y - featherX, g.y + featherX, x));
+        if (wx <= 0.0) continue;
+        float wy;
+        if (m.x > 1.5) {
+            wy = smoothstep(m.y - featherWaist, m.y + featherWaist, sy);
+        } else if (m.x > 0.5) {
+            wy = 1.0 - smoothstep(m.y - featherWaist, m.y + featherWaist, sy);
+        } else {
+            wy = smoothstep(g.z - 80.0, g.z + 4.0, sy) * (1.0 - smoothstep(g.w - 4.0, g.w + 80.0, sy));
+        }
+        float w = wx * wy;
+        if (w <= 0.0) continue;
+        float dist = max(0.0, (sy - l.x) * l.y);
+        sum += w * l.z * exp(-dist / max(l.w, 1.0));
+        weight += w;
+    }
+    return weight > 1e-4 ? sum / weight : 0.0;
+}
+
+/// 返回这一点的亮度倍数（1 = 原图）。x 用丝的静止位置，被拨开的丝带着自己的光走。
+static inline float flowGain(float x, float sy, constant Uniforms &u, constant FlowParams &fp) {
+    if (u.flow <= 0.0) return 1.0;
+    float lit = flowLight(x, sy, fp);
+    // 没被点亮的地方：发布会效果档约剩 12% 亮度，柔和档约 30%。
+    float base = 1.0 - pow(u.flow, 0.45);
+    return base + 2.6 * u.flow * lit;
+}
+
+// 亮度倍数作用在丝的颜色上；超过原图亮度时再往白色推，靠近光源处接近过曝的白。
+static inline float3 applyFlow(float3 c, float m) {
+    float lum = dot(c, float3(0.2126, 0.7152, 0.0722));
+    // 只提亮明确是光丝的像素；原图里接近黑的噪点只会被压暗，不会被放大成可见的点。
+    float gate = smoothstep(0.004, 0.03, lum);
+    m = m > 1.0 ? 1.0 + (m - 1.0) * gate : m;
+    // 压暗的地方略微偏冷，像发布会画面里的深蓝；点亮处不改色相。
+    float3 cool = mix(float3(1.0), float3(0.78, 0.9, 1.12), saturate(1.0 - m) * 0.7);
+    return c * m * cool + float3(0.92, 0.96, 1.0) * max(0.0, m - 1.0) * (0.05 + 0.3 * sqrt(lum));
+}
+
+fragment float4 fmain(VOut in [[stage_in]],
+                      constant Uniforms &u [[buffer(0)]],
+                      device const Strand *strands [[buffer(1)]],
+                      device const int *restIndex [[buffer(2)]],
+                      device const uchar *activity [[buffer(3)]],
+                      texture2d<float> img [[texture(0)]],
+                      texture2d<half> sim [[texture(1)]],
+                      texture2d<half> cohesion [[texture(2)]],
+                      constant FlowParams &fp [[buffer(4)]]) {
+    float2 dev = in.pos.xy;
+    float sx = (dev.x - u.offset.x) / u.scale;
+    float sy = clamp((dev.y - u.offset.y) / u.scale, 0.0, u.srcSize.y);
+    float f = u.footprint;
+    int W = u.srcWidth;
+    float vImg = sy / u.srcSize.y;
+    float xl = sx - 0.5 * f;
+    float xr = sx + 0.5 * f;
+
+    bool fast = u.simActive < 0.5;
+    int lo = 0, hi = 0;
+    if (!fast) {
+        lo = restIndex[clamp(int(floor(xl - u.reach)), 0, W - 1)];
+        hi = restIndex[clamp(int(floor(xr + u.reach)), 0, W - 1)];
+        fast = hi < u.activeLo || lo > u.activeHi;
+        if (!fast) {
+            // 只要查找窗口里插值用到的几行有任何一格在动，就走光丝路径。
+            float rowF = sy / u.srcSize.y * float(u.rows - 1);
+            // B 样条读取这一行附近的四个节点（上一行到下两行）。
+            int rm = clamp(int(floor(rowF)) - 1, 0, u.rows - 1);
+            int r0 = clamp(int(floor(rowF)), 0, u.rows - 1);
+            int r1 = min(r0 + 1, u.rows - 1);
+            int r2 = min(r0 + 2, u.rows - 1);
+            int moving = 0;
+            for (int blk = lo >> 3; blk <= (hi >> 3); ++blk) {
+                moving |= activity[rm * u.blocks + blk] | activity[r0 * u.blocks + blk]
+                        | activity[r1 * u.blocks + blk] | activity[r2 * u.blocks + blk];
+            }
+            fast = moving == 0;
+        }
+    }
+    if (fast) {
+        float4 c = img.sample(imgSampler, float2(sx / u.srcSize.x, vImg), level(u.lod));
+        if (u.flow > 0.0) {
+            c.rgb = applyFlow(c.rgb, flowGain(sx, sy, u, fp));
+        }
+        return float4(c.rgb, 1.0);
+    }
+
+    int N = u.strandCount;
+    float vY = (sy / u.srcSize.y * float(u.rows - 1) + 0.5) / float(u.rows);
+    RowTap tap = rowTap(sy, u);
+
+    // 找最后一根左边缘 ≤ 像素右缘的丝。模拟保证同一行左边缘单调递增：
+    // 先用本列静止的丝和它的位移猜一次，再朝正确方向走几步（通常 1–3 次取样）。
+    // 成束区的丝会向两侧各多盖 kSeal 源像素，查找时把右缘放宽同样的量。
+    const float kSeal = 1.6;
+    xr += kSeal;
+    int j = restIndex[clamp(int(floor(xr)), 0, W - 1)];
+    float dj = simAt(sim, j, tap, N).x;
+    j = clamp(restIndex[clamp(int(floor(xr - dj)), 0, W - 1)], lo, hi);
+    float Lj = strands[j].restL + simAt(sim, j, tap, N).x;
+    for (int step = 0; step < 48 && Lj > xr && j > lo; ++step) {
+        --j;
+        Lj = strands[j].restL + simAt(sim, j, tap, N).x;
+    }
+    for (int step = 0; step < 48 && j < hi; ++step) {
+        float Ln = strands[j + 1].restL + simAt(sim, j + 1, tap, N).x;
+        if (Ln > xr) break;
+        ++j;
+    }
+    lo = j;
+
+    const float3 lightDir = normalize(float3(-0.35, -0.55, 0.75));
+    const float3 halfV = normalize(lightDir + float3(0, 0, 1));
+    const float diffuse0 = lightDir.z;
+    const float spec0 = powr(halfV.z, 36.0);
+
+    // 像素横向 4 个子样本，每个只记最前和次前两层（其余几乎总被挡住），
+    // 覆盖率精确抗锯齿；丝之间的空隙就是黑色背景。
+    // 四个子样本打包成 float4 分量，全部留在寄存器里。
+    const float4 xs = sx + f * (float4(0, 1, 2, 3) - 1.5) * 0.25;
+    float4 fr = 0, fg = 0, fb = 0, fa = 0, fz = 1e9;
+    float4 sr = 0, sg = 0, sb = 0, sa = 0, sz = 1e9;
+
+    for (int idx = lo; idx >= 0 && idx > lo - 6; --idx) {
+        device const Strand &s = strands[idx];
+        float4 st = simAt(sim, idx, tap, N);
+        float d = st.x;
+        // 左边缘单调：再往前的丝都够不到这个像素了。
+        if (s.restL + d + u.maxWidth + kSeal <= xl) break;
+        float th = st.y, slope = st.z, z = st.w;
+        float ct = cos(th), sn = sin(th);
+        float cs = mix(1.0, max(abs(ct), 0.3), 0.35);
+        float center = s.restL + 0.5 * s.width + d;
+        float half_ = 0.5 * s.width * cs;
+        // 成束区（卷边、收口、屏幕顶/底边）：丝略微加宽、与邻居重叠，封住亚像素缝。
+        // 只在丝真的移动时加宽，静止画面保持与原图逐像素一致。
+        float seal = float(cohesion.sample(simSampler, float2((float(idx) + 0.5) / float(N), vY)).r)
+                   * kSeal * smoothstep(0.0, 0.35, abs(d));
+        float L = center - half_ - seal, R = center + half_ + seal;
+        if (R <= xl || L > xr) continue;
+
+        float u0 = s.restL + 0.5 * s.width + (sx - center) / cs;
+        u0 = clamp(u0, s.restL - 0.5 * f - seal, s.restL + s.width + 0.5 * f + seal);
+        float3 c = img.sample(imgSampler, float2(u0 / u.srcSize.x, vImg), level(u.lod)).rgb;
+        float a = materialAlpha(c);
+
+        // 光照：扭转让丝面转向，斜率让丝身倾斜。静止时修正量为零。
+        float2 b = normalize(float2(1.0, -slope));
+        float3 n = normalize(float3(sn * b.x, sn * b.y, ct));
+        float diff = abs(dot(n, lightDir));
+        float shade = (0.45 + 0.55 * diff) / (0.45 + 0.55 * diffuse0);
+        float spec = max(0.0, powr(abs(dot(n, halfV)), 36.0) - spec0);
+        float k3 = 1.0 - cs;
+        float fres = k3 * k3 * k3;
+        float lum = dot(c, float3(0.2126, 0.7152, 0.0722));
+        float lift = u.depth * 0.10 * smoothstep(2.0, 30.0, abs(d));
+        c = c * shade * (1.0 + lift)
+          + float3(1.0, 0.97, 0.92) * u.glow * (spec * 1.6 + fres * 0.45) * sqrt(lum) * a;
+
+        bool4 cov = xs >= L && xs < R;
+        bool4 front = cov && (z < fz);
+        bool4 second = cov && !front && (z < sz);
+        // 新的最前层把原最前层挤到第二层。
+        sr = select(select(sr, fr, front), c.r, second);
+        sg = select(select(sg, fg, front), c.g, second);
+        sb = select(select(sb, fb, front), c.b, second);
+        sa = select(select(sa, fa, front), a, second);
+        sz = select(select(sz, fz, front), z, second);
+        fr = select(fr, c.r, front);
+        fg = select(fg, c.g, front);
+        fb = select(fb, c.b, front);
+        fa = select(fa, a, front);
+        fz = select(fz, z, front);
+    }
+
+    float4 r = fr + (1.0 - fa) * sr;
+    float4 g = fg + (1.0 - fa) * sg;
+    float4 b = fb + (1.0 - fa) * sb;
+    float3 acc = float3(dot(r, 1.0), dot(g, 1.0), dot(b, 1.0));
+    // 流光最后整体作用（包括转向高光），压暗的光区里不会冒出一团灰白的高光。
+    float3 outc = acc * 0.25;
+    if (u.flow > 0.0) outc = applyFlow(outc, flowGain(sx, sy, u, fp));
+    return float4(outc, 1.0);
+}

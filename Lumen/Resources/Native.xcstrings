@@ -1,0 +1,226 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Always": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "常显（一直在）"
+          }
+        }
+      }
+    },
+    "Character brightness": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字符亮度"
+          }
+        }
+      }
+    },
+    "Code Sea": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代码海"
+          }
+        }
+      }
+    },
+    "Flow speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流光速度"
+          }
+        }
+      }
+    },
+    "Glow under the pointer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指针划过时字符微微发亮"
+          }
+        }
+      }
+    },
+    "Idle light flow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空闲流光"
+          }
+        }
+      }
+    },
+    "Layer depth": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分层深度"
+          }
+        }
+      }
+    },
+    "Lower frame rate on battery": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用电池时降低帧率"
+          }
+        }
+      }
+    },
+    "Metallic sheen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "金属反光"
+          }
+        }
+      }
+    },
+    "Night sea tone": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "夜海色调"
+          }
+        }
+      }
+    },
+    "Occasionally (about every 3 minutes)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "偶尔（约 3 分钟一次）"
+          }
+        }
+      }
+    },
+    "Often (about every minute)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "经常（约 1 分钟一次）"
+          }
+        }
+      }
+    },
+    "Only when summoned": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不主动出现"
+          }
+        }
+      }
+    },
+    "PRO Strands": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PRO 光丝"
+          }
+        }
+      }
+    },
+    "Reach": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用范围"
+          }
+        }
+      }
+    },
+    "Sea motion": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "海面浮动"
+          }
+        }
+      }
+    },
+    "She appears": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "她出现的频率"
+          }
+        }
+      }
+    },
+    "Spring back": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回弹速度"
+          }
+        }
+      }
+    },
+    "Strand twist": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "光丝扭转"
+          }
+        }
+      }
+    },
+    "Strum strength": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拨动强度"
+          }
+        }
+      }
+    },
+    "The %@ project folder is missing its artwork. Prepare its assets first, as its README describes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」的项目文件夹里缺少壁纸原图。请先按它的 README 准备素材。"
+          }
+        }
+      }
+    },
+    "Wings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翅膀"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

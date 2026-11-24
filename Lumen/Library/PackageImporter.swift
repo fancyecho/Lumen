@@ -10,17 +10,22 @@ enum PackageImporter {
         case project(URL)
         /// A folder of HTML without a project file; `entry` is relative to the folder.
         case webFolder(URL, entry: String)
+        /// The project folder of a wallpaper whose renderer is built into Lumen.
+        case native(URL, NativeWallpaper)
         case unsupported(String)
     }
 
     enum ImportError: LocalizedError {
         case alreadyInLibrary(String)
         case notAWallpaper
+        case missingNativeResource(String)
 
         var errorDescription: String? {
             switch self {
             case .alreadyInLibrary(let title): String(localized: "“\(title)” is already in your library.")
             case .notAWallpaper: String(localized: "Not a video, web page or Wallpaper Engine project.")
+            case .missingNativeResource(let title):
+                String(localized: "The \(title) project folder is missing its artwork. Prepare its assets first, as its README describes.", table: "Native")
             }
         }
     }
@@ -31,6 +36,7 @@ enum PackageImporter {
             return .unsupported(String(localized: "The file is missing."))
         }
         if isDirectory.boolValue {
+            if let native = NativeWallpaper.detect(folder: url) { return .native(url, native) }
             if WEProject.isProjectFolder(url) { return .project(url) }
             for entry in ["index.html", "index.htm"] where FileManager.default.fileExists(atPath: url.appending(path: entry).path) {
                 return .webFolder(url, entry: entry)
@@ -112,6 +118,54 @@ enum PackageImporter {
         package.byteCount = await Task.detached(priority: .utility) { folderSize(content) }.value
         let title = LibraryStore.prettyTitle(for: source)
         return Wallpaper(id: id, kind: .web, title: title, category: "Other", author: "You", addedAt: Date(), package: package)
+    }
+
+    /// Copies the person's resources for a native wallpaper (Code Sea's portrait and preview) out of
+    /// its project folder; the renderer itself is part of Lumen, so nothing else is needed.
+    static func importNative(_ source: URL, native: NativeWallpaper, id: UUID) async throws -> Wallpaper {
+        let folder = AppPaths.folder(for: id)
+        let content = folder.appending(path: "content", directoryHint: .isDirectory)
+        var package = PackageAsset(entry: native.rawValue)
+        package.source = NativeWallpaper.packageSource
+        package.properties = native.properties
+        let values = package.resolvedValues
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                let scoped = source.startAccessingSecurityScopedResource()
+                defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+                try FileManager.default.createDirectory(at: content, withIntermediateDirectories: true)
+                for file in native.importedFiles {
+                    let from = source.appending(path: file.source)
+                    guard FileManager.default.fileExists(atPath: from.path) else { continue }
+                    try FileManager.default.copyItem(at: from, to: content.appending(path: file.stored))
+                }
+                if let required = native.requiredFile, !FileManager.default.fileExists(atPath: content.appending(path: required).path) {
+                    throw ImportError.missingNativeResource(native.title)
+                }
+                let preview = content.appending(path: "preview.jpg")
+                if !FileManager.default.fileExists(atPath: preview.path) {
+                    switch native {
+                    case .codeSea:
+                        try? CodeSea.writeThumbnail(avatarURL: CodeSea.avatarURL(in: content), values: values, to: preview)
+                    case .proStrands:
+                        if let image = PROStrands.imageURL(in: content) {
+                            try? PROStrands.writeThumbnail(imageURL: image, values: values, to: preview)
+                        }
+                    }
+                }
+            }.value
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            throw error
+        }
+        let preview = content.appending(path: "preview.jpg")
+        if FileManager.default.fileExists(atPath: preview.path) {
+            package.preview = "preview.jpg"
+            writeThumbnail(from: preview, to: folder.appending(path: "thumb.jpg"))
+        }
+        package.byteCount = await Task.detached(priority: .utility) { folderSize(content) }.value
+        return Wallpaper(id: id, kind: .native, title: native.title, category: native.category, author: "You",
+                         addedAt: Date(), package: package)
     }
 
     /// A web page shown straight from the internet.

@@ -254,6 +254,8 @@ final class WallpaperEngine {
             return WebRenderer(source: source, properties: package.properties, values: package.resolvedValues, settings: settings.webRenderSettings)
         case .scene:
             return makeSceneRenderer(for: wallpaper)
+        case .native:
+            return makeNativeRenderer(for: wallpaper, preview: false)
         }
     }
 
@@ -284,9 +286,36 @@ final class WallpaperEngine {
             var preview = SceneRenderSettings.preview
             preview.scaling = settings.videoScaling
             return try? SceneRenderer(source: source, values: package.resolvedValues, settings: preview, framing: framing ?? wallpaper.resolvedFraming)
+        case .native:
+            return makeNativeRenderer(for: wallpaper, preview: true)
         default:
             return nil
         }
+    }
+
+    private func makeNativeRenderer(for wallpaper: Wallpaper, preview: Bool) -> WallpaperRenderer? {
+        guard let package = wallpaper.package, let native = NativeWallpaper(package: package) else { return nil }
+        let folder = library.packageFolder(for: wallpaper)
+        do {
+            switch native {
+            case .codeSea:
+                return try CodeSeaRenderer(
+                    avatarURL: folder.flatMap(CodeSea.avatarURL(in:)), values: package.resolvedValues,
+                    settings: preview ? .preview : nativeRenderSettings, isPreview: preview
+                )
+            case .proStrands:
+                guard let image = folder.flatMap(PROStrands.imageURL(in:)) else { return nil }
+                return try PROStrandsRenderer(imageURL: image, values: package.resolvedValues,
+                                              settings: preview ? .preview : nativeRenderSettings, isPreview: preview)
+            }
+        } catch {
+            Log.engine.error("Native wallpaper unavailable: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    private var nativeRenderSettings: NativeRenderSettings {
+        NativeRenderSettings(frameRate: settings.shaderFrameRate > 0 ? settings.shaderFrameRate : 60, onBattery: system.onBattery)
     }
 
     private func makeSceneRenderer(for wallpaper: Wallpaper) -> WallpaperRenderer? {
@@ -333,6 +362,9 @@ final class WallpaperEngine {
     /// Single place that decides, per display, whether anything should be animating.
     func reconcile() {
         let global = globalPauseReason()
+        let native = nativeRenderSettings
+        hosts.values.compactMap { $0.renderer as? CodeSeaRenderer }.forEach { $0.update(settings: native) }
+        hosts.values.compactMap { $0.renderer as? PROStrandsRenderer }.forEach { $0.update(settings: native) }
         occlusion.threshold = settings.coverageThreshold
         occlusion.isEnabled = settings.pauseWhenCovered && !hosts.isEmpty && global == nil
 
@@ -413,6 +445,9 @@ final class WallpaperEngine {
             hosts.values.compactMap { $0.renderer as? WebRenderer }.forEach { $0.update(settings: web) }
             hosts.values.compactMap { $0.renderer as? SceneRenderer }.forEach { $0.update(settings: settings.sceneRenderSettings) }
             pointer.pollRate = settings.shaderFrameRate > 0 ? settings.shaderFrameRate : 60
+            let native = nativeRenderSettings
+            hosts.values.compactMap { $0.renderer as? CodeSeaRenderer }.forEach { $0.update(settings: native) }
+            hosts.values.compactMap { $0.renderer as? PROStrandsRenderer }.forEach { $0.update(settings: native) }
         case .stillFrame:
             let lockManaged = lockScreenManagedDisplayIDs()
             if settings.syncStillFrame {

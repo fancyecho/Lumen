@@ -182,7 +182,7 @@ struct WallpaperDetailView: View {
     @ViewBuilder
     private func columns(_ wallpaper: Wallpaper) -> some View {
         let editable = wallpaper.package.flatMap { $0.properties.contains(where: \.isEditable) ? $0 : nil }
-        let showsFraming = wallpaper.kind != .web
+        let showsFraming = wallpaper.kind != .web && wallpaper.kind != .native
         let hasAdjustments = showsFraming || editable != nil
         HStack(alignment: .top, spacing: Theme.Space.xl) {
             if hasAdjustments {

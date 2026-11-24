@@ -113,8 +113,14 @@ final class LibraryStore {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             items = try decoder.decode([Wallpaper].self, from: data)
+            for index in items.indices { NativeWallpaper.refresh(&items[index]) }
         } catch {
+            // Never let the next save replace a library this build can't read (a newer build's
+            // file, a damaged write): keep a copy beside it first.
             Log.library.error("Library file unreadable: \(error.localizedDescription, privacy: .public)")
+            let backup = AppPaths.libraryFile.deletingPathExtension()
+                .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+            try? FileManager.default.copyItem(at: AppPaths.libraryFile, to: backup)
         }
         dropOversizedOptimizedCopies()
     }
@@ -248,6 +254,11 @@ final class LibraryStore {
                     wallpaper = try await importProject(at: folder, id: job.id, source: source)
                 case .webFolder(let folder, let entry):
                     wallpaper = try await PackageImporter.importWebFolder(folder, entry: entry, id: job.id)
+                case .native(let folder, let native):
+                    if let existing = items.first(where: { NativeWallpaper(package: $0.package) == native }) {
+                        throw PackageImporter.ImportError.alreadyInLibrary(existing.title)
+                    }
+                    wallpaper = try await PackageImporter.importNative(folder, native: native, id: job.id)
                 case .unsupported:
                     throw PackageImporter.ImportError.notAWallpaper
                 }
