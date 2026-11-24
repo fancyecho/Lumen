@@ -161,6 +161,9 @@ for id in items {
             Thread.sleep(forTimeInterval: 0.05)
             gpu = Array(times).sorted()[30]
         }
+        if environment["LUMEN_SCRIPT_ERRORS"] != nil, let errors = instance.scripts?.errorMessages, !errors.isEmpty {
+            for message in errors { print("  script error: \(message)") }
+        }
         try savePNG(instance.outputTexture, to: out.appending(path: "\(id).png"))
         renderSaved = true
         let line = String(format: "%@ OK load %.2fs gpu %.2fms particles %d layers %d size %dx%d skipped %@ — %@", id, loadTime, gpu * 1000, instance.particleLayers.reduce(0) { $0 + $1.systems.reduce(0) { $0 + $1.particles.count } }, instance.layers.count, instance.renderSize.x, instance.renderSize.y, instance.unsupported.joined(separator: ","), project.title)

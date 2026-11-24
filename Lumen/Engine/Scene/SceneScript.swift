@@ -21,6 +21,8 @@ final class SceneScriptRuntime: @unchecked Sendable {
         let color: SIMD3<Float>
         let text: String?
         let size: SIMD2<Float>?
+        /// The layer's model, as `getInitialLayerConfig` reports it.
+        var image: String? = nil
         var animations: [String: SceneAnimation] = [:]
     }
 
@@ -42,6 +44,13 @@ final class SceneScriptRuntime: @unchecked Sendable {
     private(set) var cursorLayerIDs: Set<Int> = []
     private var failed = false
     private let lock = NSLock()
+    /// Distinct exceptions scripts threw (a missing API, an unset variable), for diagnosis.
+    private(set) var errorMessages: [String] = []
+
+    private func recordError(_ message: String) {
+        guard errorMessages.count < 30, !errorMessages.contains(message) else { return }
+        errorMessages.append(message)
+    }
 
     init?(layers: [LayerInfo], canvas: SIMD2<Float>, userProperties: [String: PropertyValue], storageKey: String) {
         guard let context = JSContext() else { return nil }
@@ -52,10 +61,17 @@ final class SceneScriptRuntime: @unchecked Sendable {
             animations.perform(layer: layer, property: property, operation: operation, value: Float(value))
         }
         context.setObject(timelineCommand, forKeyedSubscript: "__timelineCommand" as NSString)
+        // Set after init: the handlers below capture self weakly.
+        var reportError: ((String) -> Void)?
+        let scriptError: @convention(block) (String) -> Void = { message in reportError?(message) }
+        context.setObject(scriptError, forKeyedSubscript: "__lumenScriptError" as NSString)
         context.exceptionHandler = { _, exception in
-            #if DEBUG
-            if let message = exception?.toString() { Log.engine.debug("SceneScript: \(message, privacy: .public)") }
-            #endif
+            if let message = exception?.toString() {
+                reportError?(message)
+                #if DEBUG
+                Log.engine.debug("SceneScript: \(message, privacy: .public)")
+                #endif
+            }
         }
         context.evaluateScript(Self.prelude)
         var properties: [String: Any] = [:]
@@ -88,6 +104,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
                 }
             }
             if let size = layer.size { entry["size"] = [size.x, size.y] }
+            if let image = layer.image { entry["image"] = image }
             return entry
         }
         let saved = UserDefaults.standard.dictionary(forKey: "sceneScriptStorage.\(storageKey)") ?? [:]
@@ -97,6 +114,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
             UserDefaults.standard.set(dictionary, forKey: "sceneScriptStorage.\(storageKey)")
         }
         context.setObject(storage, forKeyedSubscript: "__persistStorage" as NSString)
+        reportError = { [weak self] message in self?.recordError(message) }
     }
 
     /// User colours are "r g b" strings; scripts expect them as such, numbers as numbers.
@@ -138,7 +156,7 @@ final class SceneScriptRuntime: @unchecked Sendable {
         hasScripts = true
     }
 
-    /// Calls `applyUserProperties` and `init` on every script.
+    /// Calls `init`, then `applyUserProperties`, on every script.
     func start() {
         guard hasScripts else { return }
         lock.lock()
@@ -208,13 +226,27 @@ final class SceneScriptRuntime: @unchecked Sendable {
 
     /// Strips `import` lines and `export` keywords so the module runs inside a function.
     static func moduleBody(_ source: String) -> String {
-        var lines: [String] = []
-        for line in source.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("import ") { continue }
-            lines.append(line)
+        // Imports become variables bound to Lumen's built-in modules. Matching anywhere (not only at
+        // a line start) covers minified scripts (`…;import*as _0x1f from'WEMath';…`), and binding the
+        // alias keeps `import * as math from 'WEMath'` working, which dropping the line would not.
+        let literal = #"('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"#
+        var text = source
+        text = text.replacing(try! Regex(#"\bimport\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s*from\s*"# + literal + #"\s*;?"#).wordBoundaryKind(.simple)) { match in
+            "var \(match.output[1].substring ?? "") = __module(\(match.output[2].substring ?? "''"));"
         }
-        var text = lines.joined(separator: "\n")
+        text = text.replacing(try! Regex(#"\bimport\s*\{([^}]*)\}\s*from\s*"# + literal + #"\s*;?"#).wordBoundaryKind(.simple)) { match in
+            let module = "__module(\(match.output[2].substring ?? "''"))"
+            let bindings = (match.output[1].substring ?? "").split(separator: ",").compactMap { part -> String? in
+                let names = part.split(whereSeparator: \.isWhitespace).filter { $0 != "as" }
+                guard let source = names.first else { return nil }
+                return "var \(names.last ?? source) = \(module).\(source);"
+            }
+            return bindings.joined(separator: " ")
+        }
+        text = text.replacing(try! Regex(#"\bimport\s+([A-Za-z_$][\w$]*)\s+from\s*"# + literal + #"\s*;?"#).wordBoundaryKind(.simple)) { match in
+            "var \(match.output[1].substring ?? "") = __module(\(match.output[2].substring ?? "''"));"
+        }
+        text = text.replacing(try! Regex(#"\bimport\s*"# + literal + #"\s*;?"#).wordBoundaryKind(.simple)) { _ in "" }
         text = text.replacingOccurrences(of: "export default ", with: "")
         text = text.replacing(/\bexport\s+(?=(?:async\s+)?function\b|var\b|let\b|const\b|class\b)/) { _ in "" }
         return text
@@ -357,6 +389,39 @@ final class SceneScriptRuntime: @unchecked Sendable {
     var setTimeout = __setTimeout;
     var clearTimeout = __clearTimeout;
     function __vec(a) { return a ? new Vec3(a[0], a[1], a[2]) : new Vec3(0, 0, 0); }
+    function __module(name) {
+      return { WEMath: WEMath, WEVector: WEVector, WEColor: WEColor }[name] || {};
+    }
+
+    var __videoStandIn = {
+      play: function () {}, pause: function () {}, stop: function () {}, isPlaying: function () { return true; },
+      setCurrentTime: function () {}, getCurrentTime: function () { return 0; }, duration: 0,
+      addEndedCallback: function () {}, removeEndedCallback: function () {}
+    };
+
+    function __mat4(a, b) {
+      var r = new Array(16);
+      for (var c = 0; c < 4; c++) for (var row = 0; row < 4; row++) {
+        var s = 0; for (var k = 0; k < 4; k++) s += a[k * 4 + row] * b[c * 4 + k]; r[c * 4 + row] = s;
+      }
+      return r;
+    }
+
+    // Column-major like Wallpaper Engine's Mat4 (translation in m[12], m[13], m[14]):
+    // parent × translate(origin) × rotate(angles, radians, Z·Y·X) × scale.
+    function __worldMatrix(layer) {
+      var o = layer.origin || new Vec3(0), s = layer.scale || new Vec3(1), a = layer.angles || new Vec3(0);
+      var cx = Math.cos(a.x), sx = Math.sin(a.x), cy = Math.cos(a.y), sy = Math.sin(a.y), cz = Math.cos(a.z), sz = Math.sin(a.z);
+      var rot = [cy * cz, cy * sz, -sy, 0,
+                 sx * sy * cz - cx * sz, sx * sy * sz + cx * cz, sx * cy, 0,
+                 cx * sy * cz + sx * sz, cx * sy * sz - sx * cz, cx * cy, 0,
+                 0, 0, 0, 1];
+      var local = __mat4([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, +o.x || 0, +o.y || 0, +o.z || 0, 1],
+                         __mat4(rot, [+s.x, 0, 0, 0, 0, +s.y, 0, 0, 0, 0, +(s.z === undefined ? 1 : s.z), 0, 0, 0, 0, 1]));
+      var parent = layer.__parent !== undefined ? __layers[layer.__parent] : null;
+      return { m: parent && parent !== layer ? __mat4(__worldMatrix(parent).m, local) : local };
+    }
+
     function __makeLayer(d) {
       var layer = {
         id: d.id, name: d.name, origin: __vec(d.origin), scale: __vec(d.scale), angles: __vec(d.angles),
@@ -368,6 +433,13 @@ final class SceneScriptRuntime: @unchecked Sendable {
         getAnimation: function (name) { return __getTimeline(this, name, undefined); },
         getEffect: function () { return { visible: true, getMaterial: function () { return { setValue: function () {} }; } }; },
         getChildren: function () { var me = this.id; return __order.filter(function (l) { return l.__parent === me; }).map(__touch); },
+        getTransformMatrix: function () { return __worldMatrix(this); },
+        // Video textures can't be driven from scripts yet; a stand-in keeps such scripts running
+        // (the video keeps looping) instead of failing on the first call.
+        getVideoTexture: function () { return __videoStandIn; },
+        __config: { name: d.name, image: d.image, text: d.text, size: d.size ? d.size[0] + ' ' + d.size[1] : undefined,
+                    origin: __vec(d.origin).toString(), scale: __vec(d.scale).toString(), angles: __vec(d.angles).toString(),
+                    alpha: d.alpha, visible: d.visible, color: __vec(d.color).toString() },
         play: function () {}, pause: function () {}, stop: function () {}, isPlaying: function () { return false; }
       };
       return layer;
@@ -449,6 +521,10 @@ final class SceneScriptRuntime: @unchecked Sendable {
         var idx = __order.indexOf(layer);
         if (idx >= 0) __order.splice(idx, 1);
       },
+      getInitialLayerConfig: function (layer) {
+        var target = typeof layer === 'string' ? __byName[layer] : layer;
+        return target && target.__config ? Object.assign({}, target.__config) : null;
+      },
       getCameraTransforms: function () { return { eye: new Vec3(__canvas.x / 2, __canvas.y / 2, 1000), center: new Vec3(__canvas.x / 2, __canvas.y / 2, 0), up: new Vec3(0, 1, 0) }; },
       clearColor: new Vec3(0, 0, 0), bloom: false
     };
@@ -486,24 +562,41 @@ final class SceneScriptRuntime: @unchecked Sendable {
       return hasCursorHandlers;
     }
 
+    function __finite(v) { return isFinite(v.x) && isFinite(v.y) && isFinite(v.z === undefined ? 0 : v.z); }
+
     function __assign(s, value) {
       if (value === undefined) return;
-      s.value = value;
       var p = s.property;
-      if (p === 'origin' || p === 'scale' || p === 'angles' || p === 'color') { if (value && typeof value === 'object') s.layer[p] = new Vec3(value); }
-      else if (p === 'alpha') s.layer.alpha = +value;
-      else if (p === 'visible') s.layer.visible = !!value;
-      else if (p === 'text') s.layer.text = String(value);
+      // A script that reads a variable it hasn't set yet returns NaN. Vec3 turns NaN into 0, which
+      // collapses the layer (scale 0) or flings it to the origin, and the next update would start
+      // from that NaN again; keep the last good value instead.
+      if (p === 'origin' || p === 'scale' || p === 'angles' || p === 'color') {
+        if (!value || typeof value !== 'object' || !__finite(value)) return;
+        s.value = value;
+        s.layer[p] = new Vec3(value);
+      } else if (p === 'alpha') {
+        var alpha = +value;
+        if (!isFinite(alpha)) return;
+        s.value = value;
+        s.layer.alpha = alpha;
+      } else {
+        s.value = value;
+        if (p === 'visible') s.layer.visible = !!value;
+        else if (p === 'text') s.layer.text = String(value);
+      }
     }
 
     function __call(s, name, arg) {
       if (!s.api || typeof s.api[name] !== 'function' || s.errors > 20) return undefined;
-      try { return s.api[name](arg); } catch (e) { s.errors++; return undefined; }
+      try { return s.api[name](arg); } catch (e) { s.errors++; __lumenScriptError(name + ': ' + String(e && e.message || e)); return undefined; }
     }
 
+    // Wallpaper Engine runs init first, then delivers the user properties once: scripts set up
+    // state in init (the starting scale, a layer's origin) that applyUserProperties then uses, and
+    // some treat that first applyUserProperties call as the load-time one and skip it.
     function __start() {
-      __scripts.forEach(function (s) { __call(s, 'applyUserProperties', engine.userProperties); });
       __scripts.forEach(function (s) { var v = __call(s, 'init', s.value); if (v !== undefined) __assign(s, v); });
+      __scripts.forEach(function (s) { __call(s, 'applyUserProperties', engine.userProperties); });
     }
 
     function __applyUserProperties(changed) {
