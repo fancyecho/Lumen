@@ -3,11 +3,11 @@ import SwiftUI
 struct StudioView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 264, maximum: 420), spacing: Theme.Space.lg, alignment: .top)]
+    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 440), spacing: Theme.Space.xl, alignment: .top)]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.xxl) {
+            VStack(alignment: .leading, spacing: Theme.Space.section - Theme.Space.xs) {
                 PageHeader(
                     eyebrow: "Studio",
                     title: "Generative wallpapers",
@@ -16,13 +16,13 @@ struct StudioView: View {
                     Button(action: createShader) {
                         Label("New Shader", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.lumenPrimary)
                     .controlSize(.large)
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Space.md) {
                     SectionTitle("Presets", subtitle: String(localized: "Tuned shaders that cost a fraction of a video. Open one to change colours and motion."))
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xxl) {
                         ForEach(model.library.builtins) { WallpaperCard(wallpaper: $0) }
                     }
                 }
@@ -30,7 +30,7 @@ struct StudioView: View {
                 if !model.library.customShaders.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Space.md) {
                         SectionTitle("Your creations")
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xxl) {
                             ForEach(model.library.customShaders) { WallpaperCard(wallpaper: $0) }
                         }
                     }

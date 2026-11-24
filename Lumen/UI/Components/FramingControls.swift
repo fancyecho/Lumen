@@ -15,32 +15,22 @@ struct FramingControls: View {
 
     var body: some View {
         let framing = wallpaper.resolvedFraming
-        VStack(alignment: .leading, spacing: Theme.Space.lg) {
-            HStack(alignment: .center, spacing: Theme.Space.md) {
-                Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Theme.accentSoft))
-                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                    Text("Position & Zoom").font(Theme.TypeScale.cardTitle)
-                    Text("Drag the preview or pinch to zoom. Changes show on your desktop right away.")
-                        .font(Theme.TypeScale.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: Theme.Space.sm)
-                FramingResetButton(wallpaper: wallpaper)
-            }
-
+        LumenPanel(
+            symbol: "arrow.up.and.down.and.arrow.left.and.right",
+            title: "Position & Zoom",
+            subtitle: String(localized: "Drag the preview or pinch to zoom. Changes show on your desktop right away.")
+        ) {
+            FramingResetButton(wallpaper: wallpaper)
+        } content: {
             HStack(alignment: .center, spacing: Theme.Space.xl) {
                 displayMock(framing)
-                    .frame(width: 300)
+                    .frame(minWidth: 210, maxWidth: 300)
                 VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     FramingSliders(wallpaper: wallpaper)
                     if let hint = roomHint(for: framing) {
                         Label(hint, systemImage: "info.circle")
                             .font(Theme.TypeScale.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Ink.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, Theme.Space.xxs)
                     }
@@ -48,8 +38,6 @@ struct FramingControls: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .padding(Theme.Space.lg)
-        .lumenSurface(radius: Theme.Radius.xl)
     }
 
     // MARK: Display mock
@@ -210,7 +198,7 @@ struct FramingResetButton: View {
         } label: {
             Label("Center", systemImage: "scope")
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.lumenSecondary)
         .disabled(wallpaper.resolvedFraming.isCentered)
         .help("Reset position and zoom")
     }
@@ -225,15 +213,16 @@ private struct FramingSliderRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
-                .font(.system(size: 13))
+                .font(Theme.TypeScale.body)
+                .foregroundStyle(Theme.Ink.primary)
                 .frame(width: 64, alignment: .leading)
             Slider(value: $value, in: range) { Text(title) }
                 .labelsHidden()
                 .controlSize(.small)
             Text(readout(value))
-                .font(.system(size: 12, weight: .medium))
+                .font(Theme.TypeScale.caption.weight(.medium))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.Ink.secondary)
                 .frame(width: 66, alignment: .trailing)
         }
     }

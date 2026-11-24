@@ -18,7 +18,7 @@ struct WallpaperCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 1) {
             artwork
             if showsCaption { caption }
         }
@@ -42,15 +42,13 @@ struct WallpaperCard: View {
                 LiveWallpaperPreview(wallpaper: wallpaper)
                     .transition(.opacity)
             }
-            if hovering {
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.55)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .allowsHitTesting(false)
-                .transition(.opacity)
-            }
+            LinearGradient(
+                stops: [.init(color: .clear, location: 0.45), .init(color: .black.opacity(0.6), location: 1)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .opacity(hovering ? 1 : 0)
+            .allowsHitTesting(false)
         }
         .aspectRatio(16.0 / 9.0, contentMode: .fit)
         .overlay(alignment: .topLeading) { badges.padding(Theme.Space.sm - 2) }
@@ -64,74 +62,47 @@ struct WallpaperCard: View {
             if hovering {
                 quickActions
                     .padding(Theme.Space.sm - 2)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .bottomTrailing)))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                .strokeBorder(
-                    isOnDesktop
-                        ? Theme.playing.opacity(hovering ? 0.55 : 0.35)
-                        : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(hovering ? 0.50 : 0.28), radius: hovering ? 22 : 12, y: hovering ? 12 : 6)
-        .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
+        .artworkFrame(isHovering: hovering, highlight: isOnDesktop ? Theme.playing.opacity(0.5) : nil)
         .animation(reduceMotion ? nil : Theme.Motion.snappy, value: hovering)
         .animation(reduceMotion ? nil : Theme.Motion.smooth, value: previewing)
     }
 
+    /// Only facts worth seeing at a glance sit on the artwork; the kind lives in the caption.
     @ViewBuilder
     private var badges: some View {
-        HStack(spacing: Theme.Space.xxs) {
-            switch wallpaper.kind {
-            case .video:
-                if let video = wallpaper.video {
-                    if let label = Format.resolutionClass(video.width, video.height) { ArtBadge(text: label) }
-                    if video.isHDR { ArtBadge(text: "HDR") }
-                    if video.optimized != nil { ArtBadge(text: String(localized: "Optimized"), symbol: "bolt.fill") }
+        if let video = wallpaper.video {
+            HStack(spacing: Theme.Space.xxs) {
+                if let label = Format.resolutionClass(video.width, video.height), video.width >= 3840 || video.height >= 2160 {
+                    ArtBadge(text: label)
                 }
-            case .shader:
-                ArtBadge(text: "Live", symbol: "sparkles")
-            case .web:
-                ArtBadge(text: "Web", symbol: "globe")
-            case .scene:
-                ArtBadge(text: String(localized: "Scene"), symbol: "square.3.layers.3d")
+                if video.isHDR { ArtBadge(text: "HDR") }
             }
         }
     }
 
     private var quickActions: some View {
-        GlassEffectContainer(spacing: Theme.Space.xs) {
-            HStack(spacing: Theme.Space.xs) {
-                Button {
-                    model.library.toggleFavorite(wallpaper.id)
-                } label: {
-                    Image(systemName: wallpaper.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(wallpaper.isFavorite ? Theme.favorite : Color.primary)
-                        .frame(width: 18, height: 18)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .accessibilityLabel(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
+        HStack(spacing: Theme.Space.xs) {
+            Button {
+                model.library.toggleFavorite(wallpaper.id)
+            } label: {
+                Image(systemName: wallpaper.isFavorite ? "heart.fill" : "heart")
+                    .foregroundStyle(wallpaper.isFavorite ? Theme.favorite : Theme.Ink.primary)
+            }
+            .buttonStyle(.lumenIcon)
+            .accessibilityLabel(wallpaper.isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
 
-                if isOnEveryDisplay {
-                    Label("In Use", systemImage: "checkmark")
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .glassEffect(.regular, in: .capsule)
-                } else {
-                    Button {
-                        model.setWallpaper(wallpaper, on: .allDisplays)
-                    } label: {
-                        Label("Set as Wallpaper", systemImage: "play.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .buttonStyle(.glassProminent)
+            if isOnEveryDisplay {
+                ChromeLabel { Label("In Use", systemImage: "checkmark") }
+            } else {
+                Button {
+                    model.setWallpaper(wallpaper, on: .allDisplays)
+                } label: {
+                    Label("Set as Wallpaper", systemImage: "play.fill")
                 }
+                .buttonStyle(.lumenPrimary)
             }
         }
     }
@@ -141,10 +112,11 @@ struct WallpaperCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(wallpaper.title)
                     .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
                     .lineLimit(1)
-                Text(subtitle)
+                Text(WallpaperDescriptor.subtitle(for: wallpaper))
                     .font(Theme.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -152,29 +124,8 @@ struct WallpaperCard: View {
                 Image(systemName: "heart.fill")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.favorite)
+                    .accessibilityLabel(Text("Favorite"))
             }
-        }
-        .padding(.horizontal, 2)
-    }
-
-    private var subtitle: String {
-        switch wallpaper.kind {
-        case .video:
-            let category = WallpaperCategories.displayName(wallpaper.category)
-            guard let video = wallpaper.video else { return category }
-            return "\(category) · \(Format.duration(video.duration)) · \(video.codec)"
-        case .shader:
-            let category = WallpaperCategories.displayName(wallpaper.category)
-            return wallpaper.isBuiltin
-                ? String(localized: "Rendered live · \(category)")
-                : String(localized: "Your shader · \(category)")
-        case .web:
-            let category = WallpaperCategories.displayName(wallpaper.category)
-            if let host = wallpaper.package?.remoteURL.flatMap({ URL(string: $0)?.host() }) { return "\(category) · \(host)" }
-            return String(localized: "Web page · \(category)")
-        case .scene:
-            let category = WallpaperCategories.displayName(wallpaper.category)
-            return String(localized: "Scene · \(category)")
         }
     }
 
@@ -232,7 +183,8 @@ struct WallpaperMenuItems: View {
     }
 }
 
-/// Primary "Set as Wallpaper" control; offers per-display targets when several are connected.
+/// Primary "Set as Wallpaper" control. With several displays a small menu beside it picks one;
+/// the main button always means "everywhere".
 struct SetWallpaperButton: View {
     @Environment(AppModel.self) private var model
     var title: LocalizedStringKey = "Set as Wallpaper"
@@ -240,26 +192,38 @@ struct SetWallpaperButton: View {
 
     var body: some View {
         let displays = model.engine.displays
-        if displays.count > 1 {
-            Menu {
-                Button("All Displays") { action(.allDisplays) }
-                Divider()
-                ForEach(displays) { display in
-                    Button(display.name) { action(.display(display.id)) }
-                }
-            } label: {
-                Label(title, systemImage: "play.fill")
-            } primaryAction: {
-                action(.allDisplays)
-            }
-            .menuStyle(.button)
-            .buttonStyle(.glassProminent)
-            .fixedSize()
-        } else {
+        HStack(spacing: Theme.Space.xs) {
             Button { action(.allDisplays) } label: {
                 Label(title, systemImage: "play.fill")
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.lumenPrimary)
+
+            if displays.count > 1 {
+                Menu {
+                    Button("All Displays") { action(.allDisplays) }
+                    Divider()
+                    ForEach(displays) { display in
+                        Button(display.name) { action(.display(display.id)) }
+                    }
+                } label: {
+                    ChromeLabel(isIconOnly: true) { Image(systemName: "display.2") }
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Choose display")
+            }
         }
+    }
+}
+
+extension AppModel {
+    /// Puts a random other wallpaper on one display (or everywhere, when there's only one display).
+    func surpriseMe(on display: WallpaperEngine.Display?) {
+        let pool = library.all.filter { $0.id != display?.wallpaperID }
+        guard let pick = pool.randomElement() else { return }
+        let target: DisplayTarget = engine.displays.count > 1 ? (display.map { .display($0.id) } ?? .allDisplays) : .allDisplays
+        setWallpaper(pick, on: target)
     }
 }

@@ -89,20 +89,80 @@ struct LiveWallpaperPreview: View {
 }
 
 /// Plays a project's preview GIF (or shows its still) without decoding anything heavier.
+/// Fills its frame like the thumbnail underneath, so square Workshop GIFs don't letterbox inside 16:9 cards.
 struct AnimatedImagePreview: NSViewRepresentable {
     let url: URL
 
-    func makeNSView(context: Context) -> NSImageView {
-        let view = NSImageView()
-        view.imageScaling = .scaleProportionallyUpOrDown
-        view.animates = true
-        view.image = NSImage(contentsOf: url)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    func makeNSView(context: Context) -> AspectFillImageView {
+        AspectFillImageView(image: NSImage(contentsOf: url))
+    }
+
+    func updateNSView(_ view: AspectFillImageView, context: Context) {}
+}
+
+/// Plays a remote (Workshop) preview, animated GIFs included, filling its frame. Loads off the main thread.
+struct RemoteAnimatedImage: NSViewRepresentable {
+    let url: URL
+    /// Fill (crop) by default; `false` fits the whole image inside the frame.
+    var fills = true
+
+    func makeNSView(context: Context) -> AspectFillImageView {
+        let view = AspectFillImageView(image: nil, fills: fills)
+        load(into: view)
         return view
     }
 
-    func updateNSView(_ view: NSImageView, context: Context) {}
+    func updateNSView(_ view: AspectFillImageView, context: Context) {}
+
+    private func load(into view: AspectFillImageView) {
+        Task { @MainActor [weak view] in
+            guard let data = await WorkshopPreviews.data(for: url) else { return }
+            view?.setImage(NSImage(data: data))
+        }
+    }
+}
+
+final class AspectFillImageView: NSView {
+    private let imageView = NSImageView()
+    private let fills: Bool
+
+    init(image: NSImage?, fills: Bool = true) {
+        self.fills = fills
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        imageView.image = image
+        imageView.animates = true
+        imageView.imageScaling = .scaleAxesIndependently
+        addSubview(imageView)
+        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func setImage(_ image: NSImage?) {
+        imageView.image = image
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        guard let size = imageView.image?.size, size.width > 0, size.height > 0 else {
+            imageView.frame = bounds
+            return
+        }
+        let scale = fills
+            ? max(bounds.width / size.width, bounds.height / size.height)
+            : min(bounds.width / size.width, bounds.height / size.height)
+        let fitted = CGSize(width: size.width * scale, height: size.height * scale)
+        imageView.frame = CGRect(
+            x: (bounds.width - fitted.width) / 2,
+            y: (bounds.height - fitted.height) / 2,
+            width: fitted.width,
+            height: fitted.height
+        )
+    }
 }
 
 /// A live web or scene renderer in a view, for the details page.
