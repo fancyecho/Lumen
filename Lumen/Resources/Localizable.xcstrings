@@ -42,6 +42,17 @@
         }
       }
     },
+    "%@ subscribers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 人订阅"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
     "“%@” wallpapers are Windows programs and can't run on a Mac.": {
       "localizations": {
         "zh-Hans": {
@@ -78,6 +89,532 @@
         }
       }
     },
+    "About": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简介"
+          }
+        }
+      }
+    },
+    "Add to Library": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入资源库"
+          }
+        }
+      }
+    },
+    "Added": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加时间"
+          }
+        }
+      }
+    },
+    "Adding…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加入…"
+          }
+        }
+      }
+    },
+    "All Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部时间"
+          }
+        }
+      }
+    },
+    "Animals": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动物"
+          }
+        }
+      }
+    },
+    "Any genre": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部题材"
+          }
+        }
+      }
+    },
+    "Any Resolution": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "任意分辨率"
+          }
+        }
+      }
+    },
+    "Approved": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "官方认证"
+          }
+        }
+      }
+    },
+    "Audio Responsive": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频响应"
+          }
+        }
+      }
+    },
+    "Best Match": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最相关"
+          }
+        }
+      }
+    },
+    "Browse the Steam Workshop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览 Steam 创意工坊"
+          }
+        }
+      }
+    },
+    "Browse Wallpaper Engine's Steam Workshop and download straight into your library.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览 Wallpaper Engine 的 Steam 创意工坊，下载后直接进入资源库。"
+          }
+        }
+      }
+    },
+    "Browsing works without an account; downloading uses your own Steam sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览无需登录；下载会使用你自己的 Steam 账号。"
+          }
+        }
+      }
+    },
+    "Built-in wallpapers keep their name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置壁纸不能改名"
+          }
+        }
+      }
+    },
+    "Cartoon": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡通"
+          }
+        }
+      }
+    },
+    "Category": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分类"
+          }
+        }
+      }
+    },
+    "Choose Another…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换一张…"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
+      }
+    },
+    "Codec": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编码"
+          }
+        }
+      }
+    },
+    "Content Rating": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容分级"
+          }
+        }
+      }
+    },
+    "Couldn't reach the Workshop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连不上创意工坊"
+          }
+        }
+      }
+    },
+    "Customizable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可自定义"
+          }
+        }
+      }
+    },
+    "Cyberpunk": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "赛博朋克"
+          }
+        }
+      }
+    },
+    "Downloading": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载"
+          }
+        }
+      }
+    },
+    "Downloading %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载 %lld 个"
+          }
+        }
+      }
+    },
+    "Drawn on the GPU within a fixed pixel budget. Tune colours and motion in Studio.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 GPU 在固定像素预算内实时绘制。可以在创作页调整配色和动效。"
+          }
+        }
+      }
+    },
+    "Dual Monitor": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双屏"
+          }
+        }
+      }
+    },
+    "Dynamic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动态分辨率"
+          }
+        }
+      }
+    },
+    "Everyone": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全年龄"
+          }
+        }
+      }
+    },
+    "Everyone and Questionable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全年龄及轻度敏感"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败"
+          }
+        }
+      }
+    },
+    "Fantasy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "奇幻"
+          }
+        }
+      }
+    },
+    "Favorite": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "喜欢"
+          }
+        }
+      }
+    },
+    "Favorited": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收藏"
+          }
+        }
+      }
+    },
+    "Features": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "特性"
+          }
+        }
+      }
+    },
+    "Filters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选"
+          }
+        }
+      }
+    },
+    "Folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹"
+          }
+        }
+      }
+    },
+    "Frame Rate": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帧率"
+          }
+        }
+      }
+    },
+    "Girls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "少女"
+          }
+        }
+      }
+    },
+    "Go to": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳至"
+          }
+        }
+      }
+    },
+    "Go to page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳至页码"
+          }
+        }
+      }
+    },
+    "Grid": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网格"
+          }
+        }
+      }
+    },
+    "Guys": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "男性角色"
+          }
+        }
+      }
+    },
+    "Hide Preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏预览"
+          }
+        }
+      }
+    },
+    "Landscape": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "风景"
+          }
+        }
+      }
+    },
+    "Last 3 Months": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近 3 个月"
+          }
+        }
+      }
+    },
+    "Last 6 Months": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近 6 个月"
+          }
+        }
+      }
+    },
+    "Length": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长"
+          }
+        }
+      }
+    },
+    "List": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表"
+          }
+        }
+      }
+    },
+    "%lld / %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld / %2$lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld favorites": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 人收藏"
+          }
+        }
+      }
+    },
     "%lld fps": {
       "shouldTranslate": false
     },
@@ -91,6 +628,16 @@
         }
       }
     },
+    "%lld of 5 stars": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 星（满分 5 星）"
+          }
+        }
+      }
+    },
     "%lld of %lld displays playing": {
       "localizations": {
         "zh-Hans": {
@@ -99,7 +646,8 @@
             "value": "%1$lld/%2$lld 台显示器正在播放"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "%lld options · applied live": {
       "localizations": {
@@ -123,6 +671,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%2$@ 中有 %1$lld 个项目"
+          }
+        }
+      }
+    },
+    "%lld results": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个结果"
           }
         }
       }
@@ -163,7 +721,8 @@
             "value": "资源库中有 %lld 个视频"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "%lld wallpapers": {
       "localizations": {
@@ -706,7 +1265,8 @@
             "value": "更换"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Change wallpaper": {
       "localizations": {
@@ -1106,7 +1666,8 @@
             "value": "从 Steam 下载"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Download from Steam Workshop…": {
       "localizations": {
@@ -1116,7 +1677,8 @@
             "value": "从 Steam 创意工坊下载…"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Download to Lumen": {
       "localizations": {
@@ -1216,7 +1778,8 @@
             "value": "每台显示器都可以播放各自的壁纸。"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Edit Code": {
       "localizations": {
@@ -1416,7 +1979,8 @@
             "value": "在这台显示器上恢复系统壁纸"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Good to know": {
       "localizations": {
@@ -1614,6 +2178,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "第 %1$lld 行：%2$@"
+          }
+        }
+      }
+    },
+    "Loading": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载"
           }
         }
       }
@@ -1837,12 +2411,62 @@
         }
       }
     },
+    "Media Integration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "媒体联动"
+          }
+        }
+      }
+    },
+    "Medieval": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中世纪"
+          }
+        }
+      }
+    },
+    "Memes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "梗图"
+          }
+        }
+      }
+    },
     "Minimal": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "极简"
+          }
+        }
+      }
+    },
+    "More": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多"
+          }
+        }
+      }
+    },
+    "Most Subscribed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "订阅最多"
           }
         }
       }
@@ -1874,6 +2498,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "MP4 或 MOV · HEVC、H.264、ProRes · M3 及更新芯片支持 AV1"
+          }
+        }
+      }
+    },
+    "Music": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音乐"
           }
         }
       }
@@ -1938,6 +2572,16 @@
         }
       }
     },
+    "Newest": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新发布"
+          }
+        }
+      }
+    },
     "Next change %@": {
       "localizations": {
         "zh-Hans": {
@@ -1954,6 +2598,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "播放列表下一张"
+          }
+        }
+      }
+    },
+    "Next Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一页"
           }
         }
       }
@@ -1976,7 +2630,8 @@
             "value": "还没有设置动态壁纸"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "No matches": {
       "localizations": {
@@ -2079,6 +2734,16 @@
         }
       }
     },
+    "Nothing downloading.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有正在下载的内容。"
+          }
+        }
+      }
+    },
     "Nothing here yet": {
       "localizations": {
         "zh-Hans": {
@@ -2165,6 +2830,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "已接通电源"
+          }
+        }
+      }
+    },
+    "On This Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本机"
           }
         }
       }
@@ -2287,7 +2962,8 @@
             "value": "已优化"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Optimized “%@” · saved %@": {
       "localizations": {
@@ -2335,6 +3011,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "其他管理锁屏的壁纸 App 运行时，可能会替换掉 Lumen 的设置。"
+          }
+        }
+      }
+    },
+    "Page %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 页"
           }
         }
       }
@@ -2397,7 +3083,8 @@
             "value": "使用电池时暂停"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Pause when at least": {
       "localizations": {
@@ -2417,7 +3104,8 @@
             "value": "被遮挡时暂停"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Paused": {
       "localizations": {
@@ -2507,6 +3195,16 @@
         }
       }
     },
+    "Pixel Art": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "像素画"
+          }
+        }
+      }
+    },
     "Play": {
       "localizations": {
         "zh-Hans": {
@@ -2555,7 +3253,8 @@
             "value": "播放速度"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Playing": {
       "localizations": {
@@ -2583,6 +3282,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在播放"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
+    "Playing on %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放中 · %@"
           }
         }
       }
@@ -2613,6 +3323,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "播放列表"
+          }
+        }
+      }
+    },
+    "Portrait": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "竖屏"
           }
         }
       }
@@ -2697,6 +3417,16 @@
         }
       }
     },
+    "Previous Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一页"
+          }
+        }
+      }
+    },
     "project.json couldn't be read.": {
       "localizations": {
         "zh-Hans": {
@@ -2707,12 +3437,53 @@
         }
       }
     },
+    "Puppet Warp": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "木偶变形"
+          }
+        }
+      }
+    },
+    "Questionable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轻度敏感"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
+    "Queued": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排队中"
+          }
+        }
+      }
+    },
     "Quit Lumen": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "退出 Lumen"
+          }
+        }
+      }
+    },
+    "Recently Updated": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近更新"
           }
         }
       }
@@ -2757,6 +3528,16 @@
         }
       }
     },
+    "Relaxing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "放松"
+          }
+        }
+      }
+    },
     "Remove": {
       "localizations": {
         "zh-Hans": {
@@ -2773,6 +3554,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消喜欢"
+          }
+        }
+      }
+    },
+    "Rename": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名"
           }
         }
       }
@@ -2805,7 +3596,8 @@
             "value": "实时渲染 · %@"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Rendered live · %lld fps": {
       "localizations": {
@@ -2835,7 +3627,8 @@
             "value": "由 GPU 实时渲染，可以在“创作”里调整配色和动效。"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Rendering for the Lock Screen failed: %@": {
       "localizations": {
@@ -2897,12 +3690,42 @@
         }
       }
     },
+    "Reset Filters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置筛选"
+          }
+        }
+      }
+    },
     "Reset position and zoom": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "重置位置和缩放"
+          }
+        }
+      }
+    },
+    "Resolution": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分辨率"
+          }
+        }
+      }
+    },
+    "Resolution, features and content rating": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分辨率、特性和内容分级"
           }
         }
       }
@@ -2953,6 +3776,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "继续播放所有显示器"
+          }
+        }
+      }
+    },
+    "Retro": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复古"
           }
         }
       }
@@ -3115,7 +3948,8 @@
             "value": "场景 · %@"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Scene assets": {
       "localizations": {
@@ -3247,6 +4081,26 @@
         }
       }
     },
+    "Search results are sorted by relevance": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索结果按相关度排序"
+          }
+        }
+      }
+    },
+    "Search the Steam Workshop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索 Steam 创意工坊"
+          }
+        }
+      }
+    },
     "Search wallpapers": {
       "localizations": {
         "zh-Hans": {
@@ -3273,6 +4127,27 @@
           "stringUnit": {
             "state": "translated",
             "value": "查看全部"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
+    "See All": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看全部"
+          }
+        }
+      }
+    },
+    "Select a wallpaper to preview it here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中一张壁纸，在这里预览。"
           }
         }
       }
@@ -3357,6 +4232,16 @@
         }
       }
     },
+    "Show as grid or list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以网格或列表显示"
+          }
+        }
+      }
+    },
     "Show Dock icon": {
       "localizations": {
         "zh-Hans": {
@@ -3383,6 +4268,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "在访达中显示资源库文件夹"
+          }
+        }
+      }
+    },
+    "Show Preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示预览"
           }
         }
       }
@@ -3447,12 +4342,32 @@
         }
       }
     },
+    "Sign In to Steam": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录 Steam"
+          }
+        }
+      }
+    },
     "Sign in to Steam first.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "请先登录 Steam。"
+          }
+        }
+      }
+    },
+    "Sign in to Steam to download Workshop items": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录 Steam 后才能下载创意工坊内容"
           }
         }
       }
@@ -3497,6 +4412,16 @@
         }
       }
     },
+    "Size": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大小"
+          }
+        }
+      }
+    },
     "Slow gas clouds and distant stars": {
       "localizations": {
         "zh-Hans": {
@@ -3523,6 +4448,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "排序方式"
+          }
+        }
+      }
+    },
+    "Source": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源"
           }
         }
       }
@@ -3557,6 +4492,26 @@
         }
       }
     },
+    "Sports": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运动"
+          }
+        }
+      }
+    },
+    "Standard": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标准"
+          }
+        }
+      }
+    },
     "Start Rotation": {
       "localizations": {
         "zh-Hans": {
@@ -3573,6 +4528,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态"
+          }
+        }
+      }
+    },
+    "Steam account and downloads": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 账号与下载"
           }
         }
       }
@@ -3807,6 +4772,16 @@
         }
       }
     },
+    "Subscribers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "订阅"
+          }
+        }
+      }
+    },
     "Surprise Me": {
       "localizations": {
         "zh-Hans": {
@@ -3837,6 +4812,16 @@
         }
       }
     },
+    "Technology": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "科技"
+          }
+        }
+      }
+    },
     "that display": {
       "localizations": {
         "zh-Hans": {
@@ -3856,6 +4841,17 @@
           }
         }
       }
+    },
+    "That's everything for this search.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经到底了。"
+          }
+        }
+      },
+      "extractionState": "stale"
     },
     "The download failed: %@": {
       "localizations": {
@@ -3967,6 +4963,16 @@
         }
       }
     },
+    "The Steam Workshop didn't answer. Check your connection and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steam 创意工坊没有响应。请检查网络后重试。"
+          }
+        }
+      }
+    },
     "The video already matches your display's shape. Zoom in to make room to move it.": {
       "localizations": {
         "zh-Hans": {
@@ -4023,6 +5029,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "这台 Mac 没有可用的 Metal 设备。"
+          }
+        }
+      }
+    },
+    "This Month": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本月"
           }
         }
       }
@@ -4087,12 +5103,32 @@
         }
       }
     },
+    "This Week": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本周"
+          }
+        }
+      }
+    },
     "This Workshop item uses an unsupported download format.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "这个创意工坊项目使用了不支持的下载格式。"
+          }
+        }
+      }
+    },
+    "This Year": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今年"
           }
         }
       }
@@ -4107,12 +5143,52 @@
         }
       }
     },
+    "Today": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天"
+          }
+        }
+      }
+    },
     "Top": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "偏上"
+          }
+        }
+      }
+    },
+    "Top Rated": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "评分最高"
+          }
+        }
+      }
+    },
+    "Trending": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "热门"
+          }
+        }
+      }
+    },
+    "Triple Monitor": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "三屏"
           }
         }
       }
@@ -4127,6 +5203,26 @@
         }
       }
     },
+    "Try Again": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Try other words or fewer filters.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换个关键词，或者减少筛选条件。"
+          }
+        }
+      }
+    },
     "Tuned shaders that cost a fraction of a video. Open one to change colours and motion.": {
       "localizations": {
         "zh-Hans": {
@@ -4137,12 +5233,52 @@
         }
       }
     },
+    "TV & Film": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影视"
+          }
+        }
+      }
+    },
+    "Type": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "类型"
+          }
+        }
+      }
+    },
+    "Ultrawide": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超宽屏"
+          }
+        }
+      }
+    },
     "Unknown": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "未知"
+          }
+        }
+      }
+    },
+    "Unspecified": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未分类"
           }
         }
       }
@@ -4167,6 +5303,27 @@
         }
       }
     },
+    "Updated": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新于"
+          }
+        }
+      }
+    },
+    "Updated %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新于 %@"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
     "Use Folder": {
       "localizations": {
         "zh-Hans": {
@@ -4183,6 +5340,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "恢复系统壁纸"
+          }
+        }
+      }
+    },
+    "User Shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户快捷方式"
+          }
+        }
+      }
+    },
+    "Vehicles": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载具"
           }
         }
       }
@@ -4213,6 +5390,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "视频播放速度"
+          }
+        }
+      }
+    },
+    "Video Texture": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频纹理"
           }
         }
       }
@@ -4253,6 +5440,27 @@
           "stringUnit": {
             "state": "translated",
             "value": "视频、项目或文件夹…"
+          }
+        }
+      }
+    },
+    "View": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示方式"
+          }
+        }
+      },
+      "extractionState": "stale"
+    },
+    "View on Steam": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Steam 上查看"
           }
         }
       }
@@ -4325,7 +5533,8 @@
             "value": "壁纸声音"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Wallpapers always pause while the display sleeps, the screen is locked, the screen saver runs or another user is active.": {
       "localizations": {
@@ -4415,7 +5624,8 @@
             "value": "网页 · %@"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Web Page…": {
       "localizations": {
@@ -4547,6 +5757,16 @@
         }
       }
     },
+    "Workshop ID": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创意工坊 ID"
+          }
+        }
+      }
+    },
     "Workshop item %@": {
       "localizations": {
         "zh-Hans": {
@@ -4577,6 +5797,16 @@
         }
       }
     },
+    "Your Shader": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我的着色器"
+          }
+        }
+      }
+    },
     "Your shader · %@": {
       "localizations": {
         "zh-Hans": {
@@ -4585,7 +5815,8 @@
             "value": "我的着色器 · %@"
           }
         }
-      }
+      },
+      "extractionState": "stale"
     },
     "Zoom": {
       "localizations": {

@@ -45,16 +45,13 @@ struct SteamPanel: View {
     private var header: some View {
         HStack(alignment: .top, spacing: Theme.Space.md) {
             VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                Text(verbatim: "STEAM WORKSHOP")
-                    .font(Theme.TypeScale.eyebrow)
-                    .tracking(1.8)
-                    .foregroundStyle(Theme.accent)
+                Eyebrow(text: "Steam Workshop")
                 Text("Download to Lumen")
-                    .font(Theme.display(22))
+                    .font(Theme.TypeScale.panelTitle)
             }
             Spacer()
             Button("Done") { dismiss() }
-                .buttonStyle(.glass)
+                .buttonStyle(.lumenSecondary)
                 .keyboardShortcut(.cancelAction)
         }
     }
@@ -68,7 +65,7 @@ struct SteamPanel: View {
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(startDownload)
                 Button("Download", action: startDownload)
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.lumenPrimary)
                     .disabled(SteamWorkshop.itemID(from: link) == nil)
             }
             Button {
@@ -76,7 +73,7 @@ struct SteamPanel: View {
             } label: {
                 Label("Browse the Steam Workshop…", systemImage: "safari")
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.lumenSecondary)
         }
         .padding(Theme.Space.md)
         .lumenSurface(radius: Theme.Radius.lg)
@@ -101,7 +98,7 @@ struct SteamPanel: View {
                     }
                     Spacer()
                     Button("Sign Out") { steam.signOut() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.lumenSecondary)
                         .disabled(steam.isBusy)
                 }
                 if steam.usesSteamCMD { qrSignInButton(steam) }
@@ -117,7 +114,7 @@ struct SteamPanel: View {
                                 .font(Theme.TypeScale.bodyMedium)
                                 .fixedSize(horizontal: false, vertical: true)
                             Button("Cancel") { steam.cancelQRSignIn() }
-                                .buttonStyle(.glass)
+                                .buttonStyle(.lumenSecondary)
                         }
                     }
                 } else if steam.isQRSignIn {
@@ -128,7 +125,7 @@ struct SteamPanel: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Cancel") { steam.cancelQRSignIn() }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.lumenSecondary)
                     }
                 } else {
                     qrSignInButton(steam)
@@ -150,7 +147,7 @@ struct SteamPanel: View {
                                     steam.signIn(username: username, password: password)
                                     password = ""
                                 }
-                                .buttonStyle(.glassProminent)
+                                .buttonStyle(.lumenPrimary)
                                 .disabled(username.isEmpty || password.isEmpty || steam.isBusy)
                             }
                             .padding(.top, Theme.Space.xxs)
@@ -176,7 +173,7 @@ struct SteamPanel: View {
         } label: {
             Label("Sign In with Steam QR Code", systemImage: "qrcode")
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.lumenPrimary)
         .disabled(steam.isBusy)
     }
 
@@ -192,10 +189,10 @@ struct SteamPanel: View {
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(sendGuardCode)
                     Button("Continue", action: sendGuardCode)
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.lumenPrimary)
                         .disabled(guardCode.isEmpty)
                     Button("Cancel") { model.steam.cancelPrompt() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.lumenSecondary)
                 }
             case .mobileConfirmation:
                 HStack(spacing: Theme.Space.sm) {
@@ -205,7 +202,7 @@ struct SteamPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Theme.Space.xs)
                     Button("Cancel") { model.steam.cancelPrompt() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.lumenSecondary)
                 }
             }
         }
@@ -300,7 +297,7 @@ private struct DownloadRow: View {
             Spacer()
             if case .done(let id?) = download.state {
                 Button("Show") { open(id) }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.lumenSecondary)
                     .controlSize(.small)
             }
         }
@@ -355,7 +352,7 @@ struct SteamWorkshopBrowser: View {
                         Button { navigator.webView?.goForward() } label: { Image(systemName: "chevron.right") }
                         Button { navigator.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.lumenSecondary)
                 }
                 Text(verbatim: currentURL?.host() ?? "steamcommunity.com")
                     .font(Theme.TypeScale.caption)
@@ -370,11 +367,11 @@ struct SteamWorkshopBrowser: View {
                     } label: {
                         Label(requested.contains(itemID) ? "Added to Downloads" : "Download to Lumen", systemImage: "arrow.down.circle.fill")
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.lumenPrimary)
                     .disabled(requested.contains(itemID))
                 }
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.lumenSecondary)
             }
             .padding(.horizontal, Theme.Space.md)
             .padding(.vertical, Theme.Space.sm - 2)

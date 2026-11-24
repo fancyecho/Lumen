@@ -18,11 +18,7 @@ struct AddWebPageSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.md) {
             HStack(spacing: Theme.Space.sm) {
-                Image(systemName: "globe")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Theme.accentSoft))
+                IconWell(symbol: "globe", size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Add a Web Page").font(Theme.TypeScale.sectionTitle)
                     Text(verbatim: "HTML · URL")
@@ -45,14 +41,14 @@ struct AddWebPageSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                    .buttonStyle(.glass)
+                    .buttonStyle(.lumenSecondary)
                     .controlSize(.large)
                 Button("Add") {
                     if let url { model.addWebPage(url, title: title) }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.lumenPrimary)
                 .controlSize(.large)
                 .disabled(url == nil)
             }

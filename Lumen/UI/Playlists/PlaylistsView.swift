@@ -3,7 +3,7 @@ import SwiftUI
 struct PlaylistsView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 264, maximum: 420), spacing: Theme.Space.lg, alignment: .top)]
+    private let columns = [GridItem(.adaptive(minimum: 280, maximum: 440), spacing: Theme.Space.xl, alignment: .top)]
 
     var body: some View {
         ScrollView {
@@ -17,7 +17,7 @@ struct PlaylistsView: View {
                         Button(action: createPlaylist) {
                             Label("New Playlist", systemImage: "plus")
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.lumenPrimary)
                         .controlSize(.large)
                     }
                 }
@@ -31,11 +31,11 @@ struct PlaylistsView: View {
                         Button(action: createPlaylist) {
                             Label("New Playlist", systemImage: "plus")
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.lumenPrimary)
                         .controlSize(.large)
                     }
                 } else {
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xl + Theme.Space.xxs) {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Space.xxl) {
                         ForEach(model.playlists.playlists) { playlist in
                             PlaylistCard(playlist: playlist)
                         }
@@ -70,20 +70,18 @@ struct NewPlaylistCard: View {
                     RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                         .fill(hovering ? Theme.Surface.elevated : Theme.Surface.base)
                     RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
-                        .foregroundStyle(hovering ? Theme.accent.opacity(0.6) : Theme.Surface.strokeHover)
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(hovering ? Theme.accent : .secondary)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(hovering ? Theme.accentSoft : Theme.Surface.elevated))
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 6]))
+                        .foregroundStyle(hovering ? Theme.accentInk.opacity(0.7) : Theme.Surface.strokeHover)
+                    IconWell(symbol: "plus", tint: hovering ? Theme.accentInk : Theme.Ink.secondary, size: 44)
                 }
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                VStack(alignment: .leading, spacing: Theme.Space.xxs - 1) {
-                    Text("New Playlist").font(Theme.TypeScale.cardTitle)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("New Playlist")
+                        .font(Theme.TypeScale.cardTitle)
+                        .foregroundStyle(Theme.Ink.primary)
                     Text("Pick wallpapers and an interval")
                         .font(Theme.TypeScale.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Ink.secondary)
                 }
             }
             .contentShape(Rectangle())
@@ -114,14 +112,6 @@ struct PlaylistCard: View {
                             .transition(.opacity)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                        .strokeBorder(
-                            isActive ? Theme.accent : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
-                            lineWidth: isActive ? 2 : 1
-                        )
-                )
                 .overlay(alignment: .topLeading) {
                     if isActive {
                         ArtBadge(text: String(localized: "Rotating now"), symbol: "arrow.triangle.2.circlepath")
@@ -140,23 +130,24 @@ struct PlaylistCard: View {
                                     Label("Play", systemImage: "play.fill")
                                 }
                             }
-                            .font(Theme.TypeScale.bodyMedium)
                         }
-                        .buttonStyle(.glassProminent)
+                        .buttonStyle(.lumenPrimary)
                         .disabled(wallpapers.isEmpty)
                         .padding(Theme.Space.sm - 2)
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
                     }
                 }
-                .shadow(color: .black.opacity(hovering ? 0.50 : 0.28), radius: hovering ? 22 : 12, y: hovering ? 12 : 6)
-                .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
+                .artworkFrame(isHovering: hovering, highlight: isActive ? Theme.accentInk : nil)
 
-            VStack(alignment: .leading, spacing: Theme.Space.xxs - 1) {
-                Text(playlist.name).font(Theme.TypeScale.cardTitle).lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(playlist.name)
+                    .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
+                    .lineLimit(1)
                 Text(summary(count: wallpapers.count))
                     .font(Theme.TypeScale.caption)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
                     .lineLimit(1)
             }
         }
@@ -183,7 +174,7 @@ struct PlaylistCard: View {
                 Theme.Surface.mediaFill
                 Image(systemName: "rectangle.stack")
                     .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.tertiary)
             }
         } else if tiles.count < 4 {
             ThumbnailView(wallpaper: tiles[0])
@@ -227,56 +218,74 @@ struct PlaylistEditorView: View {
         let isActive = model.playlists.activeID == playlist.id
         return ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.xl) {
-                VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                    Text(verbatim: "PLAYLIST")
-                        .font(Theme.TypeScale.eyebrow)
-                        .tracking(1.8)
-                        .foregroundStyle(Theme.accent)
+                VStack(alignment: .leading, spacing: Theme.Space.xs + 2) {
+                    Eyebrow(text: "Playlist")
                     TextField("Name", text: binding(\.name))
                         .textFieldStyle(.plain)
                         .font(Theme.TypeScale.pageTitle)
+                        .foregroundStyle(Theme.Ink.primary)
                 }
 
                 HStack(spacing: Theme.Space.sm) {
-                    Picker("Change wallpaper", selection: binding(\.intervalMinutes)) {
-                        ForEach(intervals, id: \.self) { minutes in
-                            Text(Format.interval(minutes: minutes).capitalizingFirstLetter).tag(minutes)
+                    Menu {
+                        Picker("Change wallpaper", selection: binding(\.intervalMinutes)) {
+                            ForEach(intervals, id: \.self) { minutes in
+                                Text(Format.interval(minutes: minutes).capitalizingFirstLetter).tag(minutes)
+                            }
+                        }
+                        .pickerStyle(.inline)
+                    } label: {
+                        ChromeLabel {
+                            HStack(spacing: 6) {
+                                Image(systemName: "timer").imageScale(.small).accessibilityHidden(true)
+                                Text(Format.interval(minutes: playlist.intervalMinutes).capitalizingFirstLetter)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(Theme.Ink.tertiary)
+                                    .accessibilityHidden(true)
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
                     .fixedSize()
+                    .controlSize(.large)
+                    .help("Change wallpaper")
 
                     Toggle("Shuffle", isOn: binding(\.shuffle))
                         .toggleStyle(.switch)
+                        .foregroundStyle(Theme.Ink.primary)
+                        .padding(.leading, Theme.Space.xs)
 
                     Spacer()
 
-                    if isActive {
-                        Button { model.playlists.stop() } label: { Label("Stop", systemImage: "stop.fill") }
-                            .buttonStyle(.glass)
-                            .controlSize(.large)
-                    } else {
-                        Button { model.playlists.play(playlist.id) } label: { Label("Start Rotation", systemImage: "play.fill") }
-                            .buttonStyle(.glassProminent)
-                            .controlSize(.large)
-                            .disabled(playlist.wallpaperIDs.isEmpty)
+                    Group {
+                        if isActive {
+                            Button { model.playlists.stop() } label: { Label("Stop", systemImage: "stop.fill") }
+                                .buttonStyle(.lumenSecondary)
+                        } else {
+                            Button { model.playlists.play(playlist.id) } label: { Label("Start Rotation", systemImage: "play.fill") }
+                                .buttonStyle(.lumenPrimary)
+                                .disabled(playlist.wallpaperIDs.isEmpty)
+                        }
+                        Button(role: .destructive) {
+                            model.playlists.delete(playlist.id)
+                            model.router.back()
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.lumenIcon)
+                        .help("Delete playlist")
+                        .accessibilityLabel(Text("Delete playlist"))
                     }
-                    Button(role: .destructive) {
-                        model.playlists.delete(playlist.id)
-                        model.router.back()
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
                     .controlSize(.large)
-                    .help("Delete playlist")
                 }
 
                 if isActive, let next = model.playlists.nextChange {
                     Label("Next change \(next.formatted(.relative(presentation: .named)))", systemImage: "timer")
                         .font(Theme.TypeScale.bodyMedium)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Ink.secondary)
                         .padding(.horizontal, Theme.Space.sm)
                         .padding(.vertical, Theme.Space.xs)
                         .background(Capsule().fill(Theme.Surface.elevated))
@@ -288,9 +297,9 @@ struct PlaylistEditorView: View {
                     subtitle: String(localized: "\(playlist.wallpaperIDs.count) selected · click to add or remove. Order follows selection.")
                 )
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: Theme.Space.md, alignment: .top)],
+                    columns: [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: Theme.Space.lg, alignment: .top)],
                     alignment: .leading,
-                    spacing: Theme.Space.lg
+                    spacing: Theme.Space.xl
                 ) {
                     ForEach(model.library.all) { wallpaper in
                         SelectableWallpaperTile(
@@ -340,14 +349,6 @@ struct SelectableWallpaperTile: View {
             VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 ThumbnailView(wallpaper: wallpaper)
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                            .strokeBorder(
-                                position != nil ? Theme.accent : (hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke),
-                                lineWidth: position != nil ? 2 : 1
-                            )
-                    )
                     .overlay(alignment: .topTrailing) {
                         if let position {
                             Text(verbatim: "\(position + 1)")
@@ -359,10 +360,11 @@ struct SelectableWallpaperTile: View {
                                 .padding(Theme.Space.xs)
                         }
                     }
-                    .opacity(position == nil && !hovering ? 0.72 : 1)
+                    .artworkFrame(radius: Theme.Radius.md, isHovering: hovering, highlight: position != nil ? Theme.accentInk : nil, lifts: false)
+                    .opacity(position == nil && !hovering ? 0.62 : 1)
                 Text(wallpaper.title)
                     .font(Theme.TypeScale.bodyMedium)
-                    .foregroundStyle(position == nil ? .secondary : .primary)
+                    .foregroundStyle(position == nil ? Theme.Ink.secondary : Theme.Ink.primary)
                     .lineLimit(1)
             }
             .contentShape(Rectangle())

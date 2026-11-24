@@ -24,6 +24,8 @@ final class AppModel {
     let lockScreen: LockScreenManager
     let workshop = WorkshopLibrary()
     let steam: SteamWorkshop
+    /// Steam Workshop browsing state; lives here so results survive switching tabs.
+    let workshopBrowser = WorkshopBrowser()
 
     var isImporterPresented = false
     var isWebPageSheetPresented = false
@@ -79,6 +81,11 @@ final class AppModel {
             engine.apply(wallpaper, to: .allDisplays)
         }
         if UserDefaults.standard.bool(forKey: "LumenDebugSteam") { isSteamPanelPresented = true }
+        // `-LumenDebugDelete <uuid>` removes a wallpaper a test added, through the normal delete path.
+        if let id = UserDefaults.standard.string(forKey: "LumenDebugDelete").flatMap(UUID.init(uuidString:)),
+           let wallpaper = library.wallpaper(id: id) {
+            delete(wallpaper)
+        }
         guard let raw = UserDefaults.standard.string(forKey: "LumenDebugRoute") else { return }
         let parts = raw.split(separator: ":", maxSplits: 1).map(String.init)
         if parts.count == 2, let id = UUID(uuidString: parts[1]) {

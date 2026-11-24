@@ -16,16 +16,16 @@ struct NowPlayingBar: View {
 
     var body: some View {
         let wallpaper = display?.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
-        HStack(spacing: Theme.Space.sm) {
+        HStack(spacing: Theme.Space.md) {
             info(wallpaper: wallpaper)
             Rectangle()
                 .fill(Theme.Surface.divider)
-                .frame(width: 1, height: 24)
+                .frame(width: 1, height: 26)
             controls(hasWallpaper: wallpaper != nil)
         }
-        .padding(.leading, Theme.Space.xs)
-        .padding(.trailing, Theme.Space.sm - 2)
-        .padding(.vertical, 6)
+        .padding(.leading, 7)
+        .padding(.trailing, Theme.Space.sm)
+        .padding(.vertical, 7)
         .glassEffect(.regular, in: .capsule)
         .animation(reduceMotion ? nil : Theme.Motion.snappy, value: wallpaper?.id)
     }
@@ -39,32 +39,31 @@ struct NowPlayingBar: View {
             }
             model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
         } label: {
-            HStack(spacing: Theme.Space.sm - 2) {
+            HStack(spacing: Theme.Space.sm) {
+                // A pill, so its curve runs parallel to the capsule around it.
                 Group {
                     if let wallpaper {
                         ThumbnailView(wallpaper: wallpaper)
                     } else {
                         Image(systemName: "sparkles")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentInk)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Theme.Surface.elevated)
                     }
                 }
-                .frame(width: 48, height: 34)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .strokeBorder(Theme.Surface.scrimStroke, lineWidth: 0.75)
-                )
+                .frame(width: 62, height: 38)
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(Theme.Surface.scrimStroke, lineWidth: 0.75))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(wallpaper?.title ?? String(localized: "Nothing on your desktop yet"))
                         .font(Theme.TypeScale.bodyMedium.weight(.semibold))
+                        .foregroundStyle(Theme.Ink.primary)
                         .lineLimit(1)
                     statusLine(hasWallpaper: wallpaper != nil)
                 }
-                .frame(minWidth: 160, idealWidth: 204, maxWidth: 230, alignment: .leading)
+                .frame(minWidth: 150, idealWidth: 200, maxWidth: 220, alignment: .leading)
             }
             .contentShape(Rectangle())
         }
@@ -104,8 +103,8 @@ struct NowPlayingBar: View {
                 .help("Choose display")
             }
         }
-        .font(.system(size: 11.5, weight: .medium))
-        .foregroundStyle(.secondary)
+        .font(Theme.TypeScale.label)
+        .foregroundStyle(Theme.Ink.secondary)
         .lineLimit(1)
     }
 
@@ -136,6 +135,12 @@ struct NowPlayingBar: View {
                 }
                 .help("Next in Playlist")
             }
+
+            Button { model.surpriseMe(on: display) } label: {
+                Image(systemName: "shuffle")
+            }
+            .disabled(model.library.all.count < 2)
+            .help("Surprise me with another wallpaper")
 
             Button { settings.audioEnabled.toggle() } label: {
                 Image(systemName: settings.audioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")

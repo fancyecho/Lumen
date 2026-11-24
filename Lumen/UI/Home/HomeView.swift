@@ -2,138 +2,283 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @State private var width: CGFloat = 1280
 
     var body: some View {
+        let inset = Theme.Layout.inset(for: width)
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.xxl) {
-                hero
-                displaysSection
-                if !recent.isEmpty { recentShelf }
-                generativeShelf
-                if model.engine.displays.count != 1 { SmartPausePanel() }
+            VStack(alignment: .leading, spacing: Theme.Space.section) {
+                HomeStage()
+                    .padding(.horizontal, inset)
+
+                if !recent.isEmpty {
+                    Shelf(title: "Recently added", wallpapers: recent, inset: inset) {
+                        SectionLink(title: "See All") { model.router.show(.library) }
+                    }
+                }
+                if !favorites.isEmpty {
+                    Shelf(title: "Favorites", wallpapers: favorites, inset: inset) { EmptyView() }
+                }
+                Shelf(
+                    title: "Rendered live",
+                    subtitle: String(localized: "Drawn on the GPU within a fixed pixel budget. Tune colours and motion in Studio."),
+                    wallpapers: model.library.builtins,
+                    inset: inset
+                ) {
+                    SectionLink(title: "Open Studio") { model.router.show(.studio) }
+                }
+
+                SmartPausePanel()
+                    .padding(.horizontal, inset)
             }
-            .padding(.horizontal, Theme.Space.page)
-            .padding(.top, Theme.Space.lg)
+            .padding(.top, Theme.Space.md)
             .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
-            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.automatic)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
-    private var recent: [Wallpaper] { Array(model.library.items.prefix(8)) }
+    private var recent: [Wallpaper] { Array(model.library.items.prefix(10)) }
+    private var favorites: [Wallpaper] { Array(model.library.all.filter(\.isFavorite).prefix(10)) }
+}
 
-    private var hero: some View {
-        let engine = model.engine
-        let playing = engine.displays.filter(\.isPlaying).count
-        let libraryCount = model.library.items.count
-        return VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
-            Text(verbatim: "\(Format.greeting()) · \(Date.now.formatted(Date.FormatStyle(locale: Locale(identifier: "en_US")).weekday(.wide)))".uppercased())
-                .font(Theme.TypeScale.eyebrow)
-                .tracking(1.8)
-                .foregroundStyle(Theme.accent)
-            Text(verbatim: "Your desktop,\nin motion.")
-                .font(Theme.TypeScale.heroTitle)
-                .lineSpacing(-4)
-            Text(heroSubtitle(playing: playing, libraryCount: libraryCount))
-                .font(Theme.TypeScale.body)
-                .foregroundStyle(.secondary)
+// MARK: Stage
+
+/// The top of Home: what's on the desktop, framed like a print with its caption beside it.
+private struct HomeStage: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var focusedDisplayID: String?
+    @State private var hovering = false
+    @State private var previewing = false
+    @State private var hoverTask: Task<Void, Never>?
+
+    private var displays: [WallpaperEngine.Display] { model.engine.displays }
+
+    private var display: WallpaperEngine.Display? {
+        displays.first { $0.id == focusedDisplayID }
+            ?? displays.first { $0.wallpaperID != nil && $0.isPrimary }
+            ?? displays.first { $0.wallpaperID != nil }
+            ?? displays.first
+    }
+
+    private var wallpaper: Wallpaper? {
+        display?.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: Theme.Space.xxl + Theme.Space.xs) {
+            artwork
+                .frame(minWidth: 460, maxWidth: 860)
+                .layoutPriority(1)
+            caption
+                .frame(minWidth: 340, idealWidth: 380, maxWidth: 420, alignment: .leading)
+            Spacer(minLength: 0)
+        }
+        .onDisappear {
+            hoverTask?.cancel()
+            previewing = false
         }
     }
 
-    private func heroSubtitle(playing: Int, libraryCount: Int) -> String {
-        let displays = model.engine.displays.count
-        let library = libraryCount == 0
-            ? String(localized: "Drop a video anywhere in this window to start")
-            : String(localized: "\(libraryCount) videos in your library")
-        let status: String
-        if displays > 1 {
-            status = String(localized: "\(playing) of \(displays) displays playing")
-        } else if playing == 1 {
-            status = String(localized: "Playing now")
-        } else if let only = model.engine.displays.first, only.wallpaperID != nil, let reason = only.pauseReason {
-            status = reason.title
-        } else {
-            status = String(localized: "No live wallpaper yet")
-        }
-        return "\(library) · \(status)"
-    }
+    // MARK: Artwork
 
-    private var displaysSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
-            SectionTitle("On your displays", subtitle: String(localized: "Each display can play its own wallpaper."))
-            if let only = model.engine.displays.first, model.engine.displays.count == 1 {
-                // One display: pair the display card cleanly beside Smart pause.
-                HStack(alignment: .top, spacing: Theme.Space.xl) {
-                    DisplayCard(display: only)
-                        .frame(minWidth: 380, maxWidth: 540)
-                    SmartPausePanel(isCompact: true)
-                        .frame(minWidth: 320, maxWidth: .infinity)
+    private var artwork: some View {
+        ZStack {
+            if let wallpaper {
+                ThumbnailView(wallpaper: wallpaper)
+                if previewing {
+                    LiveWallpaperPreview(wallpaper: wallpaper)
+                        .transition(.opacity)
                 }
             } else {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 340, maximum: 580), spacing: Theme.Space.lg, alignment: .top)],
-                    alignment: .leading,
-                    spacing: Theme.Space.lg
-                ) {
-                    ForEach(model.engine.displays) { display in
-                        DisplayCard(display: display)
+                emptyArtwork
+            }
+        }
+        .aspectRatio(16.0 / 10.0, contentMode: .fit)
+        .overlay(alignment: .topLeading) {
+            if let display {
+                DisplayStatusPill(display: display).padding(Theme.Space.md)
+            }
+        }
+        .artworkFrame(radius: Theme.Radius.xxl, isHovering: hovering, lifts: false)
+        .contentShape(Rectangle())
+        .onHover(perform: setHovering)
+        .onTapGesture(perform: openCurrent)
+        .animation(reduceMotion ? nil : Theme.Motion.smooth, value: previewing)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(wallpaper.map { Text($0.title) } ?? Text("Showing the system wallpaper"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { openCurrent() }
+    }
+
+    private var emptyArtwork: some View {
+        ZStack {
+            if let featured = model.library.builtins.first {
+                ThumbnailView(wallpaper: featured).opacity(0.5)
+            } else {
+                Theme.Surface.mediaFill
+            }
+            VStack(spacing: Theme.Space.sm) {
+                IconWell(symbol: "sparkles.rectangle.stack", size: 52)
+                Text("Showing the system wallpaper")
+                    .font(Theme.TypeScale.bodyMedium)
+                    .foregroundStyle(Theme.Ink.primary)
+            }
+        }
+    }
+
+    // MARK: Caption
+
+    private var caption: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            Eyebrow(text: greeting)
+            if let wallpaper {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                    Text(wallpaper.title)
+                        .font(Theme.TypeScale.artworkTitle)
+                        .tracking(-0.4)
+                        .foregroundStyle(Theme.Ink.primary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(WallpaperDescriptor.subtitle(for: wallpaper))
+                        .font(Theme.TypeScale.body)
+                        .foregroundStyle(Theme.Ink.secondary)
+                        .lineLimit(1)
+                }
+                statusLine
+                actions
+            } else {
+                Text(verbatim: "Your desktop,\nin motion.")
+                    .font(Theme.TypeScale.heroTitle)
+                    .tracking(-0.5)
+                    .foregroundStyle(Theme.Ink.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(model.library.items.isEmpty
+                     ? String(localized: "Drop a video anywhere in this window to start")
+                     : String(localized: "Pick one from the library, or let Lumen choose for you."))
+                    .font(Theme.TypeScale.body)
+                    .foregroundStyle(Theme.Ink.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                emptyActions
+            }
+            if displays.count > 1 { displaySwitcher }
+            HairlineDivider().padding(.vertical, Theme.Space.xxs)
+            stats
+        }
+    }
+
+    private var greeting: String {
+        let weekday = Date.now.formatted(Date.FormatStyle(locale: Locale(identifier: "en_US")).weekday(.wide))
+        return "\(Format.greeting()) · \(weekday)"
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if let display {
+            HStack(spacing: 7) {
+                if let reason = display.pauseReason {
+                    Image(systemName: reason.symbol)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(reason.savesEnergy ? Theme.saving : Theme.paused)
+                    Text(reason.title)
+                } else {
+                    StatusDot(color: Theme.playing, pulsing: true)
+                    Text("Playing on \(display.name)")
+                }
+            }
+            .font(Theme.TypeScale.bodyMedium)
+            .foregroundStyle(Theme.Ink.secondary)
+            .lineLimit(1)
+        }
+    }
+
+    private var actions: some View {
+        let engine = model.engine
+        return HStack(spacing: Theme.Space.xs) {
+            Button(action: openCurrent) {
+                Label("Customize", systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.lumenPrimary)
+
+            Button { model.surpriseMe(on: display) } label: {
+                Label("Surprise Me", systemImage: "shuffle")
+            }
+            .buttonStyle(.lumenSecondary)
+            .disabled(model.library.all.count < 2)
+
+            Button { engine.toggleUserPause() } label: {
+                Image(systemName: engine.userPaused ? "play.fill" : "pause.fill")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.lumenIcon)
+            .help(engine.userPaused ? Text("Resume all displays") : Text("Pause all displays"))
+            .accessibilityLabel(engine.userPaused ? Text("Resume all displays") : Text("Pause all displays"))
+
+            Menu {
+                Button("Choose Another…") { model.router.show(.library) }
+                if let display {
+                    Button("Use System Wallpaper") { model.clearWallpaper(on: .display(display.id)) }
+                }
+            } label: {
+                ChromeLabel(isIconOnly: true) { Image(systemName: "ellipsis") }
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More")
+        }
+        .fixedSize()
+        .controlSize(.large)
+    }
+
+    private var emptyActions: some View {
+        HStack(spacing: Theme.Space.xs) {
+            Button { model.router.show(.library) } label: {
+                Label("Choose Wallpaper", systemImage: "square.grid.2x2")
+            }
+            .buttonStyle(.lumenPrimary)
+            Button { model.surpriseMe(on: display) } label: {
+                Label("Surprise Me", systemImage: "shuffle")
+            }
+            .buttonStyle(.lumenSecondary)
+            .disabled(model.library.all.isEmpty)
+        }
+        .fixedSize()
+        .controlSize(.large)
+    }
+
+    private var displaySwitcher: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Theme.Space.xxs) {
+                ForEach(displays) { item in
+                    FilterChip(
+                        title: item.name,
+                        symbol: item.isBuiltin ? "laptopcomputer" : "display",
+                        isSelected: item.id == display?.id,
+                        style: .quiet
+                    ) {
+                        withAnimation(reduceMotion ? nil : Theme.Motion.snappy) { focusedDisplayID = item.id }
                     }
                 }
             }
         }
     }
 
-    private var recentShelf: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
-            SectionTitle(title: "Recently added") {
-                Button("See all") { model.router.show(.library) }
-                    .buttonStyle(.link)
-                    .font(Theme.TypeScale.bodyMedium)
-            }
-            shelf(recent)
+    private var stats: some View {
+        let engine = model.engine
+        let playing = engine.displays.filter(\.isPlaying).count
+        return HStack(alignment: .top, spacing: Theme.Space.xl) {
+            StageStat(value: "\(model.library.all.count)", label: "Library")
+            StageStat(value: "\(playing)/\(engine.displays.count)", label: "Live now")
+            StageStat(value: Format.bytes(model.library.totalDiskUsage), label: "On disk")
         }
     }
 
-    private var generativeShelf: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
-            SectionTitle(title: "Generative", subtitle: String(localized: "Rendered live on the GPU. Tune colours and motion in Studio.")) {
-                Button("Open Studio") { model.router.show(.studio) }
-                    .buttonStyle(.link)
-                    .font(Theme.TypeScale.bodyMedium)
-            }
-            shelf(model.library.builtins)
-        }
-    }
+    // MARK: Actions
 
-    private func shelf(_ wallpapers: [Wallpaper]) -> some View {
-        ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: Theme.Space.lg) {
-                ForEach(wallpapers) { wallpaper in
-                    WallpaperCard(wallpaper: wallpaper)
-                        .frame(width: 280)
-                }
-            }
-            .padding(.vertical, 14)
-            .padding(.horizontal, Theme.Space.xxs)
-        }
-        .scrollIndicators(.never)
-        .scrollClipDisabled()
-        .padding(.vertical, -14)
-    }
-}
-
-struct DisplayCard: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let display: WallpaperEngine.Display
-    @State private var hovering = false
-
-    private var wallpaper: Wallpaper? {
-        display.wallpaperID.flatMap { model.library.wallpaper(id: $0) }
-    }
-
-    private func openDisplayed() {
+    private func openCurrent() {
         if let wallpaper {
             model.router.open(wallpaper.kind == .shader ? .studio(wallpaper.id) : .wallpaper(wallpaper.id))
         } else {
@@ -141,110 +286,75 @@ struct DisplayCard: View {
         }
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
-            ZStack {
-                if let wallpaper {
-                    ThumbnailView(wallpaper: wallpaper)
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.45),
-                            .init(color: .black.opacity(0.72), location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .allowsHitTesting(false)
-                } else {
-                    emptyArtwork
-                }
-            }
-            .aspectRatio(16.0 / 10.0, contentMode: .fit)
-            .overlay(alignment: .topLeading) { DisplayStatusPill(display: display).padding(Theme.Space.sm) }
-            .overlay(alignment: .bottomLeading) {
-                if let wallpaper {
-                    Text(wallpaper.title)
-                        .font(Theme.TypeScale.displayCardTitle)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .shadow(color: .black.opacity(0.55), radius: 6, y: 2)
-                        .padding(Theme.Space.md)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-                    .strokeBorder(hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(hovering ? 0.48 : 0.34), radius: hovering ? 24 : 16, y: hovering ? 12 : 8)
-            .onHover { hovering = $0 }
-            .onTapGesture(perform: openDisplayed)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { openDisplayed() }
-
-            HStack(spacing: Theme.Space.sm) {
-                Image(systemName: display.isBuiltin ? "laptopcomputer" : "display")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(display.name).font(Theme.TypeScale.cardTitle)
-                    Text(verbatim: Format.resolution(Int(display.pixelSize.width), Int(display.pixelSize.height)))
-                        .font(Theme.TypeScale.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Spacer(minLength: Theme.Space.xs)
-                GlassEffectContainer(spacing: Theme.Space.xs) {
-                    HStack(spacing: Theme.Space.xs) {
-                        if wallpaper != nil {
-                            Button("Change") { model.router.show(.library) }
-                                .buttonStyle(.glass)
-                            Button {
-                                model.clearWallpaper(on: .display(display.id))
-                            } label: {
-                                Image(systemName: "xmark")
-                            }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.circle)
-                            .help("Go back to the system wallpaper on this display")
-                        } else {
-                            Button("Choose Wallpaper") { model.router.show(.library) }
-                                .buttonStyle(.glass)
-                        }
-                    }
-                }
-            }
+    private func setHovering(_ isHovering: Bool) {
+        hovering = isHovering
+        hoverTask?.cancel()
+        guard isHovering, wallpaper != nil else {
+            previewing = false
+            return
         }
-        .animation(reduceMotion ? nil : Theme.Motion.quick, value: hovering)
-    }
-
-    private var emptyArtwork: some View {
-        ZStack {
-            Theme.Surface.mediaFill
-            VStack(spacing: Theme.Space.sm - 2) {
-                Image(systemName: "sparkles.rectangle.stack")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(Theme.accent)
-                Text("Showing the system wallpaper")
-                    .font(Theme.TypeScale.bodyMedium)
-                    .foregroundStyle(.secondary)
-            }
+        // Same short delay as gallery cards: no decoder spins up for a pointer just passing over.
+        hoverTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            previewing = true
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 6]))
-                .foregroundStyle(Theme.Surface.strokeHover)
-        )
     }
 }
+
+/// Big number over a small wide label — a quiet summary under the stage caption.
+private struct StageStat: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(verbatim: value)
+                .font(Theme.display(17, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.Ink.primary)
+                .lineLimit(1)
+            Eyebrow(text: label, color: Theme.Ink.tertiary)
+        }
+    }
+}
+
+// MARK: Shelf
+
+/// A titled horizontal row of cards that scrolls out to the window edge while starting on the page margin.
+private struct Shelf<Accessory: View>: View {
+    let title: String
+    var subtitle: String?
+    let wallpapers: [Wallpaper]
+    let inset: CGFloat
+    @ViewBuilder var accessory: Accessory
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            SectionTitle(title: title, subtitle: subtitle) { accessory }
+                .padding(.horizontal, inset)
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: Theme.Space.lg) {
+                    ForEach(wallpapers) { wallpaper in
+                        WallpaperCard(wallpaper: wallpaper)
+                            .frame(width: Theme.Layout.shelfCardWidth)
+                    }
+                }
+                .padding(.vertical, Theme.Space.md)
+            }
+            .contentMargins(.horizontal, inset, for: .scrollContent)
+            .scrollIndicators(.never)
+            .scrollClipDisabled()
+            .padding(.vertical, -Theme.Space.md)
+        }
+    }
+}
+
+// MARK: Smart Pause
 
 /// Live view of the automatic pause rules and what they're doing right now.
 struct SmartPausePanel: View {
     @Environment(AppModel.self) private var model
-    /// Sits beside a display card: smaller title, tiles stack in one or two columns.
-    var isCompact = false
 
     var body: some View {
         @Bindable var settings = model.settings
@@ -253,21 +363,15 @@ struct SmartPausePanel: View {
         let liveCoverage = model.engine.displays.first(where: \.isPrimary)?.coverage
             ?? model.engine.displays.compactMap(\.coverage).first
 
-        VStack(alignment: .leading, spacing: isCompact ? Theme.Space.sm : Theme.Space.md) {
-            if isCompact {
-                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                    Text(verbatim: "Smart pause").font(Theme.TypeScale.displayCardTitle)
-                    Text("Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.")
-                        .font(Theme.TypeScale.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else {
-                SectionTitle("Smart pause", subtitle: String(localized: "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more."))
-            }
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            SectionTitle(
+                "Smart pause",
+                subtitle: String(localized: "Lumen stops decoding whenever nobody can see the wallpaper — and when your Mac needs the energy more.")
+            )
+            // Exactly four equal columns: an adaptive grid left a fifth, empty slot on wide windows.
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: isCompact ? 240 : 240), spacing: Theme.Space.sm)],
-                spacing: Theme.Space.sm
+                columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Space.md), count: 4),
+                spacing: Theme.Space.md
             ) {
                 PolicyTile(
                     symbol: "macwindow", title: String(localized: "When covered by windows"),
@@ -304,6 +408,8 @@ extension SmartPausePanel {
     }
 }
 
+/// One automatic pause rule: icon and switch on top, rule and live status below.
+/// Fixed height and single-line text, so a row of tiles always lines up whatever the language.
 struct PolicyTile: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let symbol: String
@@ -313,35 +419,39 @@ struct PolicyTile: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.Space.sm) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isTriggered ? Theme.saving : Theme.accent)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill((isTriggered ? Theme.saving : Theme.accent).opacity(0.15)))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(Theme.TypeScale.bodyMedium.weight(.semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 5) {
-                    if isTriggered { StatusDot(color: Theme.saving) }
-                    Text(status).lineLimit(1)
-                }
-                .font(Theme.TypeScale.caption)
-                .foregroundStyle(isTriggered ? Theme.saving.opacity(0.95) : Color.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center) {
+                IconWell(symbol: symbol, tint: isTriggered ? Theme.saving : .white, size: 32)
+                Spacer(minLength: Theme.Space.xs)
+                Toggle(title, isOn: $isOn)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
             }
-            Spacer(minLength: Theme.Space.xs)
-            Toggle(title, isOn: $isOn)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
+            Spacer(minLength: Theme.Space.sm)
+            Text(title)
+                .font(Theme.TypeScale.bodyMedium.weight(.semibold))
+                .foregroundStyle(Theme.Ink.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            HStack(spacing: 5) {
+                if isTriggered { StatusDot(color: Theme.saving) }
+                Text(status)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(Theme.TypeScale.caption)
+            .foregroundStyle(isTriggered ? Theme.saving : Theme.Ink.secondary)
+            .padding(.top, 3)
+            .help(status)
         }
-        .padding(Theme.Space.sm + 2)
+        .padding(Theme.Space.md)
+        .frame(maxWidth: .infinity, minHeight: 112, maxHeight: 112, alignment: .topLeading)
         .lumenSurface(
             radius: Theme.Radius.lg,
-            stroke: isTriggered ? Theme.saving.opacity(0.45) : Theme.Surface.stroke
+            stroke: isTriggered ? Theme.saving.opacity(0.35) : Theme.Surface.stroke
         )
         .animation(reduceMotion ? nil : Theme.Motion.snappy, value: isTriggered)
+        .accessibilityElement(children: .combine)
     }
 }

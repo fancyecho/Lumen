@@ -18,12 +18,17 @@ struct StudioEditorView: View {
                     HStack(alignment: .top, spacing: Theme.Space.xl) {
                         VStack(alignment: .leading, spacing: Theme.Space.md) {
                             preview(config: config, framing: base.resolvedFraming)
-                            if showsCode { codeEditor }
+                            if showsCode {
+                                codeEditor
+                            } else {
+                                presetStrip(current: base)
+                                    .padding(.top, Theme.Space.md)
+                            }
                         }
                         .frame(maxWidth: .infinity)
 
                         controls(base: base, config: config)
-                            .frame(width: 320)
+                            .frame(width: Theme.Layout.inspectorWidth)
                     }
                     .padding(.horizontal, Theme.Space.page)
                     .padding(.top, Theme.Space.lg)
@@ -44,25 +49,29 @@ struct StudioEditorView: View {
         ShaderPreview(config: config, settings: ShaderRenderSettings(frameRate: 60, pixelBudget: 1_600_000), framing: framing)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous).strokeBorder(Theme.Surface.stroke))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous).strokeBorder(Theme.Surface.scrimStroke))
             .overlay(alignment: .topLeading) {
                 ArtBadge(text: "Live", symbol: "sparkles").padding(Theme.Space.md)
             }
-            .shadow(color: .black.opacity(0.5), radius: 26, y: 14)
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 16)
     }
 
     private var codeEditor: some View {
         VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
             HStack(spacing: Theme.Space.xs) {
-                Text("Fragment shader").font(Theme.TypeScale.cardTitle)
-                Text(verbatim: "Metal Shading Language").font(Theme.TypeScale.caption).foregroundStyle(.secondary)
+                Text("Fragment shader")
+                    .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
+                Text(verbatim: "Metal Shading Language")
+                    .font(Theme.TypeScale.caption)
+                    .foregroundStyle(Theme.Ink.tertiary)
                 Spacer()
                 Button("Reset") { source = self.config?.resolvedSource ?? "" }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.lumenSecondary)
                 Button(action: runCode) {
                     Label("Run", systemImage: "play.fill")
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.lumenPrimary)
                 .keyboardShortcut(.return, modifiers: .command)
             }
             TextEditor(text: $source)
@@ -71,7 +80,7 @@ struct StudioEditorView: View {
                 .autocorrectionDisabled()
                 .padding(Theme.Space.sm)
                 .frame(minHeight: 320)
-                .background(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).fill(Color.black.opacity(0.45)))
+                .background(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).fill(Color.black.opacity(0.5)))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.Surface.stroke))
             if let compileError {
                 Label {
@@ -91,20 +100,37 @@ struct StudioEditorView: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
+    /// The other shaders, one click away, so trying presets doesn't mean bouncing back to the grid.
+    private func presetStrip(current: Wallpaper) -> some View {
+        let others = (model.library.builtins + model.library.customShaders).filter { $0.id != current.id }
+        return VStack(alignment: .leading, spacing: Theme.Space.md) {
+            SectionTitle("More to try")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: Theme.Space.sm)], alignment: .leading, spacing: Theme.Space.md) {
+                ForEach(others) { shader in
+                    PresetThumbnail(wallpaper: shader) {
+                        model.router.back()
+                        model.router.open(.studio(shader.id))
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: Controls
 
     private func controls(base: Wallpaper, config: ShaderConfig) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.lg) {
             VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                Text(verbatim: base.isBuiltin ? "PRESET" : "YOUR SHADER")
-                    .font(Theme.TypeScale.eyebrow)
-                    .tracking(1.8)
-                    .foregroundStyle(Theme.accent)
+                Eyebrow(text: base.isBuiltin ? "Preset" : "Your shader")
                 TextField("Name", text: $title)
                     .textFieldStyle(.plain)
-                    .font(Theme.TypeScale.detailTitle)
+                    .font(Theme.TypeScale.artworkTitle)
+                    .foregroundStyle(Theme.Ink.primary)
                 if let preset = BuiltinShaders.preset(id: base.id) {
-                    Text(preset.tagline).font(Theme.TypeScale.body).foregroundStyle(.secondary)
+                    Text(preset.tagline)
+                        .font(Theme.TypeScale.body)
+                        .foregroundStyle(Theme.Ink.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -120,7 +146,7 @@ struct StudioEditorView: View {
                     Button { randomizePalette() } label: { Label("Shuffle", systemImage: "shuffle") }
                     Button { resetParams(base: base) } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.lumenSecondary)
                 .controlSize(.small)
             }
 
@@ -142,6 +168,7 @@ struct StudioEditorView: View {
             VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                 SetWallpaperButton { target in apply(base: base, target: target) }
                     .controlSize(.large)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Space.xs) {
                     Button { save(base: base) } label: {
                         if base.isBuiltin {
@@ -164,27 +191,26 @@ struct StudioEditorView: View {
                             Image(systemName: "trash")
                         }
                         .help("Delete shader")
+                        .accessibilityLabel(Text("Delete shader"))
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.lumenSecondary)
             }
 
             Text("Runs at \(model.settings.shaderFrameRate) fps on the desktop, rendered at \(model.settings.shaderQuality.title.lowercased()) quality. Change this in Settings → Performance.")
                 .font(Theme.TypeScale.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Theme.Ink.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func panel<Content: View>(_ title: LocalizedStringKey, symbol: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
             HStack(spacing: Theme.Space.sm - 2) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 28, height: 28)
-                    .background(Circle().fill(Theme.accentSoft))
-                Text(title).font(Theme.TypeScale.cardTitle)
+                IconWell(symbol: symbol, size: 28)
+                Text(title)
+                    .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
             }
             content()
         }
@@ -195,12 +221,14 @@ struct StudioEditorView: View {
     private func slider(_ label: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>, format: @escaping (Double) -> String) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             HStack {
-                Text(label).font(Theme.TypeScale.body)
+                Text(label)
+                    .font(Theme.TypeScale.body)
+                    .foregroundStyle(Theme.Ink.primary)
                 Spacer()
                 Text(format(value.wrappedValue))
                     .font(Theme.TypeScale.caption.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
             }
             Slider(value: value, in: range)
                 .controlSize(.small)
@@ -301,5 +329,30 @@ struct StudioEditorView: View {
             model.setWallpaper(saved, on: target)
             if base.isBuiltin { model.router.back() ; model.router.open(.studio(saved.id)) }
         }
+    }
+}
+
+/// Small, captioned shader thumbnail for the editor's "More to try" strip.
+private struct PresetThumbnail: View {
+    let wallpaper: Wallpaper
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: Theme.Space.xs - 2) {
+                ThumbnailView(wallpaper: wallpaper)
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .artworkFrame(radius: Theme.Radius.sm, isHovering: hovering)
+                Text(wallpaper.title)
+                    .font(Theme.TypeScale.label)
+                    .foregroundStyle(hovering ? Theme.Ink.primary : Theme.Ink.secondary)
+                    .lineLimit(1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.quick, value: hovering)
     }
 }
