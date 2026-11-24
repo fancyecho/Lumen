@@ -15,7 +15,7 @@ final class ThumbnailCache {
         switch wallpaper.kind {
         case .video: "video-\(wallpaper.id.uuidString)"
         case .shader: "shader-\(StableHash.hex(of: wallpaper.shader))"
-        case .web, .scene: "package-\(wallpaper.id.uuidString)"
+        case .web, .scene, .native: "package-\(wallpaper.id.uuidString)"
         }
     }
 
@@ -25,7 +25,7 @@ final class ThumbnailCache {
 
         var cgImage: CGImage?
         switch wallpaper.kind {
-        case .video, .web, .scene:
+        case .video, .web, .scene, .native:
             guard let url = library.thumbnailURL(for: wallpaper) else { return nil }
             cgImage = await Task.detached(priority: .utility) { MediaInspector.loadImage(at: url) }.value
         case .shader:

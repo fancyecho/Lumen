@@ -1,0 +1,653 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// 字符海：整屏像代码的灰色字符。每个字是一个小方块，位移/转角/白光由 CPU 的 CharField 算好（field 纹理），
+// 这里只负责把字画在它此刻的位置上；偶尔，字符会闪烁着拼出一个飘浮的人像，然后消散。
+
+struct SeaUniforms {
+    float4 pointer;     // xy 指针（像素），z 光晕强度，w 光晕半径（像素）
+    float4 avatarRect;  // xy 人像左上角，zw 宽高（像素）
+    float4 avatar;      // x 显现进度，y 消散进度，z 出现后的秒数，w 是否在场
+    float4 look;        // xw 她心口的位置（人像 uv），y 字符亮度倍率，z 诗句流长度
+    float4 halo;        // xy 光环中心（人像 uv），z 光环半径（人像宽度的比例），w 保留
+    float4 style;       // x 夜海色调（0 暖灰 · 1 夜海），y 翅膀（0 关 · 1 开），z 浮现前光向心口聚拢的进度，w 振翅时她被托高多少（像素）
+    float4 reserved[7];
+    float2 viewPx;
+    float2 cellPx;
+    float2 gridSize;
+    float2 atlasSize;
+    float scale;        // 每点多少像素
+    float time;
+    int rippleCount;    // 保留
+    float pad;
+};
+
+struct VOut { float4 position [[position]]; };
+
+vertex VOut seaVertex(uint vid [[vertex_id]]) {
+    float2 p = float2((vid << 1) & 2, vid & 2);
+    VOut o;
+    o.position = float4(p * 2.0 - 1.0, 0.0, 1.0);
+    return o;
+}
+
+// ---------- 工具 ----------
+
+static inline uint hashu(uint x) {
+    x ^= x >> 16; x *= 0x7feb352dU;
+    x ^= x >> 15; x *= 0x846ca68bU;
+    x ^= x >> 16;
+    return x;
+}
+
+static inline float rand(int2 c, uint salt) {
+    uint h = hashu(uint(c.x) * 73856093U ^ uint(c.y) * 19349663U ^ hashu(salt + 0x9e3779b9U));
+    return float(h) * (1.0 / 4294967295.0);
+}
+
+static inline float sq(float x) { return x * x; }
+
+// 平滑的值噪声（0…1），给浮现前沿一点有机的起伏。
+static inline float vnoise(float2 x) {
+    float2 i = floor(x), f = fract(x);
+    float2 w = f * f * (3.0 - 2.0 * f);
+    int2 c = int2(i);
+    float a = rand(c, 77), b = rand(c + int2(1, 0), 77), d = rand(c + int2(0, 1), 77), e = rand(c + int2(1, 1), 77);
+    return mix(mix(a, b, w.x), mix(d, e, w.x), w.y);
+}
+static inline float dot2(float2 v) { return dot(v, v); }
+
+// 管线变体（SeaContext.pipeline）：这一帧有没有翅膀、是不是在浮现之前的聚拢阶段。用不到的代码不编进去。
+constant bool kWings [[function_constant(0)]];
+constant bool kGather [[function_constant(1)]];
+
+constant float PI = 3.14159265;
+constant float HOUR = 3600.0;   // u.time 与 u.avatar.z 都按一小时取模
+
+// 角速度取整到“一小时恰好转整数圈”：时间每小时归零时，所有周期运动无缝衔接（同 Swift 的 HourLoop.omega）。
+static inline float hourly(float w) { return round(w * HOUR / (2.0 * PI)) * (2.0 * PI / HOUR); }
+
+// 轮廓笔画：0 '-'，1 '\'，2 '|'，3 '/'（切线方向每 45° 一种）。
+static inline uint strokeChar(uint i) {
+    return i == 0U ? uint('-') : (i == 1U ? uint('\\') : (i == 2U ? uint('|') : uint('/')));
+}
+
+// 代码里常见的字符：人像、光环、粒子落在空格上时用它们补字。
+constant uchar kFill[40] = {
+    '{', '}', '(', ')', '[', ']', ';', '=', '<', '>', '+', '*', '/', '&', '|', ':', '.', '_', '#', '$',
+    'a', 'e', 'f', 'i', 'l', 'n', 'o', 'r', 's', 't', 'u', 'v', 'x', '0', '1', '2', '3', '7', '8', '9',
+};
+
+// 字符分类 → 灰度（0 普通词 1 关键字样 4 数字 5 符号 6 大写开头），差别很小，只为质感
+static inline float classLevel(uint cls) {
+    switch (cls) {
+        case 1: return 0.335;
+        case 2: return 0.285;
+        case 3: return 0.205;
+        case 4: return 0.300;
+        case 5: return 0.235;
+        case 6: return 0.315;
+        case 7: return 0.40;     // 屏幕正中那句话，比周围略亮一点点
+        default: return 0.275;
+    }
+}
+
+// ---------- 人像 ----------
+
+// 她的脸在人像图里的位置（uv 中心与半径，量自 avatar.png：刘海下沿到下巴、两颊之间）。
+constant float2 kFaceCenter = float2(0.497, 0.100);
+constant float2 kFaceRadius = float2(0.068, 0.044);
+
+// 屏幕像素 → 人像 uv：整体缓慢漂浮、轻摆，发丝和裙摆随波飘动（反向映射近似）。
+static inline float2 figureUV(float2 px, constant SeaUniforms &u) {
+    float t = u.avatar.z;
+    float2 rel = (px - u.avatarRect.xy) / u.avatarRect.zw;
+    rel.y -= 0.011 * sin(t * hourly(0.62));
+    rel.y += u.style.w / u.avatarRect.w;          // 振翅时被托高一点（翅膀跟着她一起动）
+    float aspect = u.avatarRect.w / u.avatarRect.z;
+    float ang = 0.011 * sin(t * hourly(0.41) + 0.7);
+    float2 c = float2(0.5, 0.58);
+    float2 r = (rel - c) * float2(1.0, aspect);
+    r = float2(cos(ang) * r.x + sin(ang) * r.y, -sin(ang) * r.x + cos(ang) * r.y);
+    rel = c + r / float2(1.0, aspect);
+
+    float dx = rel.x - 0.5;
+    float side = dx < 0.0 ? -1.0 : 1.0;
+    float hair = smoothstep(0.10, 0.40, abs(dx)) * smoothstep(0.14, 0.42, rel.y) * (1.0 - smoothstep(0.62, 0.82, rel.y));
+    float skirt = smoothstep(0.55, 0.97, rel.y);
+    float w1 = sin(rel.y * 10.0 - t * hourly(1.05) + side * 0.8);
+    float w2 = sin(rel.y * 21.0 - t * hourly(1.65) + 2.1);
+    float breathe = 0.5 + 0.5 * sin(t * hourly(0.38));
+    float2 off;
+    off.x = hair * ((0.016 * w1 + 0.005 * w2) * (0.6 + abs(dx) * 1.6) + side * 0.028 * breathe * abs(dx))
+          + skirt * 0.022 * sin(rel.y * 7.0 - t * hourly(0.85) + dx * 5.0) * abs(dx);
+    off.y = -hair * 0.006 * breathe;
+    return rel - off;
+}
+
+// 每格的出现/消散。出现：光从她心口向外漫开，每个字在约 0.7 秒里平滑淡入（不闪烁）；
+// 消散：从发梢、裙摆和脚尖向心口退去，心口那句话最后才消失。flash 是推进中的那道柔光，
+// release 是消散前沿刚扫过的那一带（她在那里化作往上飘的光点）。
+// 前沿不是正圆：叠一层平滑噪声，像墨在纸上洇开；往下（裙摆方向）走得快一点，像光往下流。
+// j1/j2 是每格的随机早晚（0…0.1）；字缝里的底光用固定值，前沿是平滑的。
+static inline float presence(float2 uv, float j1, float j2, constant SeaUniforms &u, thread float &flash,
+                             thread float &release) {
+    float2 hd = (uv - float2(u.look.x, u.look.w)) * float2(1.0, u.avatarRect.w / u.avatarRect.z);
+    hd.y *= hd.y > 0.0 ? 0.85 : 1.0;
+    float n = 0.65 * vnoise(uv * float2(6.0, 11.0)) + 0.35 * vnoise(uv * float2(13.0, 24.0) + 5.3);
+    float d = saturate(length(hd) / 1.45 + (n - 0.5) * 0.12);   // 0 = 心口 … 1 = 最远的脚尖
+    float x = (u.avatar.x * 1.15 - (d * 0.85 + j1)) / 0.20;
+    float y = (u.avatar.y * 1.15 - ((1.0 - d) * 0.85 + j2)) / 0.20;
+    float on = smoothstep(0.0, 1.0, x), off = smoothstep(0.0, 1.0, y);
+    flash = (x > 0.0 && x < 1.6 ? 0.45 * exp(-sq((x - 0.5) / 0.35)) : 0.0)
+          + (y > 0.0 && y < 1.6 ? 0.30 * exp(-sq((y - 0.5) / 0.35)) : 0.0);
+    release = y > 0.0 && y < 3.0 ? exp(-sq((y - 1.0) / 0.8)) : 0.0;
+    return on * (1.0 - off);
+}
+
+static inline float cellPresence(int2 cell, float2 uv, constant SeaUniforms &u, thread float &flash, thread float &release) {
+    return presence(uv, rand(cell, 11) * 0.10, rand(cell, 23) * 0.10, u, flash, release);
+}
+
+// 光环中线上的诗句：但丁《天堂篇》末句（朗费罗译，Verses.txt 里也有这句）。沿上半圈一格一字：
+// 从左侧往上、越过头顶、再沿右侧往下。圆在字符格里是个椭圆（格子高约是宽的两倍）：
+// 上段每列取一格、两侧每行取一格（分界在斜率为 1 处），正好连成一条不断的字链。不在中线上返回 0。
+constant char kHaloVerse[] = "theLoveWhichMovesTheSunAndTheOtherStars";
+constant int kHaloLen = 39;
+
+static inline uint haloChar(int2 cell, float2 hc, float R, float2 cellPx) {
+    float rx = R / cellPx.x, ry = R / cellPx.y;                 // 半轴（格）
+    float xb = rx * rx / sqrt(rx * rx + ry * ry);               // 上段的半宽（格）
+    int ctr = int(floor(hc.x / cellPx.x));                       // 圆心所在列
+    int topEnd = int(floor(xb));
+    float2 q = ((float2(cell) + 0.5) * cellPx - hc) / cellPx;    // 本格中心相对圆心（格）
+    int i = 1 << 20;                                             // 在诗句里的位置（相对正中）
+    int dc = cell.x - ctr;
+    if (dc >= -topEnd && dc <= topEnd && q.y < 0.0) {
+        float yArc = hc.y - ry * sqrt(max(1.0 - q.x * q.x / (rx * rx), 0.0)) * cellPx.y;
+        if (cell.y == int(floor(yArc / cellPx.y))) i = dc;
+    } else if (abs(q.y) < ry) {
+        // 这一侧上段最外那一格在哪一行：侧段从它的下一行接着往下数（两侧各算各的，圆心不一定在格子正中）。
+        int side = q.x < 0.0 ? -1 : 1;
+        float xe = ((float(ctr + side * topEnd) + 0.5) * cellPx.x - hc.x) / cellPx.x;
+        int rowB = int(floor((hc.y - ry * sqrt(max(1.0 - xe * xe / (rx * rx), 0.0)) * cellPx.y) / cellPx.y));
+        float xArc = rx * sqrt(max(1.0 - q.y * q.y / (ry * ry), 0.0)) * cellPx.x;
+        if (cell.y > rowB && cell.x == int(floor((hc.x + float(side) * xArc) / cellPx.x)))
+            i = side * (topEnd + (cell.y - rowB));
+    }
+    int k = i + kHaloLen / 2;
+    return (k >= 0 && k < kHaloLen) ? uint(uchar(kHaloVerse[k])) : 0U;
+}
+
+// ---------- 每帧由 Swift 算好的参数（buffer 1，fx） ----------
+// fx[0]     翅膀根部（肩胛后）：xy 左、zw 右（像素）
+// fx[1]     腕关节的主星：xy 左、zw 右（像素）
+// fx[2]     x 腕星的芒长（像素）、y 左腕星亮度、z 右腕星亮度、w 根部辉光亮度
+// fx[3]     冲击波：xy 圆心、z 半径（像素）、w 强度（0 = 没有）
+// fx[4]     x 预备时周围海面压暗多少、y 下扑后的光浪走到哪（0…1，<0 = 没有）、z 翼下海面反光强度、w 根部辉光半径（像素）
+// fx[5]     x 左翼跨度、y 右翼跨度（像素）、z 翼骨伸到哪（0…1）、w 腕关节的高度（像素，翼下从这里往下算）
+// fx[6]     光纹理：xy 每格宽高（像素）、zw 格数
+// fx[7]     保留
+// fx[8…35]  浮现之前汇聚的光点：每段尾光 xy 头、zw 尾（像素）（GatherMotes）
+// fx[36…42] 这 28 个光点的亮度
+// fx[43]    范围：x/y 翅膀所在横条的上下边（像素），z 光点离心口最远多少像素
+constant int kWRoot = 0, kWStar = 1, kWLight = 2, kWShock = 3, kWSea = 4, kWSpan = 5, kWGlow = 6;
+constant int kMotes = 8, kMoteBright = 36, kRange = 43;
+
+// 翅膀的色温：0 近白（根部）· 0.35 香槟金（羽身）· 1 银蓝（初级飞羽的尖端，融进夜海）。
+static inline float3 wingTone(float temp) {
+    const float3 white = float3(1.0, 0.95, 0.86), gold = float3(0.97, 0.80, 0.52), silver = float3(0.76, 0.83, 0.90);
+    return temp < 0.35 ? mix(white, gold, temp / 0.35) : mix(gold, silver, saturate((temp - 0.35) / 0.65));
+}
+
+// 一道楔形的光芒：沿芒的距离 al（0…len），离芒线的距离 pe。根部宽、往芒尖收成一根发丝，两侧带一点晕。
+static inline float wedge(float al, float pe, float len, float w0) {
+    float v = 1.0 - saturate(al / max(len, 1.0));
+    float w = w0 * (0.14 + v * v);
+    return exp(-sq(pe / w)) * sqrt(v) + 0.2 * exp(-sq(pe / (w * 4.0))) * v;
+}
+
+// 腕关节的主星：四道芒（竖的略长）、四芒星形（星形线）的芯和正中一枚小菱形，外加一圈柔光。
+static inline float wristStar(float2 p, float2 c, float len, constant SeaUniforms &u) {
+    float2 d = p - c;
+    float ch = u.cellPx.y;
+    if (dot2(d) > sq(max(len * 1.35, ch * 7.0))) return 0.0;
+    float w0 = u.cellPx.x * 0.5;
+    float ray = 0.0;
+    if (abs(d.x) < ch * 2.5) ray = wedge(abs(d.y), d.x, len * 1.25, w0);
+    if (abs(d.y) < ch * 2.5) ray = max(ray, wedge(abs(d.x), d.y, len, w0));
+    float rc = ch * 1.25, core = 0.0;
+    if (dot2(d) < sq(rc * 1.2)) {
+        float ast = pow(abs(d.x) / rc, 0.6667) + pow(abs(d.y) / rc, 0.6667);
+        core = 1.0 - smoothstep(0.6, 0.95, ast);
+        float dia = abs(d.x) / (ch * 0.40) + abs(d.y) / (ch * 0.55);
+        core += 0.35 * (1.0 - smoothstep(0.75, 1.0, dia));
+    }
+    return max(ray * 0.8, core) + 0.16 * exp(-dot2(d) / sq(ch * 2.0));
+}
+
+// 浮现之前汇聚的光点在 p 处的光：到每段尾光的距离，头亮尾淡。
+static inline float gatherMotes(float2 p, constant float4 *fx, constant SeaUniforms &u) {
+    float sum = 0.0, sig = u.cellPx.y * 0.38;
+    for (int i = 0; i < 28; i++) {
+        float b = fx[kMoteBright + i / 4][i % 4];
+        if (b <= 0.0) continue;
+        float4 sg = fx[kMotes + i];
+        float2 ab = sg.xy - sg.zw, ap = p - sg.zw;
+        float h = saturate(dot(ap, ab) / max(dot(ab, ab), 1e-3));
+        float dl2 = dot2(ap - ab * h);
+        if (dl2 > sq(sig * 3.5)) continue;
+        sum += b * exp(-dl2 / sq(sig)) * (0.35 + 0.65 * h);
+    }
+    return sum;
+}
+
+// 一个字在本像素的覆盖率。字重 wv 可以是小数（0 细 · 1 常规 · 2 半粗），在相邻两档之间插值，字重变化时不跳。
+static inline float glyphCov(texture2d<float> atlas, uint ch, float wv, float2 lp, constant SeaUniforms &u) {
+    constexpr sampler lin(filter::linear, address::clamp_to_edge);
+    float2 box = u.cellPx + 2.0;
+    uint idx = clamp(ch, 32U, 127U) - 32U;
+    float2 at = float2(idx % 16U, idx / 16U) * box + 1.0 + lp;
+    float w0 = floor(wv), f = wv - w0;
+    float c = atlas.sample(lin, (at + float2(0.0, w0 * 6.0 * box.y)) / u.atlasSize).r;
+    if (f > 0.001) c = mix(c, atlas.sample(lin, (at + float2(0.0, (w0 + 1.0) * 6.0 * box.y)) / u.atlasSize).r, f);
+    return c;
+}
+
+// ---------- 主着色 ----------
+
+fragment float4 seaFragment(VOut in [[stage_in]],
+                            constant SeaUniforms &u [[buffer(0)]],
+                            texture2d<uint> cells [[texture(0)]],
+                            texture2d<float> atlas [[texture(1)]],
+                            texture2d<float> figure [[texture(2)]],
+                            texture2d<float> field [[texture(3)]],
+                            texture2d<uint> verses [[texture(4)]],
+                            texture2d<float> wingCells [[texture(5)]],
+                            texture2d<float> wingGlow [[texture(6)]],
+                            constant float4 *fx [[buffer(1)]]) {
+    constexpr sampler mip(filter::linear, mip_filter::linear, address::clamp_to_zero);
+    constexpr sampler lin(filter::linear, address::clamp_to_zero);
+
+    float2 p = in.position.xy;
+    float t = u.time;
+    float cellH = u.cellPx.y;
+
+    // 夜海：底色和字偏冷（月光下的蓝灰），浪尖反出月白，衬出她的暖金；关掉是原来的暖灰。
+    float night = u.style.x;
+    float2 vn = p / u.viewPx - 0.5;
+    float3 bg = mix(float3(0.104, 0.101, 0.097), float3(0.086, 0.097, 0.114), night) * (1.0 - 0.38 * dot(vn, vn));
+    float glowP = u.pointer.z * exp(-dot2(p - u.pointer.xy) / sq(u.pointer.w * 1.3));
+    bg += float3(0.25, 0.38, 0.65) * glowP * 0.03;
+
+    // ---- 她的底光：把她（约一个字大小的模糊）淡淡地铺进字缝里，外面再透一圈更宽更淡的辉光。
+    // 远看她是一团光的形状，凑近仍然只有字；显现时那道前沿的柔光也照亮字缝。 ----
+    float lod = 0.0;
+    float2 uvP = 0.0;
+    float moteP = 0.0;   // 浮现之前汇聚的光点在这个像素的光（字也用它，不再按字的中心另算一遍）
+    if (u.avatar.w > 0.0) {
+        lod = log2(max(cellH * float(figure.get_height()) / u.avatarRect.w, 1.0));
+        uvP = figureUV(p, u);
+        float flashP, releaseP;
+        float visP = presence(uvP, 0.05, 0.05, u, flashP, releaseP);
+        float globalP = smoothstep(0.0, 0.6, u.avatar.x) * (1.0 - smoothstep(0.3, 1.0, u.avatar.y));
+        float4 under = figure.sample(mip, uvP, level(lod));          // 预乘透明度：边缘自然变淡
+        float4 halo = figure.sample(mip, uvP, level(lod + 2.5));
+        bg += under.rgb * 0.085 * visP + halo.rgb * 0.035 * globalP
+            + float3(1.0, 0.95, 0.85) * flashP * under.a * 0.06;
+        // 光环的辉光：比光环本身宽，从字缝里透出来（光环不随她轻摆）。
+        float2 hcP = u.avatarRect.xy + u.halo.xy * u.avatarRect.zw;
+        float rP = length(p - hcP) - u.halo.z * u.avatarRect.z;
+        bg += float3(1.0, 0.80, 0.50) * exp(-sq(rP / (cellH * 2.2))) * 0.055 * globalP;
+        // 翅膀（被她挡住的地方不画）：羽片在字缝里的柔光、细到半像素的羽轴（光纹理里存着到轴的有向距离），
+        // 肩胛后的根部辉光（只从她身体两侧溢出来），两颗腕星。
+        if (kWings && under.a < 0.98 && p.y > fx[kRange].x && p.y < fx[kRange].y) {
+            float4 wg = wingGlow.sample(lin, p / (fx[kWGlow].xy * fx[kWGlow].zw));
+            // 线是柔和的光痕，不是金属丝：芯宽一点、淡一点，外面一层更宽的晕
+            float hair = wg.a * (0.60 * exp(-sq(wg.b / (u.cellPx.x * 0.22))) + 0.35 * exp(-sq(wg.b / (u.cellPx.x * 0.9))));
+            float3 wl = wingTone(wg.g) * (wg.r * 0.42 + hair * 0.48);
+            float4 lt = fx[kWLight];
+            if (lt.w > 0.0) {
+                float rr = sq(fx[kWSea].w);
+                float rg = exp(-dot2(p - fx[kWRoot].xy) / rr) + exp(-dot2(p - fx[kWRoot].zw) / rr);
+                wl += float3(1.0, 0.95, 0.86) * rg * lt.w * 0.20;
+            }
+            float4 ws = fx[kWStar];
+            if (lt.y > 0.0) wl += float3(1.0, 0.95, 0.86) * wristStar(p, ws.xy, lt.x, u) * lt.y * 0.5;
+            if (lt.z > 0.0) wl += float3(1.0, 0.95, 0.86) * wristStar(p, ws.zw, lt.x, u) * lt.z * 0.5;
+            bg += wl * (1.0 - under.a);
+        }
+        if (kWings && fx[kWShock].w > 0.0) {   // 环形波在字缝里也透一点光
+            float4 sw = fx[kWShock];
+            bg += float3(1.0, 0.90, 0.72) * exp(-sq((length(p - sw.xy) - sw.z) / (cellH * 2.5))) * sw.w * 0.06 * (1.0 - under.a);
+        }
+        // 她照在海上的一层很淡的暖意（离她越近越暖）。
+        float2 dvP = (p - (u.avatarRect.xy + float2(0.48, 0.55) * u.avatarRect.zw)) / float2(1.0, 0.8);
+        bg += float3(1.0, 0.80, 0.52) * 0.012 * globalP / (1.0 + dot2(dvP) / sq(u.viewPx.y * 0.5));
+        // 浮现之前：汇聚的光点在字缝里也亮；心口的光慢慢聚起来，浮现开始后交给那道从心口漫开的柔光。
+        float g = u.style.z;
+        float2 hpP = u.avatarRect.xy + float2(u.look.x, u.look.w) * u.avatarRect.zw;
+        float hg = pow(smoothstep(0.1, 1.0, g), 1.5) * (1.0 - smoothstep(0.0, 0.45, u.avatar.x));
+        if (hg > 0.0) bg += float3(1.0, 0.90, 0.74) * exp(-dot2(p - hpP) / sq(cellH * (2.0 + 4.0 * g))) * hg * 0.26;
+        if (kGather && g < 1.0 && dot2(p - hpP) < sq(fx[kRange].z)) {
+            moteP = saturate(gatherMotes(p, fx, u));
+            bg += float3(1.0, 0.92, 0.80) * moteP * 0.14;   // 字缝里只透一点，主要是经过的字被点亮
+        }
+    }
+
+    // 字可能被挪到相邻格的位置上：看本格和周围 8 格，找把这个像素框住、且离它最近的那个字。
+    int2 c0 = int2(floor(p / u.cellPx));
+    int2 cell = c0;
+    float4 shock = kWings && u.avatar.w > 0.0 ? fx[kWShock] : float4(0.0);
+    float2 local = 0.0;
+    float4 fd = 0.0;
+    float best = 1e9;
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            int2 c = c0 + int2(i, j);
+            int2 g = clamp(c + 1, int2(0), int2(u.gridSize) - 1);
+            float4 f = field.read(uint2(g));
+            if (kWings && p.y > fx[kRange].x - u.cellPx.y && p.y < fx[kRange].y + u.cellPx.y) {   // 翅膀上的字不漂浮，和光线对齐
+                float4 wc = wingCells.read(uint2(g));
+                f.xy *= 1.0 - saturate(wc.r * 6.0);                    // 连续地“钉住”，羽轴挪动时字不跳
+            }
+            if (shock.w > 0.0) {   // 翅膀破开的一瞬，一道环形波把经过的字往外推一下
+                float2 dv = (float2(c) + 0.5) * u.cellPx - shock.xy;
+                float dl = length(dv);
+                f.xy += dv / max(dl, 1.0) * exp(-sq((dl - shock.z) / (cellH * 3.0))) * shock.w * cellH * 0.6;
+            }
+            float2 d = p - ((float2(c) + 0.5) * u.cellPx + f.xy);
+            float sn = sin(f.z), cs = cos(f.z);
+            float2 q = float2(cs * d.x + sn * d.y, -sn * d.x + cs * d.y);
+            if (abs(q.x) > u.cellPx.x * 0.5 || abs(q.y) > u.cellPx.y * 0.5) continue;
+            float score = dot2(q / u.cellPx);
+            if (score < best) { best = score; cell = c; local = q + u.cellPx * 0.5; fd = f; }
+        }
+    }
+    if (best > 1e8) return float4(bg, 1.0);
+
+    int2 gi = clamp(cell + 1, int2(0), int2(u.gridSize) - 1);
+    uint4 cd = cells.read(uint2(gi));
+    uint ch = cd.r;
+    uint cls = cd.g;
+    float2 cc = (float2(cell) + 0.5) * u.cellPx + fd.xy;  // 这个字此刻的中心（屏幕像素）
+
+    // 这一格要画的字。海面的字 chS 可能正淡成另一个字 chR（权重 mR）；她身上的字 chF（诗句）上面可能叠着
+    // 正在“做梦”变成的字母 chD（mD）或轮廓笔画 s0/s1（mE，两个方向按 sw 交叉淡化）。海与她按 wF 交叉淡化。
+    // 光环中线上的诗句字 chH 按 mH 盖在海面的字上。所有切换都是淡入淡出，没有硬切。
+    uint chS = ch, chR = 0U, chF = 0U, chD = 0U, s0 = 0U, s1 = 0U, chH = 0U;
+    float mR = 0.0, wF = 0.0, mD = 0.0, mE = 0.0, sw = 0.0, mH = 0.0;
+    float spaceFill = 1.0;   // 原本是空格、被人像/光环/光点补上字时的显现程度
+    float wv = 1.0;          // 字重：0 细 · 1 常规 · 2 半粗，可以是小数
+
+    // 字符偶尔被“改写”：每个字按 14.4 秒一个周期（一小时整 250 个），少数周期里它用 1.2 秒淡成另一个字，
+    // 停一会儿再淡回来。周期序号对 250 取模，时间每小时归零时被选中的字接得上。
+    if (ch != 32 && cls != 7) {
+        const float period = 14.4, fade = 1.2;
+        float tt = t + rand(cell, 3) * period;
+        float ep = floor(tt / period);
+        float tau = tt - ep * period;
+        uint e = uint(ep) % 250U;
+        if (rand(cell, e + 101U) < 0.02) {
+            chR = 33U + uint(rand(cell, e + 202U) * 93.0);
+            mR = smoothstep(0.0, fade, tau) * (1.0 - smoothstep(period - fade, period, tau));
+        }
+    }
+
+    // ---- 海面的灰，浪尖上的字反射白光；被弹开正在动的字也微微发白 ----
+    float3 glyph = mix(float3(1.0, 0.985, 0.96), float3(0.86, 0.95, 1.06), night) * classLevel(cls) * u.look.y;
+    glyph *= 1.0 + min(fd.w, 0.0);                                   // 波谷略暗
+    float crest = saturate(fd.w);
+    float3 moon = mix(float3(0.90, 0.91, 0.93), float3(0.84, 0.91, 1.0), night);
+    glyph = mix(glyph, moon, crest * 0.85);                          // 浪尖光带
+
+    // ---- 指针光晕：经过的字微微发亮 ----
+    float glowC = u.pointer.z * exp(-dot2(cc - u.pointer.xy) / sq(u.pointer.w));
+    glyph += float3(0.42, 0.56, 0.78) * glowC * 0.30;
+
+    // ---- 人像 ----
+    if (u.avatar.w > 0.0) {
+        float2 uvC = figureUV(cc, u);
+        float4 cs = figure.sample(mip, uvC, level(lod));
+        float4 cp = figure.sample(mip, uvP, level(max(lod - 1.5, 0.0)));
+        float aRim = figure.sample(mip, uvC, level(lod + 2.0)).a;
+        float aura = figure.sample(mip, uvC, level(6.5)).a;
+        float auraWide = figure.sample(mip, uvC, level(8.0)).a;
+        float global = smoothstep(0.0, 0.6, u.avatar.x) * (1.0 - smoothstep(0.3, 1.0, u.avatar.y));
+
+        float flash, release;
+        float vis = cellPresence(cell, uvC, u, flash, release);
+
+        // 轻微锐化（原色 + 与更模糊一层的差），五官、衣褶和发丝的明暗更清楚。
+        float4 cb = figure.sample(mip, uvC, level(lod + 1.5));
+        float3 colC = cs.rgb / max(cs.a, 1e-3);
+        colC = max(colC + 0.8 * (colC - cb.rgb / max(cb.a, 1e-3)), 0.0);
+        float3 colP = cp.rgb / max(cp.a, 1e-3);
+        // 脸只有十来个字宽、五六行高，画不出五官，只求“有一张脸朝着你”（神本无相）：
+        // 细节层占比加大，眼、眉、嘴相对周围的皮肤加深，透进字的笔画里；皮肤不再提亮成纯白，也不用半粗字重。
+        float face = 1.0 - smoothstep(0.55, 1.0, length((uvC - kFaceCenter) / kFaceRadius));
+        float3 col = mix(colC, colP, mix(0.55, 0.85, face));
+        if (face > 0.0) {
+            // 五官读出来靠的是“暗”，不是颜色：眼睛的橙褐色和头发同色，只有压暗才像眼睛。
+            // 比周围（模糊一层，约等于皮肤）暗多少，就按平方再暗下去；皮肤本身不变。
+            float3 ref = cb.rgb / max(cb.a, 1e-3);
+            float k = saturate(dot(col, float3(0.299, 0.587, 0.114)) / max(dot(ref, float3(0.299, 0.587, 0.114)), 1e-3));
+            col *= mix(1.0, k * k, face);
+        }
+        float luma = dot(col, float3(0.299, 0.587, 0.114));
+        col = max(mix(float3(luma), col, 1.3), 0.0);          // 缩小采样会冲淡颜色，补一点饱和度
+        float3 base = mix(col, float3(1.0, 0.93, 0.85), 0.08);
+        // 软肩曲线：中间调和原来的线性提亮差不多亮，白裙、皮肤这些亮处不再被截成一片纯白，衣褶和暖色层次留得住。
+        float3 fig = base * 1.45 / (1.0 + base * 0.45);
+        fig = max(fig, float3(0.20, 0.17, 0.15));          // 黑色缎带也留一点轮廓
+        float rim = saturate((cs.a - aRim) * 6.0);
+        fig += float3(1.0, 0.86, 0.62) * rim * 0.35;     // 轮廓一圈暖色边光
+
+        // 发丝很细，缩小到一个字大小后透明度只剩一半左右，整片长发会糊成一块。稀疏处改看更细一级的透明度：
+        // 格子中心落在发丝上，整格都是她的字（颜色饱满、不发灰）；落在发丝之间的空隙里，这格留给海面的字。
+        float aFine = figure.sample(mip, uvC, level(max(lod - 1.0, 0.0))).a;
+        float sparse = 1.0 - smoothstep(0.55, 0.9, cs.a);
+        float cover = smoothstep(0.02, 0.28, cs.a) * mix(1.0, smoothstep(0.12, 0.45, aFine), sparse);
+
+        // 赤足：只有十来个字宽、五六行高。肤色提亮、偏暖，脚下再托一小片柔和的光，
+        // 让脚背和脚趾的剪影从暗处浮出来，也像神明踮足立在光上。
+        float feet = smoothstep(0.905, 0.93, uvC.y);
+        fig = mix(fig, float3(1.0, 0.84, 0.76) * 1.12, 0.45 * feet);
+        float2 fq = (p - (u.avatarRect.xy + float2(0.41, 1.0) * u.avatarRect.zw)) / (u.avatarRect.z * float2(0.20, 0.05));
+        float pool = exp(-dot2(fq)) * global;
+        bg += float3(1.0, 0.80, 0.55) * pool * 0.13;
+        float a = cover * vis;
+        // 翅膀（在她身后、光环之后）：翼骨和羽轴上的格子是经文里的字，按色温着色（根部近白、羽身香槟金、
+        // 初级飞羽尖端银蓝），越靠根部越亮、越粗；羽片照亮落在其中的海面字（字不换，只是映成金色）。
+        float2 cc0 = (float2(cell) + 0.5) * u.cellPx;          // 这一格不漂浮时的中心
+        float4 wc = kWings ? wingCells.read(uint2(gi)) : float4(0.0);
+        float wingI = wc.r;
+        float wing = saturate(wingI * 2.0) * (1.0 - a);
+        float3 wingCol = wingTone(wc.g) * (0.42 + 0.58 * wingI);
+        float vaneC = 0.0;
+        float3 vaneCol = float3(0.0);
+        if (kWings && cc0.y > fx[kRange].x && cc0.y < fx[kRange].y) {
+            float4 wg = wingGlow.sample(lin, cc0 / (fx[kWGlow].xy * fx[kWGlow].zw));
+            vaneC = saturate(wg.r * 1.6) * (1.0 - a);
+            vaneCol = wingTone(wg.g) * (0.42 + 0.52 * saturate(wg.r));
+        }
+        // 光环：头后一圈金色的光，不随她轻摆，像悬在那里的天体，她在它前面浮动（被她挡住的部分不画）。
+        // 中线一行是那句诗，两侧各约一行淡金色的字；一道柔光沿圈缓慢流转。按格子不漂浮时的位置算，选中的格子不会变。
+        float2 hc = u.avatarRect.xy + u.halo.xy * u.avatarRect.zw;
+        float hr = u.halo.z * u.avatarRect.z;
+        float flow = 0.8 + 0.2 * sin(atan2(cc0.y - hc.y, cc0.x - hc.x) * 2.0 + t * hourly(0.35));
+        float ring = exp(-sq((length(cc0 - hc) - hr) / (cellH * 0.9))) * flow * vis * (1.0 - a);
+        chH = haloChar(cell, hc, hr, u.cellPx);
+        mH = chH != 0U && cls != 7 ? vis * (1.0 - a) : 0.0;
+        wing *= 1.0 - mH;                                   // 光环上的诗句在翅膀前面
+        vaneC *= 1.0 - mH;
+
+        // 上升的光点：四周的字像萤火一样慢慢往上飘。速度取整到“一小时整数格”，
+        // 格序号对它取模：出现后的秒数每小时归零时，光点接得上。
+        float speed = round((1.2 + rand(int2(cell.x, 0), 31) * 2.2) * HOUR) / HOUR;
+        float m = float(cell.y) + u.avatar.z * speed;
+        int laps = int(round(speed * HOUR));
+        int k = int(floor(m)) % laps;
+        k = k < 0 ? k + laps : k;
+        // 消散时，前沿刚扫过的地方光点格外密：她像是化作一把往上飘的光点散去。
+        float body = cover;
+        float density = 0.035 * (1.0 + 2.5 * u.avatar.y) + 0.30 * release * body;
+        float mote = step(1.0 - density, rand(int2(cell.x, k), 37)) * sin(PI * fract(m));
+        mote *= saturate(saturate(auraWide * 3.0) * (1.0 - body) * global + release * body);
+
+        // 人像、光环、光点落在空格上时补一个字，随它们的强弱淡入淡出。
+        if (chS == 32 && cls != 7) {
+            chS = kFill[uint(rand(cell, 5) * 39.99)];
+            spaceFill = max(max(smoothstep(0.2, 0.4, a), smoothstep(0.25, 0.45, ring)),
+                            max(smoothstep(0.2, 0.4, mote), smoothstep(0.25, 0.5, vaneC)));
+        }
+        spaceFill = max(spaceFill, mH);
+        // 组成她的字是情诗：每一行从诗句流里取连续的一段，相邻行取自不同位置（行距 173），文字本身不动。
+        // 出现/消散时（vis）、她轻摆使剪影边缘扫过格子时（cover），字形都在海里的字和诗句之间交叉淡化。
+        if (cls != 7 && u.look.z > 0.0) wF = max(smoothstep(0.2, 0.4, cover) * vis, wing);
+        if (wF > 0.0) {
+            uint n = uint(u.look.z);
+            uint idx = (uint(gi.y) * 173U + uint(gi.x)) % n;
+            uint vc = verses.read(uint2(idx % 2048U, idx / 2048U)).r;
+            chF = vc == 32U ? kFill[uint(rand(cell, 5) * 39.99)] : vc;
+            uint wch = uint(wc.b * 255.0 + 0.5);                  // 羽轴上的经文
+            if (wch > 32U && wing > smoothstep(0.2, 0.4, cover) * vis) chF = wch;
+
+            // 轮廓：剪影最外一圈换成顺着轮廓走向的笔画（- \ | /），长发、裙边和脚趾的线条更利落。
+            // 只在本格在人像里、且至少一个邻格基本在人像外时出现；“算不算轮廓”和方向都是连续的，
+            // 她轻摆时笔画淡入淡出，并在相邻两个方向之间交叉淡化。
+            float2 sx = float2(u.cellPx.x / u.avatarRect.z, 0.0), sy = float2(0.0, u.cellPx.y / u.avatarRect.w);
+            float aR = figure.sample(mip, uvC + sx, level(lod)).a, aL = figure.sample(mip, uvC - sx, level(lod)).a;
+            float aD = figure.sample(mip, uvC + sy, level(lod)).a, aU = figure.sample(mip, uvC - sy, level(lod)).a;
+            float gx = aR - aL, gy = aD - aU;
+            mE = smoothstep(0.16, 0.08, min(min(aR, aL), min(aD, aU))) * smoothstep(0.35, 0.55, length(float2(gx, gy)));
+            if (mE > 0.0) {
+                float ang = atan2(gx, -gy);                 // 切线方向（屏幕 y 向下），折到 0…π
+                ang = ang < 0.0 ? ang + PI : ang;
+                float f = ang / (PI * 0.25);                // 0 '-'  1 '\'  2 '|'  3 '/'  4 又是 '-'
+                float i0 = floor(f);
+                sw = smoothstep(0.3, 0.7, f - i0);
+                s0 = strokeChar(uint(i0) % 4U);
+                s1 = strokeChar((uint(i0) + 1U) % 4U);
+            }
+
+            // 完全显现后，每个字母各自按 9 秒一个周期“做梦”（一小时整 400 个）：少数周期里，它会在 2.6 秒内
+            // 慢慢淡成另一个同大小写的字母，再淡回原字，同时微微发亮。同一时刻只有零星几个字母在变，诗句始终读得出来。
+            bool lower = chF >= 97U && chF <= 122U, upper = chF >= 65U && chF <= 90U;
+            if (lower || upper) {
+                const float period = 9.0, span = 2.6;
+                float tt = t + rand(cell, 71) * period;
+                float epf = floor(tt / period);
+                float tau = tt - epf * period;
+                uint ep = uint(epf) % 400U;
+                if (tau < span && rand(cell, ep + 500U) < 0.09) {
+                    mD = sq(sin(PI * tau / span)) * smoothstep(0.9, 1.0, vis);
+                    chD = (lower ? 97U : 65U) + uint(rand(cell, ep + 900U) * 25.99);
+                }
+            }
+        }
+
+        float3 gold = float3(1.0, 0.80, 0.50);
+        glyph *= 1.0 - 0.12 * saturate(aura * 2.0) * global * (1.0 - cover);   // 身边的字略暗，衬出人像
+        glyph += gold * aura * global * 0.10;                             // 周围的灰字被映暖
+        glyph = mix(glyph, vaneCol, vaneC * 0.95);
+        if (kWings && fx[kWLight].w > 0.0) {   // 肩胛后的根部辉光照亮她身侧的字
+            float rr = sq(fx[kWSea].w);
+            float rg = exp(-dot2(cc0 - fx[kWRoot].xy) / rr) + exp(-dot2(cc0 - fx[kWRoot].zw) / rr);
+            glyph = mix(glyph, float3(1.0, 0.95, 0.86) * 0.85, saturate(rg * fx[kWLight].w * 0.55) * (1.0 - a));
+        }
+        glyph = mix(glyph, wingCol, wing);
+        glyph = mix(glyph, fig, a);
+        if (cls == 7) glyph = mix(glyph, float3(1.0, 0.93, 0.88), 0.3 * a);   // 心口那句话在她身上略微暖亮
+        // 光环带上的其他字压成暗金：既看得出一圈光，又给中线的诗句让出对比。
+        glyph = mix(glyph, gold * 0.42, saturate(ring) * 0.7 * (1.0 - mH));
+        glyph = mix(glyph, float3(1.0, 0.88, 0.62) * (0.85 + 0.15 * flow), mH);   // 光环上的诗句最亮
+        glyph = mix(glyph, float3(1.0, 0.92, 0.78), saturate(mote));
+        glyph += float3(1.0, 0.95, 0.85) * flash * cover * 0.6;
+        glyph = mix(glyph, float3(1.0, 0.95, 0.90), 0.22 * mD * a);   // 正在“做梦”的字母微微发亮
+        // 字重表现色调：亮处（白裙、皮肤）偏半粗，暗处（缎带、书）偏细体。按亮度连续过渡，她轻摆时字重不跳。
+        if (cls != 7) {
+            float lf = dot(fig, float3(0.299, 0.587, 0.114));
+            float hi = max(smoothstep(0.67, 0.77, lf) * (1.0 - face), smoothstep(0.4, 0.6, feet));
+            float lo = (1.0 - smoothstep(0.35, 0.45, lf)) * (1.0 - hi);
+            wv = mix(1.0, 1.0 + hi - lo, smoothstep(0.4, 0.6, a));
+            // 羽轴上的字：靠近根部半粗，往尖端渐细。
+            wv = mix(wv, mix(0.0, 1.6, wc.a), wing * (1.0 - smoothstep(0.4, 0.6, a)));
+            wv = mix(wv, 1.5, mH);
+        }
+        glyph += float3(1.0, 0.85, 0.62) * pool * 0.25 * (1.0 - a);   // 光里的海面字也被映暖
+
+        // 她的光照在海上：身边浪尖上的反光由月白转成暖金；还有一条碎金的光路竖着穿过她，
+        // 从远处（屏幕上方，窄、淡）一直铺到脚下和近处（宽、亮），只在浪尖上闪，像月光照出的那条路。
+        // 离她越近，浪尖上的反光越暖、越亮（按距离平方衰减，铺满大半个屏幕，远处仍是月白）；不在浪尖上的字也微微映暖。
+        float sY = saturate(cc.y / u.viewPx.y);
+        float pathX = cc.x - (u.avatarRect.x + 0.47 * u.avatarRect.z);
+        float path = exp(-sq(pathX / (u.avatarRect.z * (0.07 + 0.20 * sY)))) * mix(0.35, 1.0, sY);
+        float2 dvC = (cc - (u.avatarRect.xy + float2(0.48, 0.55) * u.avatarRect.zw)) / float2(1.0, 0.8);
+        float illum = 1.0 / (1.0 + dot2(dvC) / sq(u.viewPx.y * 0.5));
+        float lit = global * (1.0 - a);
+        glyph += (float3(1.0, 0.80, 0.52) - moon) * crest * 0.85 * saturate(illum * 1.2 + path) * lit;
+        glyph += float3(1.0, 0.82, 0.55) * crest * (0.25 * illum + 0.30 * path) * lit;
+        glyph += float3(1.0, 0.80, 0.52) * 0.035 * illum * lit;
+
+        // 翅膀：预备时肩胛后的光聚起，周围的海略暗（吸一口气）；破开时环形波经过的字亮一下；
+        // 展开后翼下的浪尖映出金色的反光，下扑之后一道金光顺着浪尖从翼下往两边推开。
+        if (kWings) {
+            float2 rc = 0.5 * (fx[kWRoot].xy + fx[kWRoot].zw);
+            float4 ws = fx[kWSea];
+            glyph *= 1.0 - 0.22 * ws.x * exp(-dot2(cc - rc) / sq(u.viewPx.y * 0.45)) * (1.0 - a);
+            if (shock.w > 0.0)
+                glyph += float3(1.0, 0.90, 0.72) * exp(-sq((length(cc0 - shock.xy) - shock.z) / (cellH * 3.0))) * shock.w * 0.95 * (1.0 - a);
+            float4 sp = fx[kWSpan];
+            float xn = abs(cc.x - rc.x) / max(cc.x < rc.x ? sp.x : sp.y, 1.0);
+            // 翼下的倒影：每只翅膀正下方的海面上一道碎金，只在浪尖上闪（随浪起伏、移动），
+            // 从翅膀下沿往下铺、往近处渐淡；和她身上竖着穿过的那条光路一起，是海上的三道光。
+            float yb = (cc.y - sp.w) / u.viewPx.y;                      // 在腕关节下面多远（屏幕高度的比例）
+            float below = smoothstep(0.22, 0.40, yb) * (1.0 - smoothstep(0.55, 0.88, yb));
+            float spanM = smoothstep(0.10, 0.32, xn) * (1.0 - smoothstep(0.70 * sp.z, 0.95 * sp.z, xn));
+            float colM = exp(-sq((xn - 0.48) / 0.26));                  // 倒影在翅膀中段最亮
+            float wave = ws.y >= 0.0 ? exp(-sq((xn - ws.y) / 0.08)) * (1.0 - ws.y) * smoothstep(0.05, 0.25, yb) : 0.0;
+            float refl = (ws.z * spanM * colM * below + wave) * (1.0 - a);
+            // 跟着浪面的明暗走：迎光的浪面亮、波谷暗，碎成一道道沿着浪排的金色，浪尖上最亮
+            // 每个字按自己的相位平滑地明灭，碎金一闪一闪（不是硬切）
+            float face = saturate(fd.w * 1.8 + 0.30);
+            float tw = 0.5 + 0.5 * sin(t * hourly(1.7) + rand(cell, 91) * 6.2832);
+            float glint = face * face * refl * (0.35 + 1.3 * tw * tw * tw);
+            glyph = mix(glyph, glyph * float3(1.12, 0.95, 0.72), saturate(refl * 0.5));   // 倒影里的月白转成暖金
+            glyph += float3(1.0, 0.82, 0.55) * glint * 1.2;
+        }
+
+        // 浮现之前（gather）：光点从四周的海面向她心口汇聚，经过的字被照亮；心口的光慢慢聚起来，
+        // I Love You 跟着慢慢亮起，等她浮现过半再慢慢回到平常。没有圈，也不压暗整片海，进出都是缓的。
+        float g = u.style.z;
+        float2 hp = u.avatarRect.xy + float2(u.look.x, u.look.w) * u.avatarRect.zw;
+        float hgC = pow(smoothstep(0.1, 1.0, g), 1.5) * (1.0 - smoothstep(0.0, 0.45, u.avatar.x));
+        if (hgC > 0.0) glyph = mix(glyph, float3(1.0, 0.92, 0.80), exp(-dot2(cc - hp) / sq(cellH * (2.2 + 3.5 * g))) * hgC * 0.7);
+        if (kGather) glyph = mix(glyph, float3(1.0, 0.94, 0.84), moteP * 0.85);
+        if (cls == 7) glyph = mix(glyph, float3(1.0, 0.92, 0.80),
+                                  0.85 * smoothstep(0.15, 1.0, g) * (1.0 - smoothstep(0.3, 0.8, u.avatar.x)));
+    }
+
+    // ---- 字形：按上面的权重把最多几张字形叠起来（权重为 0 或 1 的那张不采样） ----
+    float2 lp = clamp(local, 0.5, u.cellPx - 0.5);
+    float cov = 0.0;
+    if (wF < 1.0) {
+        float cs = mR < 1.0 ? glyphCov(atlas, chS, wv, lp, u) : 0.0;
+        if (mR > 0.0) cs = mix(cs, glyphCov(atlas, chR, wv, lp, u), mR);
+        if (mH > 0.0) cs = mix(cs, glyphCov(atlas, chH, wv, lp, u), mH);
+        cov = cs * spaceFill;
+    }
+    if (wF > 0.0) {
+        float cf = mD < 1.0 ? glyphCov(atlas, chF, wv, lp, u) : 0.0;
+        if (mD > 0.0) cf = mix(cf, glyphCov(atlas, chD, wv, lp, u), mD);
+        if (mE > 0.0) {
+            float ce = sw < 1.0 ? glyphCov(atlas, s0, wv, lp, u) : 0.0;
+            if (sw > 0.0) ce = mix(ce, glyphCov(atlas, s1, wv, lp, u), sw);
+            cf = mix(cf, ce, mE);
+        }
+        cov = mix(cov, cf, wF);
+    }
+
+    float3 outc = mix(bg, glyph, cov);
+    return float4(outc, 1.0);
+}

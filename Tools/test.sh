@@ -8,7 +8,8 @@
 #   Tools/test.sh visual diff <before> <after> [N]  rank pixel changes between two saved scene runs
 #   Tools/test.sh shaders [v|<name>|dump:<name>] translate + compile every WE shader
 #   Tools/test.sh steam                         check SteamCMD prompt parsing with a fake steamcmd
-#   Tools/test.sh lockloop scene|web <folder> [entry] [WxH]  record a Lock Screen loop to build/tools (no install)
+#   Tools/test.sh lockloop scene|web|codesea|prostrands <folder> [entry] [WxH]  record a Lock Screen loop to build/tools (no install)
+#   Tools/test.sh native codesea|prostrands <resource|-> render native wallpapers' key frames to build/tools/native
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/Lumen"
@@ -32,6 +33,13 @@ build_scene_harness() {
 }
 
 case "${1:-}" in
+  native)
+    kind="${2:?codesea or prostrands}"
+    swiftc -O -o "$OUT/native-harness" "$ROOT/Tools/NativeHarness/main.swift" \
+      "$SRC"/Engine/Native/CodeSea/CodeSea{Context,Core,Field,Text,Wings}.swift \
+      "$SRC"/Engine/Native/PROStrands/PROStrands{Core,Layout,Sim}.swift
+    "$OUT/native-harness" "$kind" "${3:--}" "$OUT/native"
+    ;;
   build|unit)
     cd "$ROOT"
     xcodegen generate >/dev/null
@@ -91,6 +99,8 @@ case "${1:-}" in
     find "$SRC" -name '*.swift' ! -name LumenApp.swift > "$OUT/app-sources.txt"
     xargs swiftc -O -D DEBUG -enable-bare-slash-regex -module-name Lumen -o "$OUT/loop-recorder" \
       "$ROOT/Tools/LoopRecorderTest/main.swift" < "$OUT/app-sources.txt"
+    # Native wallpapers load their shaders and text as bundle resources; a tool's bundle is its folder.
+    cp "$SRC"/Engine/Native/*/*.msl "$SRC"/Engine/Native/CodeSea/CodeSeaVerses.txt "$OUT/"
     "$OUT/loop-recorder" "$2" "$3" "${4:-$([[ "$2" == web ]] && echo index.html || echo scene.json)}" "$OUT/lockloop.mov" "$ASSETS" "${5:-2560x1664}"
     echo "movie: $OUT/lockloop.mov"
     ;;

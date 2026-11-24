@@ -13,7 +13,7 @@ struct WallpaperDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Space.xl) {
                     hero(wallpaper)
                     info(wallpaper)
-                    if wallpaper.kind != .web {
+                    if wallpaper.kind != .web && wallpaper.kind != .native {
                         FramingControls(wallpaper: wallpaper)
                     }
                     if let package = wallpaper.package, package.properties.contains(where: \.isEditable) {
@@ -97,8 +97,8 @@ struct WallpaperDetailView: View {
             } else if let package = wallpaper.package {
                 FlowLayout(spacing: Theme.Space.xs, lineSpacing: Theme.Space.xs) {
                     MetaChip(
-                        symbol: wallpaper.kind == .scene ? "square.3.layers.3d" : "globe",
-                        text: wallpaper.kind == .scene ? String(localized: "Scene") : "Web"
+                        symbol: wallpaper.kind == .scene ? "square.3.layers.3d" : wallpaper.kind == .native ? "sparkles" : "globe",
+                        text: wallpaper.kind == .scene ? String(localized: "Scene") : wallpaper.kind == .native ? "Live" : "Web"
                     )
                     if let width = package.width, let height = package.height, width > 0, height > 0 {
                         MetaChip(symbol: "rectangle.dashed", text: Format.resolution(width, height))

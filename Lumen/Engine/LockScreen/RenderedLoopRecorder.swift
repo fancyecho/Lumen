@@ -192,7 +192,7 @@ enum SceneLoopRecorder {
         try writer.finish()
     }
 
-    private static func draw(_ texture: MTLTexture, into target: MTLTexture, pipeline: MTLRenderPipelineState, rect: inout SIMD4<Float>,
+    static func draw(_ texture: MTLTexture, into target: MTLTexture, pipeline: MTLRenderPipelineState, rect: inout SIMD4<Float>,
                              sampler: MTLSamplerState, buffer: MTLCommandBuffer, clear: Bool, alpha: Float) {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target
@@ -210,7 +210,7 @@ enum SceneLoopRecorder {
     }
 
     /// The present pass with constant-alpha blending, for dissolving into the first frame.
-    private static func fadePipeline(device: MTLDevice) throws -> MTLRenderPipelineState {
+    static func fadePipeline(device: MTLDevice) throws -> MTLRenderPipelineState {
         let library = try device.makeLibrary(source: SceneUtilityPipelines.source, options: nil)
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name: "lumen_scene_present_vertex")

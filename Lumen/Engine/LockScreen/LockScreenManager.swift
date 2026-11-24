@@ -277,6 +277,7 @@ final class LockScreenManager {
         let display = NSScreen.screens.first?.pixelSize ?? CGSize(width: 3840, height: 2160)
         var scene: SceneLoopRecorder.Source?
         var web: LockScreenVideoBuilder.WebSource?
+        var native: LockScreenVideoBuilder.NativeSource?
         switch wallpaper.kind {
         case .scene:
             guard let package = wallpaper.package, let folder = library.packageFolder(for: wallpaper),
@@ -293,6 +294,11 @@ final class LockScreenManager {
                 return nil
             }
             web = LockScreenVideoBuilder.WebSource(source: source, properties: package.properties, values: package.resolvedValues)
+        case .native:
+            guard let package = wallpaper.package, let kind = NativeWallpaper(package: package) else { return nil }
+            native = LockScreenVideoBuilder.NativeSource(wallpaper: kind, folder: library.packageFolder(for: wallpaper),
+                                                         values: package.resolvedValues,
+                                                         backingScale: NSScreen.screens.first?.backingScaleFactor ?? 2)
         case .video, .shader:
             break
         }
@@ -307,6 +313,7 @@ final class LockScreenManager {
             shader: wallpaper.shader,
             scene: scene,
             web: web,
+            native: native,
             framing: wallpaper.resolvedFraming,
             scaling: settings.videoScaling,
             displaySize: display

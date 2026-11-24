@@ -23,6 +23,8 @@ enum LockScreenVideoBuilder {
         let scene: SceneLoopRecorder.Source?
         /// Web wallpapers: the page and its properties.
         let web: WebSource?
+        /// Native wallpapers: which one, the person's resources and its settings.
+        var native: NativeSource? = nil
         let framing: WallpaperFraming
         let scaling: VideoScaling
         /// Pixel size of the main display; the movie is rendered at (or under) this size.
@@ -32,7 +34,7 @@ enum LockScreenVideoBuilder {
             let parts: [String] = [
                 wallpaperID.uuidString, kind.rawValue, sourceURL?.lastPathComponent ?? "",
                 shader.map { StableHash.hex(of: $0) } ?? "",
-                (scene?.values ?? web?.values).map(Self.valuesKey) ?? "",
+                (scene?.values ?? web?.values ?? native?.values).map(Self.valuesKey) ?? "",
                 "\(framing.horizontal),\(framing.vertical),\(framing.zoom)", scaling.rawValue,
                 "\(Int(displaySize.width))x\(Int(displaySize.height))",
             ]
@@ -43,6 +45,14 @@ enum LockScreenVideoBuilder {
         private static func valuesKey(_ values: [String: PropertyValue]) -> String {
             values.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.jsonLiteral)" }.joined(separator: ",")
         }
+    }
+
+    struct NativeSource: Sendable {
+        let wallpaper: NativeWallpaper
+        let folder: URL?
+        let values: [String: PropertyValue]
+        /// Pixels per point of the display the movie is made for.
+        let backingScale: CGFloat
     }
 
     struct WebSource: Sendable {
@@ -97,6 +107,23 @@ enum LockScreenVideoBuilder {
             loop = workFolder.appending(path: "loop.mov")
             try await WebLoopRecorder.record(web.source, properties: web.properties, values: web.values,
                                              size: recordedSize(for: request.displaySize), to: loop) { progress($0 * 0.9) }
+        case .native:
+            guard let native = request.native else { throw Failure.noVideoTrack }
+            loop = workFolder.appending(path: "loop.mov")
+            let size = recordedSize(for: request.displaySize)
+            // Characters are drawn at a fixed point size, so record at the display's density
+            // (lowered with the picture when a large display is recorded at 4K).
+            let scale = max(1, native.backingScale * size.width / max(request.displaySize.width, 1))
+            try await Task.detached(priority: .utility) {
+                switch native.wallpaper {
+                case .codeSea:
+                    try CodeSea.recordLoop(avatarURL: native.folder.flatMap(CodeSea.avatarURL(in:)), values: native.values,
+                                           size: size, scale: scale, to: loop) { progress($0 * 0.9) }
+                case .proStrands:
+                    guard let image = native.folder.flatMap(PROStrands.imageURL(in:)) else { throw Failure.noVideoTrack }
+                    try PROStrands.recordLoop(imageURL: image, values: native.values, size: size, to: loop) { progress($0 * 0.9) }
+                }
+            }.value
         case .shader:
             guard let shader = request.shader else { throw Failure.noVideoTrack }
             loop = workFolder.appending(path: "loop.mov")

@@ -43,6 +43,7 @@ AppModel (@MainActor, 全局状态)
 | `Lumen/Engine/LockScreen` | 锁屏视频生成与安装；场景离屏录制、网页快照录制（`RenderedLoopRecorder.swift`） |
 | `Lumen/Engine/Audio` | 系统音频采集（Core Audio process tap）与频谱分析，供音频响应壁纸使用 |
 | `Lumen/Engine/Web` | Web 渲染器、`lumen-web://` 本地协议、注入的桥接脚本 |
+| `Lumen/Engine/Native` | 内置渲染代码的「原生壁纸」：用户自己做的代码海（`CodeSea/`）和 PRO 光丝（`PROStrands/`），从各自的独立 app 移植。`NativeWallpaper` 负责识别项目文件夹、导入资源、给出属性；着色器是 `.msl` 资源，运行时编译 |
 | `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（见下节） |
 | `Lumen/Library` | 资源库、导入（视频、WE 项目、网页）、缩略图、HEVC 转码、播放列表 |
 | `Lumen/Library/Steam` | SteamCMD 安装与驱动（伪终端）、创意工坊下载队列 |

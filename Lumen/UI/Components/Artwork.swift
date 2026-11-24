@@ -78,7 +78,7 @@ struct LiveWallpaperPreview: View {
             if let config = wallpaper.shader {
                 ShaderPreview(config: config, settings: shaderSettings)
             }
-        case .web, .scene:
+        case .web, .scene, .native:
             if rendersLive {
                 PackagePreview(wallpaper: wallpaper)
             } else if let url = model.library.previewURL(for: wallpaper) {

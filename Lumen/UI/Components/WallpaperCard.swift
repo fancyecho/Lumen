@@ -93,7 +93,7 @@ struct WallpaperCard: View {
                     if video.isHDR { ArtBadge(text: "HDR") }
                     if video.optimized != nil { ArtBadge(text: String(localized: "Optimized"), symbol: "bolt.fill") }
                 }
-            case .shader:
+            case .shader, .native:
                 ArtBadge(text: "Live", symbol: "sparkles")
             case .web:
                 ArtBadge(text: "Web", symbol: "globe")
@@ -175,6 +175,8 @@ struct WallpaperCard: View {
         case .scene:
             let category = WallpaperCategories.displayName(wallpaper.category)
             return String(localized: "Scene · \(category)")
+        case .native:
+            return String(localized: "Rendered live · \(WallpaperCategories.displayName(wallpaper.category))")
         }
     }
 

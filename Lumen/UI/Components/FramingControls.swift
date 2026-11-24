@@ -122,7 +122,7 @@ struct FramingControls: View {
             let zoom = max(start.zoom, 1)
             return (2 * translation.width / previewSize.width / zoom,
                     2 * translation.height / previewSize.height / zoom)
-        case .web:
+        case .web, .native:
             return (0, 0)
         case .video, .scene:
             let content: CGSize
@@ -315,7 +315,7 @@ struct FramedWallpaperPreview: NSViewRepresentable {
                 renderer.setActive(true)
                 scene = renderer
                 content = renderer.view
-            case .web:
+            case .web, .native:
                 return
             }
             content.frame = container.bounds

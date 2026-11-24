@@ -72,6 +72,15 @@ Tools/test.sh lockloop web "<项目文件夹>"
 ```
 
 把场景或网页壁纸录成锁屏用的循环视频（`build/tools/lockloop.mov`），**不安装到系统锁屏**。会编译整个 app 源码，第一次要几分钟。
+原生壁纸也可以录：`Tools/test.sh lockloop codesea "<资源库条目>/content"`（或 `prostrands`），文件夹里要有导入时复制的 `avatar.png` / `image.png`。
+
+```bash
+Tools/test.sh native codesea "<code-sea-wallpaper>/Resources/avatar.png"   # 不带人像就传 -
+Tools/test.sh native prostrands "<pro-native>/Resources/16InchPro.png"
+```
+
+用移植后的代码离屏渲染原生壁纸（代码海、PRO 光丝）的关键帧到 `build/tools/native`，并打印着色器编译、资源加载和各帧的 GPU 时间。人像和原图只从项目文件夹读取，不进仓库。
+GPU 时间受机器负载和频率爬升影响，跟原项目比较时，同一时刻跑一遍原项目自带的 `--bench`。
 
 ```bash
 Tools/test.sh steam

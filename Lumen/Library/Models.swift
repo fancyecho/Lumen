@@ -9,6 +9,9 @@ enum WallpaperKind: String, Codable, Hashable {
     case web
     /// A Wallpaper Engine scene, drawn by Lumen's Metal scene renderer.
     case scene
+    /// Drawn by renderer code built into Lumen (see `NativeWallpaper`); its package holds the
+    /// person's own resources, such as Code Sea's portrait.
+    case native
 
     /// Kinds that are drawn live by Lumen rather than decoded from a file.
     var isRendered: Bool { self != .video }
@@ -16,7 +19,10 @@ enum WallpaperKind: String, Codable, Hashable {
 
 struct Wallpaper: Identifiable, Codable, Hashable {
     var id: UUID
-    var kind: WallpaperKind
+    /// Native wallpapers are written to disk as `web` with a `native` package source. A build
+    /// without native support then decodes the library instead of failing on an unknown kind
+    /// (which leaves it empty and lets the next save erase it), and keeps the marker when it saves.
+    private var storedKind: WallpaperKind
     var title: String
     var category: String
     var author: String
@@ -24,13 +30,37 @@ struct Wallpaper: Identifiable, Codable, Hashable {
     var isFavorite: Bool = false
     var video: VideoAsset?
     var shader: ShaderConfig?
-    /// Web pages and Wallpaper Engine projects.
+    /// Web pages, Wallpaper Engine projects and native wallpapers' resources.
     var package: PackageAsset?
     /// Position and zoom on the display; nil means centred.
     var framing: WallpaperFraming?
 
+    var kind: WallpaperKind {
+        storedKind == .web && package?.source == NativeWallpaper.packageSource ? .native : storedKind
+    }
+
     var isBuiltin: Bool { BuiltinShaders.ids.contains(id) }
     var resolvedFraming: WallpaperFraming { framing ?? .centered }
+
+    init(id: UUID, kind: WallpaperKind, title: String, category: String, author: String, addedAt: Date,
+         isFavorite: Bool = false, video: VideoAsset? = nil, shader: ShaderConfig? = nil,
+         package: PackageAsset? = nil, framing: WallpaperFraming? = nil) {
+        self.id = id
+        storedKind = kind == .native ? .web : kind
+        self.title = title
+        self.category = category
+        self.author = author
+        self.addedAt = addedAt
+        self.isFavorite = isFavorite
+        self.video = video
+        self.shader = shader
+        self.package = package
+        self.framing = framing
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, storedKind = "kind", title, category, author, addedAt, isFavorite, video, shader, package, framing
+    }
 }
 
 struct VideoAsset: Codable, Hashable {
