@@ -45,7 +45,7 @@ AppModel (@MainActor, 全局状态)
 | `Lumen/Engine/Web` | Web 渲染器、`lumen-web://` 本地协议、注入的桥接脚本 |
 | `Lumen/Engine/Scene` | Wallpaper Engine 场景渲染器（见下节） |
 | `Lumen/Library` | 资源库、导入（视频、WE 项目、网页）、缩略图、HEVC 转码、播放列表 |
-| `Lumen/Library/Steam` | SteamCMD 安装与驱动（伪终端）、创意工坊下载队列 |
+| `Lumen/Library/Steam` | SteamCMD 安装与驱动（伪终端）、创意工坊下载队列；`WorkshopCatalog.swift` 免登录浏览创意工坊：公开浏览页按排序、搜索、标签返回结果，并把这一页的结果（标题、预览、大小、标签、订阅/收藏、星级、总页数）以 JSON 嵌在页面里，一次请求即可；解析不到时退回「页面里的条目链接 + `GetPublishedFileDetails`（无需 key）」。`WorkshopBrowser` 是挂在 `AppModel` 上的浏览状态（按页码加载，每页 30 条，最近 24 页缓存，侧边栏选中项）；`WorkshopPreviews` 负责预览图的磁盘缓存（`~/Library/Caches/app.lumen.Lumen/WorkshopPreviews`，上限 300MB）和首帧解码 |
 | `Lumen/UI` | 各页面：Home、Library、Playlists、Studio、Workshop、Detail、Settings、MenuBar |
 | `Lumen/Resources` | `Localizable.xcstrings`（zh-Hans）、资源目录 |
 | `Tools` | 命令行回归工具（不进 app target），见 `docs/TESTING.md` |
@@ -109,6 +109,8 @@ AppModel (@MainActor, 全局状态)
 | `-LumenDebugRoute wallpaper:<uuid>` / `studio:<uuid>` / `playlists` | 启动后直接打开某页 |
 | `-LumenDebugImport <folder,folder>` | 启动时导入 WE 项目文件夹 |
 | `-LumenDebugApply <title>` | 把指定标题的壁纸设为桌面（**测试后记得还原**） |
+| `-LumenDebugDelete <uuid>` | 用正常的删除流程删掉测试时加入的壁纸（清理用，只删自己加的） |
 | `-LumenDebugSteam YES` | 启动时打开 Steam 面板 |
 | `-LumenDebugMenuPreview YES` | 在普通窗口里显示菜单栏面板 |
+| `-LumenDebugWindowSize 1280x840` | 主窗口按指定内容尺寸打开，用于检查布局（截图请用真实窗口截图；`-LumenDebugCaptureDir` 的离屏截图画不出 Liquid Glass 和深色外观） |
 | `SceneLoader.debugLayerFilter` | 只加载指定对象 id（`Tools/test.sh scenes <id> <time> <object ids>`） |

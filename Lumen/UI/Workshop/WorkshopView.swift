@@ -16,72 +16,134 @@ enum WorkshopFilter: String, CaseIterable, Identifiable {
     }
 }
 
-/// Wallpaper Engine projects already on this Mac (Steam Workshop downloads, other apps,
-/// chosen folders), ready to add to the library.
+enum WorkshopMode: String {
+    /// The live Steam Workshop, browsed and downloaded in-app.
+    case steam
+    /// Wallpaper Engine projects already on this Mac (Steam's download folder, other apps, chosen folders).
+    case local
+}
+
+/// The Workshop tab: the live Steam Workshop, or the projects already on this Mac.
 struct WorkshopView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("workshopSource") private var source: WorkshopMode = .steam
+    @AppStorage("workshopInspector") private var showsInspector = true
     @State private var filter: WorkshopFilter = .all
 
+    private var inspectorVisible: Bool { source == .steam && showsInspector }
+
     var body: some View {
-        let workshop = model.workshop
-        let projects = filtered
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.xl) {
-                PageHeader(eyebrow: "Wallpaper Engine", title: "Workshop", subtitle: subtitle) {
-                    GlassEffectContainer(spacing: Theme.Space.xs) {
-                        HStack(spacing: Theme.Space.xs) {
-                            Button {
-                                model.isSteamPanelPresented = true
-                            } label: {
-                                Label("Download from Steam", systemImage: "arrow.down.circle")
-                            }
-                            .buttonStyle(.glassProminent)
-                            Button {
-                                chooseFolder()
-                            } label: {
-                                Label("Add Folder…", systemImage: "folder.badge.plus")
-                            }
-                            .buttonStyle(.glass)
-                            Button {
-                                workshop.scan()
-                            } label: {
-                                Label("Refresh", systemImage: "arrow.clockwise")
-                            }
-                            .buttonStyle(.glass)
-                            .disabled(workshop.isScanning)
+        HStack(alignment: .top, spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                        header
+                            .id(Self.topAnchor)
+                        if source == .steam {
+                            SteamWorkshopSection()
+                        } else {
+                            localContent
                         }
                     }
+                    .padding(.leading, Theme.Space.page)
+                    .padding(.trailing, inspectorVisible ? Theme.Space.xl : Theme.Space.page)
+                    .padding(.top, Theme.Space.lg)
+                    .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+                    .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
-                if model.settings.sceneAssets == nil && workshop.projects.contains(where: { $0.kind == .scene }) {
-                    AssetsNotice()
-                }
-                controls(projects)
-                if workshop.isScanning && workshop.projects.isEmpty {
-                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 60)
-                } else if projects.isEmpty {
-                    emptyState
-                } else {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 256, maximum: 380), spacing: Theme.Space.lg, alignment: .top)],
-                        alignment: .leading,
-                        spacing: Theme.Space.xl
-                    ) {
-                        ForEach(projects) { project in
-                            WorkshopCard(project: project)
-                        }
-                    }
+                // A new page starts at the top, like turning a page.
+                .onChange(of: model.workshopBrowser.page) {
+                    // After the grid swaps to placeholders, so an animation can't be cut short mid-way.
+                    Task { @MainActor in proxy.scrollTo(Self.topAnchor, anchor: .top) }
                 }
             }
-            .padding(.horizontal, Theme.Space.page)
-            .padding(.top, Theme.Space.lg)
-            .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
-            .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            if inspectorVisible {
+                WorkshopInspector()
+                    .frame(width: 340)
+                    .padding(.trailing, Theme.Space.md)
+                    .padding(.top, Theme.Space.sm)
+                    .padding(.bottom, Theme.Space.md)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
-        .task { if workshop.lastScan == nil { workshop.scan() } }
+        .animation(Theme.Motion.smooth, value: inspectorVisible)
+        .task(id: source) {
+            if source == .local, model.workshop.lastScan == nil { model.workshop.scan() }
+        }
+    }
+
+    private static let topAnchor = "workshop-top"
+
+    private var header: some View {
+        PageHeader(eyebrow: "Wallpaper Engine", title: "Workshop", subtitle: subtitle) {
+            HStack(spacing: Theme.Space.sm) {
+                GlassSegmentedControl(
+                    selection: $source,
+                    options: [
+                        .init(value: .steam, title: "Steam Workshop", symbol: "globe"),
+                        .init(value: .local, title: "On This Mac", symbol: "laptopcomputer"),
+                    ]
+                )
+                if source == .steam {
+                    SteamAccountControl()
+                } else {
+                    localActions
+                }
+            }
+        }
+    }
+
+    private var localActions: some View {
+        let workshop = model.workshop
+        return HStack(spacing: Theme.Space.xs) {
+            Button {
+                chooseFolder()
+            } label: {
+                Label("Add Folder…", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.lumenSecondary)
+            Button {
+                workshop.scan()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.lumenIcon)
+            .disabled(workshop.isScanning)
+            .help("Refresh")
+            .accessibilityLabel(Text("Refresh"))
+        }
+    }
+
+    @ViewBuilder
+    private var localContent: some View {
+        let workshop = model.workshop
+        let projects = filtered
+        if model.settings.sceneAssets == nil && workshop.projects.contains(where: { $0.kind == .scene }) {
+            AssetsNotice()
+        }
+        controls(projects)
+        if workshop.isScanning && workshop.projects.isEmpty {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 60)
+        } else if projects.isEmpty {
+            emptyState
+        } else {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 260, maximum: 400), spacing: Theme.Space.xl, alignment: .top)],
+                alignment: .leading,
+                spacing: Theme.Space.xxl
+            ) {
+                ForEach(projects) { project in
+                    WorkshopCard(project: project)
+                }
+            }
+        }
     }
 
     private var subtitle: String {
+        if source == .steam {
+            return String(localized: "Browse Wallpaper Engine's Steam Workshop and download straight into your library.")
+        }
         let workshop = model.workshop
         let names = workshop.sources.map(\.title)
         if names.isEmpty { return String(localized: "No Wallpaper Engine folders found on this Mac yet.") }
@@ -107,7 +169,7 @@ struct WorkshopView: View {
                 } label: {
                     Label("Add \(addable.count) to Library", systemImage: "plus")
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.lumenSecondary)
                 .fixedSize()
                 .disabled(!model.library.importJobs.isEmpty)
             }
@@ -115,27 +177,10 @@ struct WorkshopView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: Theme.Space.sm) {
-            Image(systemName: "shippingbox")
-                .font(.system(size: 38, weight: .light))
-                .foregroundStyle(Theme.accent)
-            Text("Nothing here yet").font(Theme.display(22))
-            Text("Lumen looks in Steam's Wallpaper Engine Workshop folder and other apps' libraries. You can also add a folder of projects, for example one copied from a Windows PC.")
-                .font(Theme.TypeScale.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 480)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
-                .fill(Theme.Surface.base)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
-                .foregroundStyle(Theme.Surface.strokeHover)
+        EmptyStatePanel(
+            symbol: "shippingbox",
+            title: String(localized: "Nothing here yet"),
+            message: String(localized: "Lumen looks in Steam's Wallpaper Engine Workshop folder and other apps' libraries. You can also add a folder of projects, for example one copied from a Windows PC.")
         )
     }
 
@@ -186,8 +231,8 @@ private struct WorkshopCard: View {
     private var existing: Wallpaper? { project.workshopID.flatMap { model.library.wallpaper(workshopID: $0) } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
-            // Place preview inside `.overlay` on a fixed 16:9 surface so square 512×512 Workshop previews never stretch the grid.
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 1) {
+            // Preview sits in `.overlay` on a fixed 16:9 surface so square 512×512 Workshop previews never stretch the grid.
             Theme.Surface.mediaFill
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
                 .overlay {
@@ -200,14 +245,14 @@ private struct WorkshopCard: View {
                     } else {
                         Image(systemName: kindSymbol)
                             .font(.system(size: 22, weight: .light))
-                            .foregroundStyle(.quaternary)
+                            .foregroundStyle(Theme.Ink.quaternary)
                     }
                 }
                 .overlay {
                     LinearGradient(
                         stops: [
-                            .init(color: .clear, location: 0.50),
-                            .init(color: .black.opacity(hovering ? 0.62 : 0.42), location: 1),
+                            .init(color: .clear, location: 0.5),
+                            .init(color: .black.opacity(hovering ? 0.6 : 0.38), location: 1),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -216,31 +261,39 @@ private struct WorkshopCard: View {
                 }
                 .clipped()
                 .overlay(alignment: .topLeading) {
-                    HStack(spacing: Theme.Space.xxs) {
-                        ArtBadge(text: kindLabel, symbol: kindSymbol)
-                        if let rating = project.contentRating, rating != "Everyone" { ArtBadge(text: rating) }
+                    if let rating = project.contentRating, rating != "Everyone" {
+                        ArtBadge(text: rating).padding(Theme.Space.sm - 2)
                     }
-                    .padding(Theme.Space.sm - 2)
                 }
-                .overlay(alignment: .bottomTrailing) { action.padding(Theme.Space.sm - 2) }
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
-                        .strokeBorder(hovering ? Theme.Surface.strokeHover : Theme.Surface.stroke, lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(hovering ? 0.45 : 0.26), radius: hovering ? 20 : 12, y: hovering ? 10 : 6)
-                .scaleEffect(hovering && !reduceMotion ? 1.015 : 1)
+                .overlay(alignment: .topTrailing) {
+                    if existing != nil {
+                        ArtBadge(text: String(localized: "In Library"), symbol: "checkmark")
+                            .padding(Theme.Space.sm - 2)
+                    } else if !project.isSupported {
+                        ArtBadge(text: String(localized: "Windows only"))
+                            .padding(Theme.Space.sm - 2)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    // Actions appear on hover, like library cards, so the grid stays a calm wall of artwork.
+                    if hovering {
+                        action
+                            .padding(Theme.Space.sm - 2)
+                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .bottomTrailing)))
+                    }
+                }
+                .artworkFrame(isHovering: hovering)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: project.title)
                     .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
                     .lineLimit(1)
                 Text(verbatim: tagsLine)
                     .font(Theme.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 2)
         }
         .onHover { hovering = $0 }
         .animation(reduceMotion ? nil : Theme.Motion.snappy, value: hovering)
@@ -248,8 +301,7 @@ private struct WorkshopCard: View {
     }
 
     private var tagsLine: String {
-        let joined = project.tags.prefix(3).joined(separator: " · ")
-        return joined.isEmpty ? kindLabel : joined
+        ([kindLabel] + project.tags.prefix(2)).joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -258,21 +310,17 @@ private struct WorkshopCard: View {
             Button {
                 model.router.open(.wallpaper(existing.id))
             } label: {
-                Label("In Library", systemImage: "checkmark")
-                    .font(.system(size: 11.5, weight: .semibold))
+                Label("Open", systemImage: "arrow.up.right")
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.lumenSecondary)
         } else if project.isSupported {
             Button {
                 model.importWorkshop([project])
             } label: {
-                Label("Add", systemImage: "plus")
-                    .font(.system(size: 11.5, weight: .semibold))
+                Label("Add to Library", systemImage: "plus")
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.lumenPrimary)
             .disabled(model.library.importJobs.contains { $0.name == project.folder.lastPathComponent })
-        } else {
-            ArtBadge(text: String(localized: "Windows only"))
         }
     }
 
@@ -323,22 +371,19 @@ enum WorkshopThumbnails {
 struct AssetsNotice: View {
     var body: some View {
         HStack(spacing: Theme.Space.md) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Theme.paused)
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Theme.paused.opacity(0.15)))
+            IconWell(symbol: "exclamationmark.triangle.fill", tint: Theme.paused, size: 36)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Scenes need Wallpaper Engine's shared assets")
                     .font(Theme.TypeScale.cardTitle)
+                    .foregroundStyle(Theme.Ink.primary)
                 Text("Scenes use shaders and effects that ship with Wallpaper Engine, not with each Workshop item. Point Lumen at an assets folder in Settings › Wallpaper Engine.")
                     .font(Theme.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: Theme.Space.sm)
             SettingsLink { Text("Open Settings") }
-                .buttonStyle(.glass)
+                .buttonStyle(.lumenSecondary)
         }
         .padding(Theme.Space.md)
         .lumenSurface(radius: Theme.Radius.lg, stroke: Theme.paused.opacity(0.32))

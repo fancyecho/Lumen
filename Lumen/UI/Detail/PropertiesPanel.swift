@@ -9,39 +9,24 @@ struct PropertiesPanel: View {
     var body: some View {
         let values = package.resolvedValues
         let visible = package.properties.filter { $0.isEditable && WEProperty.conditionHolds($0.condition, values: values) }
-        VStack(alignment: .leading, spacing: Theme.Space.md) {
-            HStack(spacing: Theme.Space.sm) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Theme.accentSoft))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Customize").font(Theme.TypeScale.cardTitle)
-                    Text("\(visible.count) options · applied live")
-                        .font(Theme.TypeScale.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Spacer(minLength: Theme.Space.sm)
-                if !package.values.isEmpty {
-                    Button("Reset") { model.resetProperties(for: wallpaper.id) }
-                        .buttonStyle(.glass)
-                }
+        LumenPanel(
+            symbol: "slider.horizontal.3",
+            title: "Customize",
+            subtitle: String(localized: "\(visible.count) options · applied live")
+        ) {
+            if !package.values.isEmpty {
+                Button("Reset") { model.resetProperties(for: wallpaper.id) }
+                    .buttonStyle(.lumenSecondary)
             }
-
+        } content: {
             if visible.isEmpty {
                 Text("Nothing to customize with the current options.")
                     .font(Theme.TypeScale.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { index, property in
-                        if index > 0 {
-                            Rectangle()
-                                .fill(Theme.Surface.divider)
-                                .frame(height: 1)
-                        }
+                        if index > 0 { HairlineDivider() }
                         PropertyRow(property: property, value: values[property.id] ?? property.defaultValue) { newValue in
                             let stored: PropertyValue? = newValue == property.defaultValue ? nil : newValue
                             model.setProperty(stored, key: property.id, for: wallpaper.id)
@@ -51,8 +36,6 @@ struct PropertiesPanel: View {
                 }
             }
         }
-        .padding(Theme.Space.lg)
-        .lumenSurface(radius: Theme.Radius.xl)
     }
 }
 
@@ -65,8 +48,9 @@ private struct PropertyRow: View {
         HStack(alignment: .center, spacing: Theme.Space.md) {
             Text(verbatim: property.label)
                 .font(Theme.TypeScale.body)
+                .foregroundStyle(Theme.Ink.primary)
                 .lineLimit(2)
-                .frame(minWidth: 160, idealWidth: 210, maxWidth: 240, alignment: .leading)
+                .frame(minWidth: 140, idealWidth: 200, maxWidth: 240, alignment: .leading)
             Spacer(minLength: Theme.Space.xs)
             control
         }
@@ -89,11 +73,11 @@ private struct PropertyRow: View {
                     in: lower...upper
                 )
                 .controlSize(.small)
-                .frame(minWidth: 160, maxWidth: 320)
+                .frame(minWidth: 140, maxWidth: 320)
                 Text(verbatim: formatted(value.doubleValue))
                     .font(Theme.TypeScale.caption.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
                     .frame(width: 54, alignment: .trailing)
             }
         case .combo:

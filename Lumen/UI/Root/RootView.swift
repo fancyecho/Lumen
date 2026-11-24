@@ -17,6 +17,8 @@ struct RootView: View {
             page
                 .id(pageID)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 6)))
+                // Content scrolling under the toolbar fades out softly instead of colliding with its buttons.
+                .scrollEdgeEffectStyle(.soft, for: .top)
         }
         .animation(reduceMotion ? nil : Theme.Motion.smooth, value: pageID)
         .safeAreaBar(edge: .bottom) {
@@ -133,6 +135,12 @@ struct RootView: View {
             .frame(minWidth: 360, idealWidth: 420, maxWidth: 450)
         }
 
+        if showsDownloads {
+            ToolbarItem(placement: .primaryAction) {
+                DownloadsToolbarButton()
+            }
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
             DisplaysMenu()
             SettingsLink {
@@ -148,8 +156,8 @@ struct RootView: View {
                 Button("Videos, Projects or Folders…") { model.isImporterPresented = true }
                 Button("Web Page…") { model.isWebPageSheetPresented = true }
                 Divider()
-                Button("Wallpaper Engine Projects on This Mac") { model.router.show(.workshop) }
-                Button("Download from Steam Workshop…") { model.isSteamPanelPresented = true }
+                Button("Browse the Steam Workshop") { showWorkshop(.steam) }
+                Button("Wallpaper Engine Projects on This Mac") { showWorkshop(.local) }
             } label: {
                 Label("Add Wallpaper", systemImage: "plus")
                     .labelStyle(.titleAndIcon)
@@ -157,11 +165,25 @@ struct RootView: View {
                 model.isImporterPresented = true
             }
             .menuStyle(.button)
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.glass)
             .fixedSize()
             .help("Add videos, Wallpaper Engine projects or web pages (⌘O)")
         }
         .sharedBackgroundVisibility(.hidden)
+    }
+
+    /// Workshop downloads in the toolbar: always on the Workshop tab once there are any, elsewhere
+    /// only while something is still downloading.
+    private var showsDownloads: Bool {
+        let downloads = model.steam.downloads
+        guard !downloads.isEmpty else { return false }
+        return model.router.tab == .workshop || downloads.contains { !$0.isFinished }
+    }
+
+    private func showWorkshop(_ mode: WorkshopMode) {
+        // The Workshop page keeps its mode in this key (@AppStorage there).
+        UserDefaults.standard.set(mode.rawValue, forKey: "workshopSource")
+        model.router.show(.workshop)
     }
 
     private func windowAppeared() {
@@ -169,6 +191,15 @@ struct RootView: View {
         #if DEBUG
         if UserDefaults.standard.bool(forKey: "LumenDebugMenuPreview") {
             openWindow(id: SceneID.menuPreview)
+        }
+        // `-LumenDebugWindowSize 1280x840` opens the main window at an exact size for layout checks.
+        let requested = (UserDefaults.standard.string(forKey: "LumenDebugWindowSize") ?? "").split(separator: "x").compactMap { Double($0) }
+        if requested.count == 2 {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                NSApp.windows.first { $0.isVisible && $0.level == .normal && $0.frame.width >= 900 }?
+                    .setContentSize(NSSize(width: requested[0], height: requested[1]))
+            }
         }
         if let dir = UserDefaults.standard.string(forKey: "LumenDebugCaptureDir"), !dir.isEmpty {
             Task { @MainActor in await runDebugCapture(to: URL(fileURLWithPath: dir)) }
@@ -294,9 +325,10 @@ struct ToastOverlay: View {
     var body: some View {
         if let toast = model.toast {
             HStack(spacing: Theme.Space.xs) {
-                Image(systemName: toast.symbol).foregroundStyle(Theme.accent)
+                Image(systemName: toast.symbol).foregroundStyle(Theme.accentInk)
                 Text(toast.message)
                     .font(Theme.TypeScale.bodyMedium)
+                    .foregroundStyle(Theme.Ink.primary)
                     .lineLimit(2)
             }
             .padding(.horizontal, Theme.Space.md)
@@ -312,15 +344,14 @@ struct DropTargetOverlay: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.6)
-            VStack(spacing: Theme.Space.sm) {
-                Image(systemName: "square.and.arrow.down.on.square")
-                    .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(Theme.accent)
+            VStack(spacing: Theme.Space.md) {
+                IconWell(symbol: "square.and.arrow.down.on.square", size: 60)
                 Text("Drop to add to your library")
-                    .font(Theme.display(22))
+                    .font(Theme.TypeScale.panelTitle)
+                    .foregroundStyle(Theme.Ink.primary)
                 Text("Videos · Wallpaper Engine projects · HTML folders")
                     .font(Theme.TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Ink.secondary)
             }
             .padding(.horizontal, 56)
             .padding(.vertical, 44)
@@ -330,8 +361,8 @@ struct DropTargetOverlay: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.xxl, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [9, 7]))
-                    .foregroundStyle(Theme.accent.opacity(0.85))
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [8, 7]))
+                    .foregroundStyle(Theme.accentInk.opacity(0.8))
             )
         }
         .ignoresSafeArea()
