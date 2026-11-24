@@ -31,6 +31,9 @@ Tools/test.sh scenes
 - 设 `LUMEN_FAKE_AUDIO=1` 会注入一段假频谱（低音强、高音弱），用来检查音频响应的着色器、粒子和脚本。
 - 设 `LUMEN_POINTER=0.3,0.6`（单个归一化屏幕坐标，左上 `0,0`、右下 `1,1`）或 `LUMEN_POINTER=0.2,0.7;0.8,0.3`（分号分隔的多段路径）会注入模拟鼠标，用来验证跟随鼠标的粒子、着色器和交互效果；启用时默认以 30fps 连续模拟 30 帧（可用 `LUMEN_FRAMES=60` 调整）。
 - 默认按 app 的 Balanced 场景预算（6MP）和 2560×1600 屏渲染；`LUMEN_DISPLAY=2560x1664`、`LUMEN_BUDGET=2000000` 可改。
+- `LUMEN_SCRIPT_ERRORS=1`：把每个场景里脚本抛出的异常（去重后）写进 `build/tools/scenes.log`，用来普查缺失的脚本 API。注意 `test.sh scenes` 的终端输出只保留 OK/FAIL 行，其余都在 `scenes.log`。
+- 热门场景语料：`LUMEN_SCENE_CORPUS=build/we-corpus-popular`（17 个创意工坊热门场景，`downloads.json` 记录来源）。
+- `LUMEN_FRAMES=360 Tools/test.sh scenes "" 0`：从 0 秒连续模拟 12 秒再截图。默认只渲染起始时刻后的 3 帧，脚本定时器和逐渐积累的粒子都来不及跑。
 - `LUMEN_BENCH=1`：每个场景连续渲染 60 帧取 GPU 时间中位数（GPU 频率升上来后的数字，比默认的单帧数字稳定）。
 - `LUMEN_MEMORY=1`：打印每个场景加载后的 GPU 内存。
 

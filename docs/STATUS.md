@@ -32,7 +32,7 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-23 收尾阶段全部合并后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景）
+**回归基线**（2026-11-24 合并 T31/T33 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景；另有 17 个创意工坊热门场景语料 `build/we-corpus-popular`，用 `LUMEN_SCENE_CORPUS` 指定，92/92 加载、206/206 着色器通过）
 
 | 项目 | 基线 |
 |---|---|
@@ -77,10 +77,13 @@
 | T26 | 能耗与稳定：按 GPU 实测自适应分辨率、加载失败与内存压力降级、长时间播放稳定性检查 | 引擎 | 中 | 完成 | gpt | 已合并 `main`（`e92c19a`）：按实测 GPU 时间自动降档、内存压力与加载失败降级、`Tools/test.sh stability` |
 | T27 | 发布准备（暂不公证）：自签名证书固定签名身份、DMG 打包脚本、安装说明、开机启动、检查更新、本地崩溃记录 | 发布 | 中 | 完成 | gpt | 已合并 `main`（`1915d89`）：`Tools/make-signing-identity.sh`（用户本人运行）、`Tools/release.sh`、`docs/INSTALL.md`、开机启动、检查更新、MetricKit 本地记录。0.1.0 DMG 为临时签名 |
 | T28 | 粒子控制点跟随鼠标：发射器、`mapsequencearoundcontrolpoint`/`betweencontrolpoints`、`vortex` 等以控制点为中心；测试工具支持模拟指针 | 场景 | 高 | 完成 | gemini | 已合并 `main`（`22b3a36`）：控制点统一解析（跟随鼠标/世界空间/父级链接）、发射器跟随控制点、`mapsequence*`、`vortex` 控制点；`LUMEN_POINTER` 模拟指针 |
-| T31 | 导入用户自己做的动态壁纸：PRO 光丝（三个网页版 + 原生版）和代码海（原生），不适配的地方做适配 | 引擎 | 高 | 待验证 | claude | 分支 `claude/T31-import-own-wallpapers`（工作树 `build/worktrees/claude-T31`）：新增「原生壁纸」类型，移植两个原生 app 的渲染器；网页渲染器补指针离开事件。五个条目已导入用户资源库。待合并后在桌面实测鼠标交互 |
+| T31 | 导入用户自己做的动态壁纸：PRO 光丝（原生版，即 GitHub `pro-strands-wallpaper`）和代码海（原生），不适配的地方做适配 | 引擎 | 高 | 完成 | claude | 已合并 `main`（`322d3bb`）：新增「原生壁纸」类型，移植两个原生 app 的渲染器；网页渲染器补指针离开事件。用户反馈「屏幕上不能正常显示」是因为当时运行的构建不含本分支，合并后已在真实桌面确认代码海正常渲染和动画 |
 | T29 | 父层 alpha 不再乘到子图层（只传可见性和变换），用 T17 打分验证 | 场景 | 高 | 完成 | gpt | 已合并 `main`（`c5afad0`）：普通父层只传可见性和变换；「清风」印章恢复；`Tools/test.sh visual diff` 前后对比 |
 | T30 | 界面重设计（第二轮）：氛围背景按壁纸取色并控亮度、首页「舞台」、卡片/列表双视图、详情页信息栏、统一面板组件、播放条与菜单栏面板；同步改写 `docs/DESIGN.md` | UI | 高 | 完成 | claude | 分支 `claude/T30-ui-redesign`。第二轮：降紫色饱和度、自绘按钮、对齐。第三轮：菜单栏面板改成整幅作品铺满；创意工坊改为 app 内的 Steam 创意工坊。第四轮：页码分页、工具栏下载进度、完整排序与筛选、可显隐的预览侧边栏。用户确认后已合并到 `main` |
 | T32 | 场景/网页高清封面帧：很多创意工坊场景只带 160–256px 的预览 GIF，卡片和首页舞台发虚。从实时渲染（详情页预览或桌面渲染器）抓一帧 ≥1920px 存为封面，`ThumbnailCache` 优先用它 | 场景/UI | 中 | 待认领 | — | 需要渲染器提供读回帧的接口，属跨模块改动，先在交接日志写明 |
+| T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
+| T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层）。做法建议：按模型路径或 `getInitialLayerConfig` 克隆已有图层，渲染时多画一份 | 场景 | 高 | 待认领 | — | 改动在 `SceneInstance` 的绘制循环，先在交接日志写明 |
+| T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -94,6 +97,34 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-24 · claude · T31 合并到 `main`、T33 引擎可靠性（已合并 `main`）
+
+- **用户反馈 1：PRO 光丝版本不对。**
+  - 用户给的 GitHub 仓库 `fancyecho/pro-strands-wallpaper` 与已移植的 `pro-native` 逐文件一致（最新提交 `554a74b`），资源库里的「PRO 光丝」就是这个版本。
+  - 不对的是三个网页版，用户已自行删除。
+- **用户反馈 2：代码海和光丝在屏幕上不能正常显示。**
+  - 原因：用户运行的是界面会话的构建，不含原生壁纸支持。原生壁纸在这种构建里会被当成打不开的网页条目。
+  - 处理：把 `main`（含 T30 界面重设计）合并进 T31，`WallpaperDescriptor` 补 `.native`（显示为「实时渲染」），详情页隐藏取景控件；然后快进 `main` 到 `322d3bb`，重建并重启用户的 Lumen。
+  - 用本分支构建在真实桌面窗口确认：代码海的海面、人像浮现、翅膀和光环都正常绘制并动画。
+- **用户要求 3：下载热门壁纸测引擎可靠性，修共性问题（T33，分支 `claude/T33-scene-reliability`）。**
+  - **下载**：在 app 自带的创意工坊浏览器里按「热门·本周」下载 17 个场景（跳过暗示性内容）。包含一个 7680×2160 超宽场景和一个 320 层场景。
+  - **语料**：复制到 `build/we-corpus-popular/<创意工坊 ID>`，之后从用户资源库删除这些测试条目。
+  - **单帧结果**：92/92 加载，206/206 着色器编译，无洋红。
+  - **修复**：
+    - **脚本生命周期顺序**：原先先调 `applyUserProperties` 再调 `init`，WE 是先 `init`。不少脚本在 `init` 里记下初始缩放或位置，之后在 `applyUserProperties` 里使用；顺序错了会抛异常、返回 NaN，图层缩到 0 后消失。例如 3844234486 的彩色条纹和标志整片不见，现已恢复。语料里还有 3000562427、3478434536、2983846453 受影响。
+    - **NaN 保护**：脚本返回非有限值时，保留上一帧的值。原先 `Vec3` 会把 NaN 读成 0，而且下一帧还会从 NaN 继续算。
+    - **`import` 改写**：任意位置（压缩脚本 `;import*as _0x… from'\x57…'`）、任意别名、`{ a as b }`、默认导入，都改写为绑定到内置模块的变量。原先只删掉以 `import` 开头的行，压缩脚本整段语法错误，别名也变成 undefined。
+    - **补 API**：`layer.getTransformMatrix()`（列主序世界矩阵）、`thisScene.getInitialLayerConfig()`、`layer.getVideoTexture()` 占位。
+  - **诊断工具**：
+    - 脚本异常现在会去重记录（`SceneScriptRuntime.errorMessages`）。
+    - `LUMEN_SCRIPT_ERRORS=1 Tools/test.sh scenes` 把异常写进 `build/tools/scenes.log`。
+    - 普查结果：13 条 → 7 条。剩下的是场景脚本引用了场景里不存在的图层，以及一个媒体集成小组件。
+  - **验证**：build 通过；`unit` 42/42；`shaders` 316/316；`scenes` 75/75、0 洋红。用旧代码和新代码在同一时刻渲染对照，变化只出现在脚本相关的场景。时间相关的场景（随真实时刻变化）不算回归。
+- **没做（已列入任务板）**：
+  - T34：脚本动态图层 `createLayer`，11/92 场景用到，音频可视化只剩一根条。
+  - T35：脚本驱动视频贴图和贴图动画。
+- **注意**：测试中替换过运行中的 Lumen 和两个设置键，均已复原。另一个会话（界面设计打磨）也在重启 Lumen，并行测试时会互相顶掉实例。
 
 ### 2026-11-24 · claude · `claude/T31-import-own-wallpapers`（待合并）
 
