@@ -72,7 +72,6 @@
 		6E71C3E48E0DB59B7EA8FDEB /* StudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FDDF22F86AD5CE72F399C7 /* StudioView.swift */; };
 		6FBF643940644EA3228599D7 /* LumenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068315FBE2E5B50B64DDFC0C /* LumenApp.swift */; };
 		71EB5F2C1E48C9C12F7E0340 /* SceneResolutionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777CE69E6D032644455C93BC /* SceneResolutionPolicyTests.swift */; };
-		75B7F07E666788FEEF8FEEC2 /* ReleaseUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */; };
 		78A71F0685250309A6BD666A /* WallpaperEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A8A05087F50BE21AF67935 /* WallpaperEngine.swift */; };
 		7CBE090D868EF178B7100A54 /* SteamCMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */; };
 		80B9EE19401DF660530E3096 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */; };
@@ -99,6 +98,7 @@
 		9F810374568EBA6531C01EAB /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFBD5C86D4BF7AF02DB9DACC /* LibraryStore.swift */; };
 		9FAC8813A56BB73CD0F1C8E8 /* CodeSeaRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FDE93074E5ECB186C898A /* CodeSeaRenderer.swift */; };
 		A1EDED739ADB6B57C815DA11 /* SceneParticles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA846667F3CFACF39D18E8E /* SceneParticles.swift */; };
+		A5EDAFFD8F130BCD242B3EE6 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24EDCAB32E3DD86743AD921 /* AppUpdater.swift */; };
 		A64FB2B23F443ED99EB5D067 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6124882AE9D574065F9AC0B5 /* SystemMonitor.swift */; };
 		ACF3EE0E2C9437B6F5D2AF14 /* SteamNativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */; };
 		AEB4A33D61CA1341A5016D46 /* MenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A15438D98A68DE986D91F0 /* MenuBarPanel.swift */; };
@@ -107,6 +107,7 @@
 		B78A9867644D1154DD8E962E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF2D45011297ED2AEBCFD8D /* AppModel.swift */; };
 		B808721A9989879364F1D753 /* SceneAnimationPlaybackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */; };
 		B88F68AAEE69FFBCF431101C /* PROStrandsSim.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98701DFFEDBD5ED0107997AD /* PROStrandsSim.swift */; };
+		BA61717815663A8A7D48AFCD /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24EDCAB32E3DD86743AD921 /* AppUpdater.swift */; };
 		BB72D947572DB7EB720ECDD7 /* SteamNativeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */; };
 		BC3D56B513A2BEEAC829F979 /* CodeSeaField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3551B94DBD9FA80C7DE4C48D /* CodeSeaField.swift */; };
 		BC452D9C051B3A4EEBA544CF /* WebRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D608A66374789D934A1E4C0B /* WebRenderer.swift */; };
@@ -138,10 +139,12 @@
 		E305B9CFAD0494EAC5695140 /* CodeSeaCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480F7BAF5D4B5B8FFBBB601A /* CodeSeaCore.swift */; };
 		E43FA524D475ECC37A6D5AD4 /* StudioEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E435D49B649CBC8FED581694 /* StudioEditorView.swift */; };
 		E466DCC80511F72DC8089EE7 /* ScenePuppet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3A6CF2142522C342D3CEC /* ScenePuppet.swift */; };
+		E624C7A1B6C4A4ED0FFC2F71 /* AppUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78808B66EFB09D181D83BDD2 /* AppUpdaterTests.swift */; };
 		E7164DCF4ABB98C47534844C /* SteamWorkshopView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F984D66C5EF9FEDBCC316B9F /* SteamWorkshopView.swift */; };
 		E76531935F953C819542FCF7 /* TexDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */; };
 		E8EB0D80C595AD634947FB96 /* WEShaderPreprocessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614C51B1F7D7F33E178EDA02 /* WEShaderPreprocessorTests.swift */; };
 		EC5004AFB5379FE4A40D9679 /* WallpaperCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DB38C40FFF27490AAC894D /* WallpaperCard.swift */; };
+		EC5342E88B232716522ADBDA /* HalfFloat.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8627B668C9B53A68AA9402A /* HalfFloat.swift */; };
 		ECCD6E52A68C7107D3F61D3E /* LockScreenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202D1BC906CDA571DDCE72D9 /* LockScreenManager.swift */; };
 		ED1FFBB300E5C4BD0F52538A /* WEShaderPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */; };
 		ED62B92DB05E24A2A3A9E1CB /* SteamNativeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E44493D5F4FE222508FDF0E8 /* SteamNativeDownload.swift */; };
@@ -222,6 +225,7 @@
 		742E87EC609779C7783C9EC5 /* Framing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Framing.swift; sourceTree = "<group>"; };
 		77634FB81764312077A0248D /* OcclusionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OcclusionMonitor.swift; sourceTree = "<group>"; };
 		777CE69E6D032644455C93BC /* SceneResolutionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneResolutionPolicyTests.swift; sourceTree = "<group>"; };
+		78808B66EFB09D181D83BDD2 /* AppUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdaterTests.swift; sourceTree = "<group>"; };
 		796508CF82781CECA422D840 /* AmbientBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBackdrop.swift; sourceTree = "<group>"; };
 		7A7F62C61B1ABD15B6D5134B /* WallpaperEngineProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperEngineProject.swift; sourceTree = "<group>"; };
 		7AA846667F3CFACF39D18E8E /* SceneParticles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneParticles.swift; sourceTree = "<group>"; };
@@ -245,6 +249,7 @@
 		A344EC8028FF1FF31AA92DBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A37EA14A81399C3314173B26 /* WorkshopSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkshopSources.swift; sourceTree = "<group>"; };
 		A64F66DEDB721B20229DBD2B /* SceneLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLoader.swift; sourceTree = "<group>"; };
+		A8627B668C9B53A68AA9402A /* HalfFloat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HalfFloat.swift; sourceTree = "<group>"; };
 		A876A698B804682C4154BDBE /* SteamCMDOutputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCMDOutputTests.swift; sourceTree = "<group>"; };
 		ACE0D3CD8B0B03D2CCF87210 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		ADB3CEBBD548387CA6D6E738 /* SteamCMD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCMD.swift; sourceTree = "<group>"; };
@@ -281,8 +286,8 @@
 		EBB788C5E6E32988778C82BB /* CodeSea.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSea.swift; sourceTree = "<group>"; };
 		EC8C92BB33CB07341BE34F69 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		F0D9771A27E13CD2665429DC /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
+		F24EDCAB32E3DD86743AD921 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		F33954DDF7914BC9CF29606D /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
-		F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseUpdate.swift; sourceTree = "<group>"; };
 		F984D66C5EF9FEDBCC316B9F /* SteamWorkshopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamWorkshopView.swift; sourceTree = "<group>"; };
 		F9A0E10328A0020DA6E66474 /* DesktopHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopHost.swift; sourceTree = "<group>"; };
 		FB69623C5BC7D5FECD47DBA0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -440,9 +445,9 @@
 				B5D43EA9088D7EED4B38A683 /* AppDelegate.swift */,
 				9BF2D45011297ED2AEBCFD8D /* AppModel.swift */,
 				28F1B121E24A55D9A9616617 /* AppSettings.swift */,
+				F24EDCAB32E3DD86743AD921 /* AppUpdater.swift */,
 				62572C9F44F40DC74C6EC13E /* LocalDiagnostics.swift */,
 				068315FBE2E5B50B64DDFC0C /* LumenApp.swift */,
-				F8C46DADB5002839715B3D16 /* ReleaseUpdate.swift */,
 				4808C95144734787B81A2AA2 /* Router.swift */,
 			);
 			path = App;
@@ -477,6 +482,7 @@
 			isa = PBXGroup;
 			children = (
 				2A71DA2F8C3EB8B623DB6D70 /* AerialSystemTests.swift */,
+				78808B66EFB09D181D83BDD2 /* AppUpdaterTests.swift */,
 				8A6215F82C90FCA9EFA924DE /* PackageArchiveTests.swift */,
 				458923F6348C7E22B0926E6C /* ParserFixtures.swift */,
 				FEABABAA054FFB1656582901 /* SceneAnimationPlaybackTests.swift */,
@@ -590,6 +596,7 @@
 		A3440940FD61C3CBDFA774BA /* Native */ = {
 			isa = PBXGroup;
 			children = (
+				A8627B668C9B53A68AA9402A /* HalfFloat.swift */,
 				0EB19AC28A06BB753D131AE8 /* NativeWallpaper.swift */,
 				989E63AA1A9656DA7712E41B /* CodeSea */,
 				944A988C0F055FB12CA52460 /* PROStrands */,
@@ -824,6 +831,7 @@
 				FF71DEC2F5C0B3ABD4A08732 /* AppLanguage.swift in Sources */,
 				B78A9867644D1154DD8E962E /* AppModel.swift in Sources */,
 				46CB4D8DE2C531E4ED062246 /* AppSettings.swift in Sources */,
+				A5EDAFFD8F130BCD242B3EE6 /* AppUpdater.swift in Sources */,
 				F74C0F2BFD6EEFEE44C398B5 /* Artwork.swift in Sources */,
 				920F1E1EBC68259000312A97 /* AssignmentStore.swift in Sources */,
 				F4E638D9692A540554AA42E4 /* AudioSpectrum.swift in Sources */,
@@ -840,6 +848,7 @@
 				29F5162BC1F480F528E368A1 /* Framing.swift in Sources */,
 				53F92E64C6AF2A64F8306D27 /* FramingControls.swift in Sources */,
 				876903FE7BFE88EC2651B345 /* HEVCTranscoder.swift in Sources */,
+				EC5342E88B232716522ADBDA /* HalfFloat.swift in Sources */,
 				9DDF916C538A2D639B2385A5 /* HomeView.swift in Sources */,
 				9F810374568EBA6531C01EAB /* LibraryStore.swift in Sources */,
 				294CF658258C57E265A4AE83 /* LibraryView.swift in Sources */,
@@ -866,7 +875,6 @@
 				8416156A9FB7F4F76B0076BF /* PlaylistStore.swift in Sources */,
 				B724420C3553E117937464BF /* PlaylistsView.swift in Sources */,
 				D2DCE31CE32DDC35D600E83A /* PropertiesPanel.swift in Sources */,
-				75B7F07E666788FEEF8FEEC2 /* ReleaseUpdate.swift in Sources */,
 				5568F3F306A6C4C06989D167 /* RenderedLoopRecorder.swift in Sources */,
 				1AB6D9D828188A4141BC258A /* RootView.swift in Sources */,
 				6239C7D3D7B201B82869A0F3 /* Router.swift in Sources */,
@@ -936,6 +944,8 @@
 			files = (
 				5D3BAFE9BD1C2C93ABB500D6 /* AerialSystem.swift in Sources */,
 				00E0FF6C6723054C50C3E1C2 /* AerialSystemTests.swift in Sources */,
+				BA61717815663A8A7D48AFCD /* AppUpdater.swift in Sources */,
+				E624C7A1B6C4A4ED0FFC2F71 /* AppUpdaterTests.swift in Sources */,
 				14054500F5EADD2BE253861F /* PackageArchiveTests.swift in Sources */,
 				9759F3CEFD065C9F2DB7833D /* ParserFixtures.swift in Sources */,
 				EFE158DCF125FECC6CABC791 /* SceneAnimation.swift in Sources */,
@@ -1066,7 +1076,7 @@
 				CODE_SIGN_IDENTITY = "$(LUMEN_CODE_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -1079,7 +1089,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;
@@ -1162,7 +1172,7 @@
 				CODE_SIGN_IDENTITY = "$(LUMEN_CODE_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -1175,7 +1185,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumen.Lumen;
 				PRODUCT_NAME = Lumen;

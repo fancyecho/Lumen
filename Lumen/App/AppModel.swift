@@ -26,6 +26,7 @@ final class AppModel {
     let steam: SteamWorkshop
     /// Steam Workshop browsing state; lives here so results survive switching tabs.
     let workshopBrowser = WorkshopBrowser()
+    let updater = AppUpdater()
 
     var isImporterPresented = false
     var isWebPageSheetPresented = false
@@ -56,6 +57,11 @@ final class AppModel {
         engine.start()
         playlists.start()
         lockScreen.start()
+        updater.onAutomaticFind = { [weak self] release in
+            self?.showToast(String(localized: "Lumen \(release.version) is available. Install it from Settings › General."),
+                            symbol: "arrow.down.circle.fill")
+        }
+        updater.checkAutomaticallyIfDue()
         #if DEBUG
         openDebugRoute()
         #endif
@@ -81,6 +87,14 @@ final class AppModel {
             engine.apply(wallpaper, to: .allDisplays)
         }
         if UserDefaults.standard.bool(forKey: "LumenDebugSteam") { isSteamPanelPresented = true }
+        // `-LumenDebugInstallUpdate YES` checks GitHub and installs a newer release straight away,
+        // to test the whole update path on a throwaway copy built with a lower version.
+        if UserDefaults.standard.bool(forKey: "LumenDebugInstallUpdate") {
+            Task {
+                await updater.check()
+                if let release = updater.available { await updater.install(release) }
+            }
+        }
         // `-LumenDebugDelete <uuid>` removes a wallpaper a test added, through the normal delete path.
         if let id = UserDefaults.standard.string(forKey: "LumenDebugDelete").flatMap(UUID.init(uuidString:)),
            let wallpaper = library.wallpaper(id: id) {

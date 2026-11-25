@@ -5945,6 +5945,106 @@
           }
         }
       }
+    },
+    "Check for updates automatically": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动检查更新"
+          }
+        }
+      }
+    },
+    "Lumen %@ is available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen %@ 已发布"
+          }
+        }
+      }
+    },
+    "Install and Relaunch": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装并重新打开"
+          }
+        }
+      }
+    },
+    "Release Notes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新说明"
+          }
+        }
+      }
+    },
+    "Installing Lumen %@…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在安装 Lumen %@…"
+          }
+        }
+      }
+    },
+    "Lumen %@ is available. Install it from Settings › General.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen %@ 已发布，可在「设置 › 通用」中安装。"
+          }
+        }
+      }
+    },
+    "The downloaded update didn't match its checksum, so Lumen didn't install it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载的更新与校验值不符，Lumen 没有安装它。"
+          }
+        }
+      }
+    },
+    "The downloaded update isn't a valid copy of Lumen.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载的更新不是有效的 Lumen 副本。"
+          }
+        }
+      }
+    },
+    "The downloaded update's code signature couldn't be verified.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法验证下载的更新的代码签名。"
+          }
+        }
+      }
+    },
+    "Lumen can't replace itself in this folder. Download the update from the release page instead.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lumen 无法在当前文件夹中替换自身，请从发布页下载更新。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

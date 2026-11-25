@@ -35,7 +35,7 @@ AppModel (@MainActor, 全局状态)
 
 | 目录 | 内容 |
 |---|---|
-| `Lumen/App` | 入口、`AppModel`、`AppSettings`、路由、调试启动参数 |
+| `Lumen/App` | 入口、`AppModel`、`AppSettings`、路由、调试启动参数；`AppUpdater` 从 GitHub Releases 检查、下载、校验并替换自身（流程见 `docs/INSTALL.md`「更新」） |
 | `Lumen/Engine` | 桌面窗口、引擎调度、画面裁切、系统壁纸同步 |
 | `Lumen/Engine/Renderers` | 视频（AVPlayerLayer + AVPlayerLooper，多屏共享）、着色器（`BudgetedMetalView` 按像素预算渲染） |
 | `Lumen/Engine/Shaders` | 内置和用户 Metal 着色器，运行时编译 |
@@ -112,6 +112,7 @@ AppModel (@MainActor, 全局状态)
 | `-LumenDebugApply <title>` | 把指定标题的壁纸设为桌面（**测试后记得还原**） |
 | `-LumenDebugDelete <uuid>` | 用正常的删除流程删掉测试时加入的壁纸（清理用，只删自己加的） |
 | `-LumenDebugSteam YES` | 启动时打开 Steam 面板 |
+| `-LumenDebugInstallUpdate YES` | 启动后检查 GitHub Releases，有新版就直接安装（只用来在用低版本号构建的临时副本上测试更新流程） |
 | `-LumenDebugMenuPreview YES` | 在普通窗口里显示菜单栏面板 |
 | `-LumenDebugWindowSize 1280x840` | 主窗口按指定内容尺寸打开，用于检查布局（截图请用真实窗口截图；`-LumenDebugCaptureDir` 的离屏截图画不出 Liquid Glass 和深色外观） |
 | `SceneLoader.debugLayerFilter` | 只加载指定对象 id（`Tools/test.sh scenes <id> <time> <object ids>`） |

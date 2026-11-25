@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-25 · claude（T38 新 app 图标与菜单栏图标，已合并 `main`）
+> 最后更新：2026-11-25 · claude（T39 0.2.0 发布：App 内更新器、双语 README、MIT 开源）
 
 ## 1. 阶段进度
 
@@ -85,6 +85,7 @@
 | T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
 | T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层） | 场景 | 高 | 完成 | claude | 随 T37 完成（分支 `claude/T37-render-fidelity`）：`createLayer` 按模型路径（含创意工坊 `workshop/<id>/` 前缀差异）或 `getInitialLayerConfig` 复制已有图层，共享编译好的材质、贴图和特效缓冲，每根条只多一次绘制；6 个音频可视化场景的 64 根条已出现。文字阴影（`createLayer({text})`）仍不画 |
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
+| T39 | 0.2.0 发布：App 内更新器（GitHub Releases）、双语 README、MIT 许可证、仓库公开 | 发布 | 高 | 完成 | claude | 分支 `claude/T39-release-0.2`：`AppUpdater` 取代只打开下载页的 `ReleaseUpdate`；`Tools/release.sh` 额外产出 zip 和校验文件；版本 0.2.0（build 2） |
 | T36 | 界面打磨第五轮：Steam 密码框点登录后不再清空；工具栏搜索框点别处会退出输入；创意工坊页隐藏底部播放条，预览侧栏三边等距对齐；顶部分段控件外壳贴合；播放列表页和编辑页重新设计 | UI | 高 | 待验证 | claude | 分支 `claude/T36-ui-polish`，未提交，等用户确认后提交/合并 |
 | T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
 | T38 | 重新设计 app 图标和菜单栏图标：简约、高级、玻璃质感、一眼能看出是壁纸软件 | UI | 中 | 完成 | claude | 已合并 `main`（分支 `claude/T38-app-icon`）。用户选了无框的整幅 app 图标和「波纹太阳」菜单栏图标。Icon Composer 文档 `Lumen/Resources/AppIcon.icon` 取代旧的 PNG 图标集；菜单栏改用模板图 `MenuBarIcon` / `MenuBarIconPlaying`；都由 `Tools/make-icon.py` 生成 |
@@ -101,6 +102,20 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-25 · claude · T39 0.2.0 发布（分支 `claude/T39-release-0.2`，已合并 `main`）
+
+- **用户要求**：构建并安装到本机；打包前加入更新器；README 改为中英双语、实事求是地介绍项目、结构、实现和尚未解决的问题；推送并发布到 GitHub；仓库改为公开开源。
+- **更新器**（`Lumen/App/AppUpdater.swift`，替换 `ReleaseUpdate.swift`）：
+  - 来源是 GitHub Releases 的 `releases/latest`（Info.plist 键 `LumenUpdateRepository`），不再需要构建时传 `LUMEN_UPDATE_FEED_URL`。
+  - 校验：zip 的 SHA-256 与发布里的 `.sha256` 一致 → 代码签名有效（`SecStaticCodeCheckValidity`，严格模式、所有架构）→ Bundle ID、版本号一致 → 当前副本若为证书签名，新副本需满足其 designated requirement（临时签名的要求只认这一份构建，所以跳过）。
+  - 安装：Lumen 退出后由 `/bin/sh` 脚本替换并重新打开，失败时放回旧副本；所在文件夹不可写时提示手动下载。
+  - 设置里新增「Check for updates automatically」（UserDefaults 键 `updates.checkAutomatically`，默认开，每天最多一次）；找到新版本时弹 toast。新增 3 个单元测试（46/46）。新字符串已补 zh-Hans。
+- **Intel 构建**：移植的代码海、PRO 光丝用了 Swift 的 `Float16`，它在 x86_64 上不存在，通用构建因此失败。新增 `Engine/Native/HalfFloat.swift`，只在 x86_64 上提供同名的半精度存储类型（与 M4 硬件转换逐位比对 214 万个值，0 差异）。
+- **签名**：本机唯一的签名证书是 Apple Development 证书，用它签发布版会把证书里的邮箱写进签名并公开，所以发布版继续用临时签名。
+- **README / LICENSE**：双语 README（功能、实测数据、安装、结构与实现、已知问题、构建、许可与致谢）；参考项目链接已核实（`MMFoundation/WallpaperMachine`、`laobamac/MirageWallpaper`，均 GPL-3.0）。新增 MIT `LICENSE`（版权人写的是 GitHub 用户名 fancyecho）。
+- **公开前检查**：提交作者均为 GitHub noreply 邮箱；仓库文件和历史里没有邮箱、密钥、本机路径或用户的个人图片（历史里的图片只有旧版 App 图标）。
+- **没做**：README 还没有截图；Intel Mac 未实测；更新器的完整替换流程用一份临时的 0.1.99 构建验证（见下方结果）。
 
 ### 2026-11-25 · claude · T38 新 app 图标与菜单栏图标（已合并 `main`）
 
