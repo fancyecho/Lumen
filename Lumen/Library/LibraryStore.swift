@@ -300,8 +300,10 @@ final class LibraryStore {
         wallpaper.package = package
         wallpaper.category = PackageImporter.category(for: project.tags)
         wallpaper.author = source == "folder" ? "You" : "Steam Workshop"
-        if let preview = project.previewURL, wallpaper.kind == .video {
-            // Wallpaper Engine previews are hand-picked frames; prefer them to an arbitrary one.
+        if let preview = project.previewURL, wallpaper.kind == .video, PackageImporter.longestSide(of: preview) >= 960 {
+            // Wallpaper Engine previews are hand-picked frames; prefer them to an arbitrary one, but
+            // only when they're sharp. Most are 160–512 px and would blur every card, so the frame
+            // already taken from the video stays.
             PackageImporter.writeThumbnail(from: preview, to: AppPaths.folder(for: id).appending(path: "thumb.jpg"))
         }
         return wallpaper
