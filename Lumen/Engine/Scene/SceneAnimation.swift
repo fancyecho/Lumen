@@ -20,6 +20,10 @@ struct SceneAnimation {
     let startPaused: Bool
     let name: String
     let parentProperty: String?
+    /// Relative timelines hold offsets from the property's own value (`relative: true`), which is
+    /// how the editor records a slide-in: a clock keyed from +500 px down to 0 lands on its
+    /// position instead of the canvas origin.
+    let base: [Float]?
 
     init?(_ raw: Any?) {
         guard let object = raw as? [String: Any], let animation = object["animation"] as? [String: Any] else { return nil }
@@ -46,6 +50,7 @@ struct SceneAnimation {
         startPaused = (options["startpaused"] as? Bool) ?? false
         name = options["name"] as? String ?? ""
         parentProperty = (options["parent"] as? [String: Any])?["key"] as? String
+        base = animation["relative"] as? Bool == true ? SceneValues.components(object["value"]) : nil
         switch options["mode"] as? String {
         case "single": mode = .single
         case "mirror": mode = .mirror
@@ -83,7 +88,9 @@ struct SceneAnimation {
     }
 
     func values(atFrame frame: Float) -> [Float] {
-        curves.map { Self.evaluate($0, frame: frame) }
+        let offsets = curves.map { Self.evaluate($0, frame: frame) }
+        guard let base else { return offsets }
+        return offsets.indices.map { offsets[$0] + (base.indices.contains($0) ? base[$0] : 0) }
     }
 
     func value(at time: Float) -> Float { values(at: time).first ?? 0 }

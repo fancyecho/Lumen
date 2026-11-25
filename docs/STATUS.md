@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-24 · claude（T30 界面重设计与 app 内创意工坊，已合并到 main）
+> 最后更新：2026-11-25 · claude（T37 通用渲染问题、T34 `createLayer`，分支 `claude/T37-render-fidelity`，未合并）
 
 ## 1. 阶段进度
 
@@ -32,7 +32,7 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-24 合并 T31/T33 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景；另有 17 个创意工坊热门场景语料 `build/we-corpus-popular`，用 `LUMEN_SCENE_CORPUS` 指定，92/92 加载、206/206 着色器通过）
+**回归基线**（2026-11-25 T37 分支，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库 75 个场景；另有 17 个创意工坊热门场景语料 `build/we-corpus-popular`，用 `LUMEN_SCENE_CORPUS` 指定，17/17 加载、无洋红、无脚本异常）
 
 | 项目 | 基线 |
 |---|---|
@@ -40,9 +40,10 @@
 | 加载耗时（着色器缓存命中） | 中位约 0.45s，最大约 1.4s（与构建并行跑时会升到 0.7s / 2.8s） |
 | GPU 帧时间（原生约 4.7MP） | 中位 4.7ms，p90 11.3ms，最大 17.7ms（Elisa 3808922316）；桌面上由 T26 按实测自动降档 |
 | 着色器翻译 + 编译 | 316/316 通过 |
+| 脚本异常（`LUMEN_SCRIPT_ERRORS=1`，75 个场景） | 6 条（都是场景脚本引用了不存在的图层或媒体集成） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 42/42 通过 |
+| 单元测试（`Tools/test.sh unit`） | 43/43 通过 |
 
 ## 3. 任务板
 
@@ -82,8 +83,9 @@
 | T30 | 界面重设计（第二轮）：氛围背景按壁纸取色并控亮度、首页「舞台」、卡片/列表双视图、详情页信息栏、统一面板组件、播放条与菜单栏面板；同步改写 `docs/DESIGN.md` | UI | 高 | 完成 | claude | 分支 `claude/T30-ui-redesign`。第二轮：降紫色饱和度、自绘按钮、对齐。第三轮：菜单栏面板改成整幅作品铺满；创意工坊改为 app 内的 Steam 创意工坊。第四轮：页码分页、工具栏下载进度、完整排序与筛选、可显隐的预览侧边栏。用户确认后已合并到 `main` |
 | T32 | 场景/网页高清封面帧：很多创意工坊场景只带 160–256px 的预览 GIF，卡片和首页舞台发虚。从实时渲染（详情页预览或桌面渲染器）抓一帧 ≥1920px 存为封面，`ThumbnailCache` 优先用它 | 场景/UI | 中 | 待认领 | — | 需要渲染器提供读回帧的接口，属跨模块改动，先在交接日志写明 |
 | T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
-| T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层）。做法建议：按模型路径或 `getInitialLayerConfig` 克隆已有图层，渲染时多画一份 | 场景 | 高 | 待认领 | — | 改动在 `SceneInstance` 的绘制循环，先在交接日志写明 |
+| T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层） | 场景 | 高 | 完成 | claude | 随 T37 完成（分支 `claude/T37-render-fidelity`）：`createLayer` 按模型路径（含创意工坊 `workshop/<id>/` 前缀差异）或 `getInitialLayerConfig` 复制已有图层，共享编译好的材质、贴图和特效缓冲，每根条只多一次绘制；6 个音频可视化场景的 64 根条已出现。文字阴影（`createLayer({text})`）仍不画 |
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
+| T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -97,6 +99,29 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-25 · claude · T37 通用渲染问题、T34 `createLayer`（已合并 `main`）
+
+- **用户要求**：继续修共性的、一眼能看出来的渲染问题，让绝大部分壁纸正常渲染；界面会话已在 `claude/T36-ui-polish` 分支上，本任务另开 worktree（`build/worktrees/claude-T37`）。
+- **方法**：两套语料（WallpaperMachine 75 个 + 创意工坊热门 17 个）逐个把渲染和作者预览拼图对比（`Tools/test.sh visual` 的分数受预览裁切和时刻影响太大，只作参考）。
+- **跨模块改动（先记在这里）**：
+  - `SceneInstance`：`drawables`/`rootDrawables` 改为可变，脚本创建的图层在加载后和每帧插入；`ImageLayer` 新增 `copy(as:keepsEffects:)` 和 `hiddenEffects`；`EffectStep` 新增 `effect`/`pass` 索引。
+  - `SceneDocument.Object` 新增 `copy(id:alignment:keepsEffects:)`；`Effect` 新增 `index`、`hasVisibilityScript`；`shape` 对象归为 `.image`。
+  - `UniformBlock.setConstant(_:to:)`；`SceneBlend.add`（one, one）。
+  - `SceneScriptRuntime`：`takeCreatedLayers()`、`takeEffectValues()`；`__frame` 返回 `[layers, effectValues]`。
+- **修复**（都是共性问题）：
+  1. **折射粒子画成黑方块**（如 2587542891 雨夜玻璃）：`genericparticle` 的 `REFRACT` 要乘 `_rt_FullFrameBuffer`，粒子路径从没拷贝帧缓冲，采样到透明黑。现在先拷贝；连续的折射粒子层共用一次拷贝（该场景 19 层雨滴，每层拷一次 4K 帧要多 5ms，共用后 GPU 5.7ms，旧代码 4.3ms 但画面是错的）。
+  2. **相对关键帧**（`animation.relative: true`）：编辑器录的「从偏移滑到原位」被当成绝对坐标，时钟跑到画布原点（3147346398 左下角的巨大时钟）。现在按属性原值叠加。8/92 个场景用到。
+  3. **形状图层 / 光束**（`"shape": "quad"`，无图片，特效 `lightshafts` 带 `DIRECTDRAW`）：以前整层被跳过。9/92 个场景（约 10%）用到，全是光束。现在按画布大小的四边形（乘对象缩放）直接画到场景上，混合用 one/one（与特效默认的 BLENDMODE 31「相加」一致）。代价：一个全屏光束约 0.3–2.5ms（角落模式最贵）。
+  4. **`createLayer`（T34）**：按模型路径或 `getInitialLayerConfig` 复制已有图层，共享材质、贴图和特效缓冲，每根条只多一次绘制（实测 64 根条的场景 GPU 时间不变）。创意工坊脚本写的是 `models/bar.json`，场景里是 `models/workshop/<id>/bar.json`，两者按去掉 `workshop/<id>/` 后比对。6 个环形/条形音频可视化场景的条已出现（`LUMEN_FAKE_AUDIO=1` 验证）。`sortLayer` 改为真正调整顺序。
+  5. **特效和着色器常量上的脚本**：以前只收集图层属性上的脚本。18/92 个场景在特效 `visible` 或 `constantshadervalues` 上挂脚本（昼夜滤镜透明度、音频条颜色、特效速度、媒体封面开关）。现在都会运行：特效可见性按帧切换（初始隐藏但有脚本的特效也会构建），常量写进对应 pass 的 uniform；`thisObject` 是带 `visible` 的特效对象，向量常量以 `Vec2/3/4` 传给脚本。
+- **验证**：build 通过；`unit` 43/43（新增相对关键帧测试）；`shaders` 316/316；`scenes` 75/75 + 热门 17/17，无洋红；脚本异常 7→6。`Tools/test.sh visual diff` 前后对比，较大变化只出现在上述场景，其余是时钟跨过午夜和视频帧不同。
+- **没做 / 下一步**：
+  - `createLayer({text: …})` 文字阴影（2983846453、3808922316）：没有可复制的模板，仍不画（这些阴影默认也隐藏）。
+  - 脚本修改已有图层的 `alignment`（3397287008 第一根条和其余条对齐方式不同）。
+  - 媒体集成（`mediaThumbnailChanged`/`mediaPlaybackChanged`）事件从未触发，相关小组件按「无媒体」显示。
+  - T35 脚本控制视频贴图仍未做。
+  - 光束只验证了单帧形状和位置，动画速度与 WE 是否一致需在真实桌面看。
 
 ### 2026-11-24 · claude · T31 合并到 `main`、T33 引擎可靠性（已合并 `main`）
 

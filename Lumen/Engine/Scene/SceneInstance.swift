@@ -93,6 +93,10 @@ struct EffectStep {
     let kind: Kind
     /// Render target name, or nil to write the next buffer in the chain.
     let target: String?
+    /// The object's effect and that effect's pass this step came from, for scripts that hide the
+    /// effect or drive one of the pass's constants.
+    var effect = -1
+    var pass = -1
 }
 
 /// An image object, with its effect chain if it has one.
@@ -147,11 +151,41 @@ final class ImageLayer {
         self.puppetClipping = puppetClipping
         self.chainCenter = chainCenter
         self.chainSize = chainSize ?? size
+        self.anchorOverride = anchorOverride
         anchor = SceneMath.translation(anchorOverride ?? SceneMath.anchorOffset(object.raw["alignment"] as? String, size: size))
         localModel = SceneMath.model(origin: object.origin, angles: object.angles, scale: object.scale) * anchor
     }
 
+    /// A layer a script created from this one. It shares the compiled passes, textures and effect
+    /// buffers: layers draw one after another, so reusing a buffer once the previous draw has
+    /// composited is safe, and the copy costs a draw call instead of a load. Composition layers,
+    /// text and layers other layers read from aren't copied.
+    func copy(as object: SceneDocument.Object, keepsEffects requested: Bool) -> ImageLayer? {
+        guard !isPassthrough, children.isEmpty, text == nil, !isCompositeSource else { return nil }
+        // A clipping mask target is sized for this layer's chain; keep the chain so it still fits.
+        let keepsEffects = requested || puppetClipping != nil
+        let realigned = object.raw["alignment"] as? String != self.object.raw["alignment"] as? String
+        let copy = ImageLayer(
+            object: object, size: size, base: base, steps: keepsEffects ? steps : [], blend: blend,
+            isPassthrough: false, isFullscreen: isFullscreen, copyBackground: copyBackground,
+            compositePass: keepsEffects ? compositePass : nil, imageExtent: imageExtent,
+            targetScales: keepsEffects ? targetScales : [:], puppet: puppet, puppetClipping: puppetClipping,
+            chainCenter: keepsEffects ? chainCenter : .zero, chainSize: keepsEffects ? chainSize : size,
+            anchorOverride: realigned ? nil : anchorOverride
+        )
+        copy.parentModel = parentModel
+        if copy.needsChain {
+            copy.bufferSize = bufferSize
+            copy.buffers = buffers
+            copy.targets = targets
+        }
+        copy.clippingMaskTarget = clippingMaskTarget
+        copy.hiddenEffects = hiddenEffects
+        return copy
+    }
+
     private let anchor: simd_float4x4
+    private let anchorOverride: SIMD2<Float>?
     var model: simd_float4x4 { parentModel * localModel }
 
     /// The model matrix for this frame's state under its parent's world transform.
@@ -159,6 +193,8 @@ final class ImageLayer {
         parent * SceneMath.model(origin: state.origin, angles: state.angles, scale: state.scale) * anchor
     }
     var needsChain: Bool { !steps.isEmpty || isPassthrough || isCompositeSource || compositePass != nil }
+    /// Effects (by index in the object's list) currently hidden; scripts toggle these.
+    var hiddenEffects: Set<Int> = []
     /// Set for text layers; scripts update its string.
     var text: SceneTextTexture?
 }
@@ -182,6 +218,14 @@ enum SceneDrawable {
     case particles(ParticleLayer)
     case model(ModelLayer)
 
+    var objectID: Int {
+        switch self {
+        case .image(let layer): layer.object.id
+        case .particles(let layer): layer.object.id
+        case .model(let layer): layer.object.id
+        }
+    }
+
     var usesModelDepth: Bool {
         guard case .model(let model) = self else { return false }
         return model.passes.contains { $0.depth != nil }
@@ -193,9 +237,9 @@ final class SceneInstance: @unchecked Sendable {
     let document: SceneDocument
     let canvas: SIMD2<Float>
     let renderSize: SIMD2<Int>
-    let drawables: [SceneDrawable]
+    private(set) var drawables: [SceneDrawable]
     /// Top-level drawables not grouped under a passthrough composition layer.
-    private let rootDrawables: [SceneDrawable]
+    private var rootDrawables: [SceneDrawable]
     var layers: [ImageLayer] { drawables.compactMap { if case .image(let layer) = $0 { layer } else { nil } } }
     var particleLayers: [ParticleLayer] { drawables.compactMap { if case .particles(let layer) = $0 { layer } else { nil } } }
     let textures: SceneTextureCache
@@ -213,10 +257,15 @@ final class SceneInstance: @unchecked Sendable {
     private let bloomTargets: [MTLTexture]
     private let utility: SceneUtilityPipelines
     private var frameCopyValid = false
+    /// The previous drawable was refracting particles, which made this frame's copy (see `encodeDrawable`).
+    private var lastDrawRefracted = false
     private var modelDepthTargets: [ObjectIdentifier: MTLTexture] = [:]
     private var placeholder: SceneTexture { textures.clear }
     private var indices: MTLBuffer?
-    private let objects: [Int: SceneDocument.Object]
+    private var objects: [Int: SceneDocument.Object]
+    /// The last copy made of each layer, so later copies draw after it, in creation order.
+    private var lastCopy: [Int: Int] = [:]
+    private var createdCount = 0
     private let puppetsByID: [Int: PuppetAnimator]
     let scripts: SceneScriptRuntime?
     private var scriptChanges: [Int: SceneScriptRuntime.Change] = [:]
@@ -301,6 +350,51 @@ final class SceneInstance: @unchecked Sendable {
             }
         }
         clearTargets(on: queue)
+        adoptCreatedLayers()
+    }
+
+    /// Adds the layers scripts created (`thisScene.createLayer`), each drawn right after the layer
+    /// it copies; audio visualisers make their bars this way.
+    private func adoptCreatedLayers() {
+        guard let scripts else { return }
+        for created in scripts.takeCreatedLayers() {
+            // A script that creates layers every frame would otherwise grow without bound.
+            guard createdCount < 1024, objects[created.id] == nil, let templateObject = objects[created.template],
+                  let template = layers.first(where: { $0.object.id == created.template }) else { continue }
+            let object = templateObject.copy(id: created.id, alignment: created.alignment, keepsEffects: created.keepsEffects)
+            guard let copy = template.copy(as: object, keepsEffects: created.keepsEffects) else { continue }
+            let after = lastCopy[created.template] ?? created.template
+            guard Self.insert(.image(copy), after: after, in: &rootDrawables) || layers.contains(where: { owner in
+                Self.insert(.image(copy), after: after, in: &owner.children)
+            }) else { continue }
+            objects[created.id] = object
+            drawables.append(.image(copy))
+            lastCopy[created.template] = created.id
+            createdCount += 1
+        }
+    }
+
+    /// Scripts on an effect's `visible` or on one of its shader constants (day/night crossfades,
+    /// audio bar colours, effect speeds).
+    private func applyScriptedEffects(_ values: [SceneScriptRuntime.EffectValue]) {
+        for value in values {
+            guard let layer = layers.first(where: { $0.object.id == value.layer }) else { continue }
+            if let constant = value.constant {
+                for step in layer.steps where step.effect == value.effect && step.pass == constant.pass {
+                    if case .draw(let pass) = step.kind { pass.uniforms.setConstant(constant.name, to: value.components) }
+                }
+            } else if (value.components.first ?? 1) != 0 {
+                layer.hiddenEffects.remove(value.effect)
+            } else {
+                layer.hiddenEffects.insert(value.effect)
+            }
+        }
+    }
+
+    private static func insert(_ drawable: SceneDrawable, after id: Int, in list: inout [SceneDrawable]) -> Bool {
+        guard let index = list.firstIndex(where: { $0.objectID == id }) else { return false }
+        list.insert(drawable, at: index + 1)
+        return true
     }
 
     /// New private textures hold whatever was in memory; effects that read a target before
@@ -482,6 +576,7 @@ final class SceneInstance: @unchecked Sendable {
     /// Draws the whole scene into `outputTexture`.
     func encode(into buffer: MTLCommandBuffer, frame: Frame) {
         frameCopyValid = false
+        lastDrawRefracted = false
         frameTime = frame.time
         frameStates.removeAll(keepingCapacity: true)
         frameWorlds.removeAll(keepingCapacity: true)
@@ -491,6 +586,8 @@ final class SceneInstance: @unchecked Sendable {
             scriptChanges = scripts.update(time: Double(frame.time), delta: Double(frame.delta), daytime: Double(frame.daytime),
                                            cursor: frame.pointerCanvas, cursorDown: frame.cursorInput.isDown,
                                            cursorScreen: frame.cursorInput.screen, cursorEvents: events, audio: frame.audio)
+            adoptCreatedLayers()
+            applyScriptedEffects(scripts.takeEffectValues())
             if !frameStates.isEmpty {
                 // Hit testing used the last script state. Draw with changes from this frame's callbacks.
                 frameStates.removeAll(keepingCapacity: true)
@@ -595,6 +692,7 @@ final class SceneInstance: @unchecked Sendable {
     private func encodeDrawable(_ drawable: SceneDrawable, into buffer: MTLCommandBuffer, session: inout SceneSession,
                                 viewProjectionOverride: simd_float4x4?, targetSize: SIMD2<Float>, frame: Frame) {
         let isSceneTarget = (session.target === sceneTexture)
+        if case .particles = drawable {} else { lastDrawRefracted = false }
         let layer: ImageLayer
         switch drawable {
         case .image(let image):
@@ -611,6 +709,13 @@ final class SceneInstance: @unchecked Sendable {
             let pointerWorld = frame.pointerCanvas.map { $0 + offset }
             particles.update(delta: frame.delta, pointerCanvas: pointerWorld, audio: frame.audio)
             guard particleState.visible else { return }
+            // Refracting particles (rain on glass, droplets) multiply by `_rt_FullFrameBuffer`;
+            // without a copy they sample transparent black and draw as black squares. A run of
+            // such layers shares one copy: a 4K frame copy per layer cost ~5 ms in a scene with
+            // 19 rain layers, and droplets refracting the droplets just drawn isn't visible.
+            let refracts = particles.systems.contains { $0.pass.usesFrameBuffer }
+            if refracts, !lastDrawRefracted { session.end(); copyFrame(buffer) }
+            lastDrawRefracted = refracts
             if let encoder = session.encoder(buffer) {
                 if isSceneTarget { frameCopyValid = false }
                 let vp = viewProjectionOverride ?? SceneMath.orthographic(canvas: canvas, offset: offset)
@@ -841,7 +946,7 @@ final class SceneInstance: @unchecked Sendable {
         }
 
         // Effects, ping-ponging between the two buffers.
-        for step in layer.steps {
+        for step in layer.steps where step.effect < 0 || !layer.hiddenEffects.contains(step.effect) {
             switch step.kind {
             case .copy(let sourceName, let targetName):
                 let source = sourceName == "previous" ? layer.buffers[current] : layer.targets[sourceName]

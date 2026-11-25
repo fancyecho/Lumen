@@ -204,8 +204,15 @@ final class SceneScriptRuntime: @unchecked Sendable {
         guard let result = context.objectForKeyedSubscript("__frame")?
             .call(withArguments: [time, delta, daytime, cursorArgument, cursorDown, screenArgument, eventArgument, audioArgument]),
               let text = result.toString(), let data = text.data(using: .utf8),
-              let entries = try? JSONSerialization.jsonObject(with: data) as? [[Any]]
+              let top = try? JSONSerialization.jsonObject(with: data) as? [Any],
+              let entries = top.first as? [[Any]]
         else { return [:] }
+        for entry in (top.count > 1 ? top[1] as? [[Any]] : nil) ?? [] where entry.count == 3 {
+            guard let id = (entry[0] as? NSNumber)?.intValue, let key = entry[1] as? String, let encoded = entry[2] as? String,
+                  let value = EffectValue(layer: id, key: key, components: encoded.split(separator: " ").compactMap { Float($0) })
+            else { continue }
+            pendingEffectValues.append(value)
+        }
         var changes: [Int: Change] = [:]
         for entry in entries where entry.count >= 13 {
             func number(_ index: Int) -> Float { (entry[index] as? NSNumber)?.floatValue ?? 0 }
@@ -222,6 +229,70 @@ final class SceneScriptRuntime: @unchecked Sendable {
             )
         }
         return changes
+    }
+
+    /// A script's latest value for an effect's `visible` (`constant == nil`, 0 or 1) or for one of
+    /// its passes' shader constants.
+    struct EffectValue {
+        let layer: Int
+        let effect: Int
+        let constant: (pass: Int, name: String)?
+        let components: [Float]
+
+        /// Parses the runtime's keys: `effect:<i>:visible` and `constant:<i>:<pass>:<name>`.
+        init?(layer: Int, key: String, components: [Float]) {
+            let parts = key.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false).map(String.init)
+            guard parts.count >= 3, let effect = Int(parts[1]) else { return nil }
+            self.layer = layer
+            self.effect = effect
+            self.components = components
+            if parts[0] == "constant", parts.count == 4, let pass = Int(parts[2]) {
+                constant = (pass, parts[3])
+            } else if parts[0] == "effect", parts[2] == "visible" {
+                constant = nil
+            } else {
+                return nil
+            }
+        }
+    }
+
+    private var pendingEffectValues: [EffectValue] = []
+
+    /// Effect values scripts changed since the last call.
+    func takeEffectValues() -> [EffectValue] {
+        lock.lock()
+        defer { lock.unlock() }
+        let values = pendingEffectValues
+        pendingEffectValues.removeAll()
+        return values
+    }
+
+    /// A layer a script made with `thisScene.createLayer`, drawn as a copy of `template`.
+    struct CreatedLayer {
+        let id: Int
+        let template: Int
+        /// False when created from a model path: Wallpaper Engine then builds a bare layer
+        /// from the model, without the template's effects.
+        let keepsEffects: Bool
+        /// Set when the script changed the copy's alignment (audio bars growing from one end).
+        let alignment: String?
+    }
+
+    /// Layers scripts created since the last call, in creation order.
+    func takeCreatedLayers() -> [CreatedLayer] {
+        guard hasScripts else { return [] }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let text = context.objectForKeyedSubscript("__takeCreated")?.call(withArguments: [])?.toString(),
+              text != "[]", let data = text.data(using: .utf8),
+              let entries = try? JSONSerialization.jsonObject(with: data) as? [[Any]]
+        else { return [] }
+        return entries.compactMap { entry in
+            guard entry.count >= 4, let id = (entry[0] as? NSNumber)?.intValue,
+                  let template = (entry[1] as? NSNumber)?.intValue else { return nil }
+            return CreatedLayer(id: id, template: template, keepsEffects: (entry[2] as? NSNumber)?.boolValue ?? true,
+                                alignment: entry[3] as? String)
+        }
     }
 
     /// Strips `import` lines and `export` keywords so the module runs inside a function.
@@ -504,7 +575,13 @@ final class SceneScriptRuntime: @unchecked Sendable {
       getLayerCount: function () { return __order.length; },
       enumerateLayers: function () { return __order.map(__touch); },
       getLayerIndex: function (layer) { return __order.indexOf(layer); },
-      sortLayer: function () {}, createLayer: function () { return __makeLayer({ id: -1, name: '', visible: false, alpha: 0 }); },
+      sortLayer: function (layer, index) {
+        var from = __order.indexOf(layer);
+        if (from < 0 || typeof index !== 'number') return;
+        __order.splice(from, 1);
+        __order.splice(Math.max(0, Math.min(__order.length, index)), 0, layer);
+      },
+      createLayer: function (config) { return __createLayer(config); },
       destroyLayer: function (key) {
         var layer = typeof key === 'string' ? __byName[key] : (typeof key === 'number' ? __order[key] : key);
         if (!layer) return;
@@ -523,7 +600,11 @@ final class SceneScriptRuntime: @unchecked Sendable {
       },
       getInitialLayerConfig: function (layer) {
         var target = typeof layer === 'string' ? __byName[layer] : layer;
-        return target && target.__config ? Object.assign({}, target.__config) : null;
+        if (!target || !target.__config) return null;
+        var config = Object.assign({}, target.__config);
+        // Lets createLayer(config) find the layer to copy even when several share a model.
+        Object.defineProperty(config, '__source', { value: target.id, enumerable: false });
+        return config;
       },
       getCameraTransforms: function () { return { eye: new Vec3(__canvas.x / 2, __canvas.y / 2, 1000), center: new Vec3(__canvas.x / 2, __canvas.y / 2, 0), up: new Vec3(0, 1, 0) }; },
       clearColor: new Vec3(0, 0, 0), bloom: false
@@ -539,11 +620,43 @@ final class SceneScriptRuntime: @unchecked Sendable {
 
     function __convertIn(property, value) {
       if (property === 'origin' || property === 'scale' || property === 'angles' || property === 'color') return value instanceof Vec3 ? value : new Vec3(String(value));
+      // Vector shader constants arrive as "x y z" text; scripts treat them as vectors.
+      if (property.indexOf('constant:') === 0 && typeof value === 'string') {
+        var c = value.trim().split(/\s+/).map(Number);
+        if (c.length === 2) return new Vec2(c[0], c[1]);
+        if (c.length === 3) return new Vec3(c[0], c[1], c[2]);
+        if (c.length === 4) return new Vec4(c[0], c[1], c[2], c[3]);
+        if (c.length === 1 && isFinite(c[0])) return c[0];
+      }
       return value;
     }
 
     var __cursorScripts = {};
     var __cursorHandlers = ['cursorEnter', 'cursorLeave', 'cursorMove', 'cursorDown', 'cursorUp', 'cursorClick'];
+
+    // Scripts on an effect (`effect:<i>:visible`) or a shader constant (`constant:<i>:<pass>:<name>`)
+    // get an effect-like thisObject, and their values go back to the renderer, not to the layer.
+    var __effectScripts = [];
+    function __isEffectProperty(p) { return p.indexOf('effect:') === 0 || p.indexOf('constant:') === 0; }
+    function __effectObject(holder, property) {
+      var o = { getMaterial: function () { return { setValue: function () {} }; } };
+      if (/:visible$/.test(property)) {
+        Object.defineProperty(o, 'visible', {
+          get: function () { return holder.script ? !!holder.script.value : true; },
+          set: function (v) { if (holder.script) __assign(holder.script, !!v); }
+        });
+      }
+      return o;
+    }
+    function __encodeValue(v) {
+      if (typeof v === 'boolean') return v ? '1' : '0';
+      if (typeof v === 'number') return isFinite(v) ? String(v) : null;
+      if (typeof v === 'string') return v;
+      if (v && typeof v === 'object' && v.x !== undefined) {
+        return [v.x, v.y, v.z, v.w].filter(function (c) { return c !== undefined; }).map(Number).join(' ');
+      }
+      return null;
+    }
 
     function __addScript(id, property, factory, value, scriptProperties) {
       var layer = __layers[id];
@@ -551,8 +664,11 @@ final class SceneScriptRuntime: @unchecked Sendable {
       __pendingScriptProperties = scriptProperties || {};
       var hasCursorHandlers = false;
       try {
-        var api = factory(layer, __propertyObject(layer, property));
+        var isEffect = __isEffectProperty(property), holder = { script: null };
+        var api = factory(layer, isEffect ? __effectObject(holder, property) : __propertyObject(layer, property));
         var script = { layer: layer, property: property, api: api, value: __convertIn(property, value), errors: 0 };
+        holder.script = script;
+        if (isEffect) __effectScripts.push(script);
         __scripts.push(script);
         hasCursorHandlers = __cursorHandlers.some(function (name) { return typeof api[name] === 'function'; });
         if (hasCursorHandlers) (__cursorScripts[id] || (__cursorScripts[id] = [])).push(script);
@@ -580,15 +696,81 @@ final class SceneScriptRuntime: @unchecked Sendable {
         s.value = value;
         s.layer.alpha = alpha;
       } else {
+        if (typeof value === 'number' && !isFinite(value)) return;
         s.value = value;
         if (p === 'visible') s.layer.visible = !!value;
         else if (p === 'text') s.layer.text = String(value);
       }
     }
 
+    var __callingLayer = null;
     function __call(s, name, arg) {
       if (!s.api || typeof s.api[name] !== 'function' || s.errors > 20) return undefined;
+      __callingLayer = s.layer;
       try { return s.api[name](arg); } catch (e) { s.errors++; __lumenScriptError(name + ': ' + String(e && e.message || e)); return undefined; }
+      finally { __callingLayer = null; }
+    }
+
+    // Layers scripts create. Each copies an existing layer that the renderer already built (same
+    // model, material and effects), so it costs one more draw rather than a new load. Wallpaper
+    // Engine's audio bars and media widgets create layers from the model of the layer running the
+    // script, or from that layer's getInitialLayerConfig().
+    var __created = [], __nextCreatedID = 0x40000000;
+    function __vecText(v, fallback) {
+      if (v === undefined || v === null) return fallback;
+      if (typeof v === 'object') return new Vec3(v).toString();
+      return String(v);
+    }
+    function __templateFor(config) {
+      if (config && typeof config === 'object') {
+        if (config.__source !== undefined && __layers[config.__source]) return __layers[config.__source];
+        config = config.image;
+      }
+      if (typeof config !== 'string' || !config) return null;
+      // Scripts published on the Workshop name their own assets without the `workshop/<id>/`
+      // folder the editor files them under ('models/bar.json' for 'models/workshop/26…/bar.json').
+      var key = __assetKey(config);
+      function matches(l) { return l.__config && typeof l.__config.image === 'string' && __assetKey(l.__config.image) === key; }
+      if (__callingLayer && matches(__callingLayer)) return __callingLayer;
+      for (var i = 0; i < __order.length; i++) {
+        if (__order[i].id < 0x40000000 && matches(__order[i])) return __order[i];
+      }
+      return null;
+    }
+    function __assetKey(path) { return path.replace(/(^|\/)workshop\/\d+\//, '$1'); }
+    function __createLayer(config) {
+      var template = __templateFor(config);
+      var base = template ? template.__config : {};
+      var c = config && typeof config === 'object' ? config : {};
+      var id = __nextCreatedID++;
+      function pick(key) { return c[key] !== undefined ? c[key] : base[key]; }
+      var d = {
+        id: id, name: c.name !== undefined ? String(c.name) : (base.name || ''),
+        origin: new Vec3(__vecText(pick('origin'), '0 0 0')), scale: new Vec3(__vecText(pick('scale'), '1 1 1')),
+        angles: new Vec3(__vecText(pick('angles'), '0 0 0')), color: new Vec3(__vecText(pick('color'), '1 1 1')),
+        alpha: pick('alpha') !== undefined ? +pick('alpha') : 1,
+        // Without a layer to copy there is nothing to draw (text shadows, new images); keep it hidden.
+        visible: template ? (c.visible !== undefined ? !!c.visible : true) : false,
+        parent: template ? template.__parent : undefined, image: pick('image'), text: pick('text')
+      };
+      d.origin = [d.origin.x, d.origin.y, d.origin.z]; d.scale = [d.scale.x, d.scale.y, d.scale.z];
+      d.angles = [d.angles.x, d.angles.y, d.angles.z]; d.color = [d.color.x, d.color.y, d.color.z];
+      var layer = __makeLayer(d);
+      __layers[id] = layer;
+      if (!(layer.name in __byName)) __byName[layer.name] = layer;
+      __order.push(layer);
+      __touch(layer);
+      if (template) __created.push({ layer: layer, template: template.id, effects: typeof config !== 'string' });
+      return layer;
+    }
+    // Hands newly created layers to the renderer once the creating call has set them up.
+    function __takeCreated() {
+      if (__created.length === 0) return '[]';
+      var out = __created.map(function (e) {
+        return [e.layer.id, e.template, e.effects, typeof e.layer.alignment === 'string' ? e.layer.alignment : null];
+      });
+      __created = [];
+      return JSON.stringify(out);
     }
 
     // Wallpaper Engine runs init first, then delivers the user properties once: scripts set up
@@ -660,7 +842,12 @@ final class SceneScriptRuntime: @unchecked Sendable {
         if (l.text !== undefined && l.text !== null) entry.push(String(l.text));
         out.push(entry);
       }
-      return JSON.stringify(out);
+      var effects = [];
+      for (var ei = 0; ei < __effectScripts.length; ei++) {
+        var es = __effectScripts[ei], encoded = __encodeValue(es.value);
+        if (encoded !== null && encoded !== es.sent) { es.sent = encoded; effects.push([es.layer.id, es.property, encoded]); }
+      }
+      return JSON.stringify([out, effects]);
     }
     """#
 }

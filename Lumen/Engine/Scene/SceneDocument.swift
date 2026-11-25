@@ -146,6 +146,10 @@ struct SceneDocument {
         let file: String
         let visible: Bool
         let passes: [PassOverride]
+        /// Position in the object's `effects` array, which scripts on the effect refer to.
+        var index = 0
+        /// A script sets `visible` at run time, so the effect is built even while hidden.
+        var hasVisibilityScript = false
     }
 
     /// Per-pass settings an effect instance overrides.
@@ -203,6 +207,20 @@ struct SceneDocument {
             if let brightness = animatedValues("brightness") { state.brightness = brightness.first ?? 0 }
             if let visible = animatedValues("visible") { state.visible = (visible.first ?? 0) > 0.5 }
             return state
+        }
+
+        /// This object under a new id, for a layer a script created from it. `keepsEffects` is false
+        /// for layers created from a bare model path, which have no effects or keyframes of their own.
+        func copy(id: Int, alignment: String?, keepsEffects: Bool) -> Object {
+            var raw = raw
+            if let alignment { raw["alignment"] = alignment }
+            var object = Object(
+                id: id, name: name, kind: kind, raw: raw, origin: origin, scale: scale, angles: angles, size: size,
+                visible: visible, alpha: alpha, color: color, brightness: brightness, colorBlendMode: colorBlendMode,
+                parallaxDepth: parallaxDepth, parent: parent, effects: keepsEffects ? effects : [], image: image, particle: particle
+            )
+            object.animations = keepsEffects ? animations : [:]
+            return object
         }
 
         var hasAnimatedTransform: Bool {
@@ -268,6 +286,8 @@ struct SceneDocument {
     private static func object(_ raw: [String: Any], values: SceneValues) -> Object {
         let kind: Object.Kind
         if raw["image"] is String { kind = .image }
+        // Shape layers (`"shape": "quad"`, no image) carry a direct-draw effect such as light shafts.
+        else if raw["shape"] is String { kind = .image }
         else if raw["particle"] is String { kind = .particle }
         else if raw["text"] != nil { kind = .text }
         else if raw["sound"] != nil { kind = .sound }
@@ -276,8 +296,8 @@ struct SceneDocument {
         else { kind = .group }
 
         var effects: [Effect] = []
-        for case let effect as [String: Any] in raw["effects"] as? [Any] ?? [] {
-            guard let file = effect["file"] as? String else { continue }
+        for (index, entry) in (raw["effects"] as? [Any] ?? []).enumerated() {
+            guard let effect = entry as? [String: Any], let file = effect["file"] as? String else { continue }
             var passes: [PassOverride] = []
             for case let pass as [String: Any] in effect["passes"] as? [Any] ?? [] {
                 var override = PassOverride()
@@ -288,7 +308,8 @@ struct SceneDocument {
                 }
                 passes.append(override)
             }
-            effects.append(Effect(file: file, visible: values.bool(effect["visible"], default: true), passes: passes))
+            effects.append(Effect(file: file, visible: values.bool(effect["visible"], default: true), passes: passes, index: index,
+                                  hasVisibilityScript: (effect["visible"] as? [String: Any])?["script"] is String))
         }
 
         let size = values.vector(raw["size"]).flatMap { $0.count >= 2 ? SIMD2($0[0], $0[1]) : nil }

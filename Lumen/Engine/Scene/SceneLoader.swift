@@ -82,7 +82,7 @@ enum SceneLoader {
         }
         let builder = Builder(files: files, values: values, textures: textures, shaders: shaders,
                               assetsAvailable: request.assets != nil, textScale: textScale,
-                              compositeSources: compositeSources, groupParents: groupParents)
+                              compositeSources: compositeSources, groupParents: groupParents, canvas: document.canvas)
 
         var models: [Int: simd_float4x4] = [:]
         var parents: [Int: simd_float4x4] = [:]
@@ -154,12 +154,7 @@ enum SceneLoader {
         var rootDrawables: [SceneDrawable] = []
         rootDrawables.reserveCapacity(drawables.count)
         for drawable in drawables {
-            let id: Int = switch drawable {
-            case .image(let layer): layer.object.id
-            case .particles(let layer): layer.object.id
-            case .model(let layer): layer.object.id
-            }
-            if let ownerID = groupOwner[id], let owner = imageByID[ownerID] {
+            if let ownerID = groupOwner[drawable.objectID], let owner = imageByID[ownerID] {
                 owner.children.append(drawable)
             } else {
                 rootDrawables.append(drawable)
@@ -195,6 +190,21 @@ enum SceneLoader {
         for object in document.objects {
             for key in scriptable {
                 if let entry = object.raw[key] as? [String: Any], entry["script"] is String { found.append((object.id, key, entry)) }
+            }
+            // Scripts on an effect's visibility or on its shader constants; the runtime reports
+            // their values under these keys (see `SceneScriptRuntime.EffectValue`).
+            for (effectIndex, entry) in (object.raw["effects"] as? [Any] ?? []).enumerated() {
+                guard let effect = entry as? [String: Any] else { continue }
+                if let visible = effect["visible"] as? [String: Any], visible["script"] is String {
+                    found.append((object.id, "effect:\(effectIndex):visible", visible))
+                }
+                for (passIndex, rawPass) in (effect["passes"] as? [Any] ?? []).enumerated() {
+                    for (name, value) in (rawPass as? [String: Any])?["constantshadervalues"] as? [String: Any] ?? [:] {
+                        if let constant = value as? [String: Any], constant["script"] is String {
+                            found.append((object.id, "constant:\(effectIndex):\(passIndex):\(name)", constant))
+                        }
+                    }
+                }
             }
         }
         guard !found.isEmpty else { return nil }
@@ -242,6 +252,7 @@ enum SceneLoader {
         let textScale: Float
         let compositeSources: Set<Int>
         let groupParents: Set<Int>
+        let canvas: SIMD2<Float>
 
         /// Text layers draw a Core Text texture with Wallpaper Engine's image shader, so
         /// colour, opacity and effects work as on image layers.
@@ -292,12 +303,9 @@ enum SceneLoader {
                                             sampler: textures.samplers.state(nearest: false, clamp: true), dynamic: rendered)
             var steps: [EffectStep] = []
             var targetScales: [String: Float] = [:]
-            for effect in object.effects where effect.visible {
-                if let built = try? effectSteps(effect, ownerID: object.id) {
-                    steps += built.steps
-                    targetScales.merge(built.targets) { a, _ in a }
-                }
-            }
+            let chain = effectChain(for: object)
+            steps = chain.steps
+            targetScales = chain.targets
             let isCompositeSource = compositeSources.contains(object.id)
             let needsChain = !steps.isEmpty || isCompositeSource
             let material = MaterialPass(shader: "genericimage2", blend: .translucent, textures: [], constants: [:], combos: ["VERSION": 2])
@@ -316,6 +324,7 @@ enum SceneLoader {
                                    compositePass: compositePass, imageExtent: SIMD2(1, 1), targetScales: targetScales,
                                    anchorOverride: raw["alignment"] == nil ? textAnchor : nil)
             layer.text = rendered
+            layer.hiddenEffects = chain.hidden
             return layer
         }
 
@@ -359,6 +368,7 @@ enum SceneLoader {
         }
 
         func imageLayer(_ object: SceneDocument.Object) throws -> ImageLayer? {
+            if object.image == nil, object.raw["shape"] is String { return try shapeLayer(object) }
             guard let modelPath = object.image, let model = files.json(modelPath) else {
                 throw SceneLoadError.missingFile(object.image ?? "model")
             }
@@ -378,17 +388,9 @@ enum SceneLoader {
             let hasGroupChildren = groupParents.contains(object.id)
             let copyBackground = values.bool(object.raw["copybackground"], default: true)
 
-            var steps: [EffectStep] = []
-            var targetScales: [String: Float] = [:]
-            for effect in object.effects where effect.visible {
-                do {
-                    let built = try effectSteps(effect, ownerID: object.id)
-                    steps += built.steps
-                    targetScales.merge(built.targets) { a, _ in a }
-                } catch {
-                    Log.engine.info("Effect \(effect.file, privacy: .public) skipped: \(error.localizedDescription, privacy: .public)")
-                }
-            }
+            let chain = effectChain(for: object)
+            let steps = chain.steps
+            let targetScales = chain.targets
             // A composition layer without effects copies the background and paints it back
             // unchanged; keep it when another layer samples it or when it groups child layers.
             if isPassthrough, steps.isEmpty, !isCompositeSource, !hasGroupChildren { return nil }
@@ -458,12 +460,38 @@ enum SceneLoader {
                 }
             }
 
-            return ImageLayer(
+            let layer = ImageLayer(
                 object: object, size: size, base: base, steps: steps, blend: pass.blend,
                 isPassthrough: isPassthrough, isFullscreen: isFullscreen, copyBackground: copyBackground,
                 isCompositeSource: isCompositeSource, compositePass: compositePass,
                 imageExtent: mainTexture?.imageExtent ?? SIMD2(1, 1), targetScales: targetScales,
                 puppet: puppet, puppetClipping: puppetClipping, chainCenter: chainCenter, chainSize: chainSize
+            )
+            layer.hiddenEffects = chain.hidden
+            return layer
+        }
+
+        /// A shape layer: a canvas-sized quad (before its scale) that its effect draws straight onto
+        /// the scene (`DIRECTDRAW`). Wallpaper Engine's light shafts are made this way; the effect's
+        /// default blend mode adds the rays to what's below, so the quad blends additively.
+        func shapeLayer(_ object: SceneDocument.Object) throws -> ImageLayer? {
+            guard let effect = object.effects.first(where: \.visible), let json = files.json(effect.file) else { return nil }
+            guard let passJSON = (json["passes"] as? [Any])?.first as? [String: Any],
+                  let materialPath = passJSON["material"] as? String,
+                  let material = MaterialPass.load(materialPath, near: (effect.file as NSString).deletingLastPathComponent,
+                                                   files: files, values: values)?.first
+            else { throw SceneLoadError.missingFile(effect.file) }
+            var override = effect.passes.first
+            // Slot 0 would be the layer's own image; a shape has none.
+            if var textures = override?.textures, !textures.isEmpty { textures[0] = nil; override?.textures = textures }
+            let base = try prepare(material, overrides: override, combos: ["DIRECTDRAW": 1],
+                                   base: (effect.file as NSString).deletingLastPathComponent, effect: false, ownerID: object.id)
+            let pipeline = try base.program.pipeline(blend: .add, depth: .invalid)
+            let pass = PreparedPass(program: base.program, pipeline: pipeline, uniforms: base.uniforms,
+                                    textures: base.textures, spriteSheet: nil)
+            return ImageLayer(
+                object: object, size: object.size ?? canvas, base: pass, steps: [], blend: .add,
+                isPassthrough: false, isFullscreen: false, imageExtent: SIMD2(1, 1), targetScales: [:]
             )
         }
 
@@ -572,6 +600,24 @@ enum SceneLoader {
             return system
         }
 
+        /// The object's visible effects, plus hidden ones a script may show later (started hidden).
+        func effectChain(for object: SceneDocument.Object) -> (steps: [EffectStep], targets: [String: Float], hidden: Set<Int>) {
+            var steps: [EffectStep] = []
+            var targets: [String: Float] = [:]
+            var hidden: Set<Int> = []
+            for effect in object.effects where effect.visible || effect.hasVisibilityScript {
+                do {
+                    let built = try effectSteps(effect, ownerID: object.id)
+                    steps += built.steps
+                    targets.merge(built.targets) { a, _ in a }
+                    if !effect.visible { hidden.insert(effect.index) }
+                } catch {
+                    Log.engine.info("Effect \(effect.file, privacy: .public) skipped: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            return (steps, targets, hidden)
+        }
+
         func effectSteps(_ effect: SceneDocument.Effect, ownerID: Int) throws -> (steps: [EffectStep], targets: [String: Float]) {
             guard let json = files.json(effect.file) else { throw SceneLoadError.missingFile(effect.file) }
             let base = (effect.file as NSString).deletingLastPathComponent
@@ -589,7 +635,8 @@ enum SceneLoader {
                 let target = (passJSON["target"] as? String).map { prefix + $0 }
                 if let command = passJSON["command"] as? String, command == "copy" {
                     let source = passJSON["source"] as? String ?? "previous"
-                    steps.append(EffectStep(kind: .copy(source: source == "previous" ? source : prefix + source, target: target ?? "previous"), target: nil))
+                    steps.append(EffectStep(kind: .copy(source: source == "previous" ? source : prefix + source, target: target ?? "previous"),
+                                            target: nil, effect: effect.index, pass: index))
                     continue
                 }
                 guard let materialPath = passJSON["material"] as? String,
@@ -602,7 +649,7 @@ enum SceneLoader {
                     binds[slot] = name == "previous" ? name : prefix + name
                 }
                 let pass = try prepare(material, overrides: override, combos: [:], base: base, effect: true, binds: binds, ownerID: ownerID)
-                steps.append(EffectStep(kind: .draw(pass), target: target))
+                steps.append(EffectStep(kind: .draw(pass), target: target, effect: effect.index, pass: index))
             }
             return (steps, targets)
         }

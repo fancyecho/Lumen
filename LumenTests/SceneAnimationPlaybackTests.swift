@@ -71,6 +71,24 @@ final class SceneAnimationPlaybackTests: XCTestCase {
         XCTAssertEqual(state.alpha, 0.5)
     }
 
+    func testRelativeTimelineOffsetsThePropertyValue() throws {
+        // A clock that slides in from 500 px above its place, as the editor records it.
+        let origin: [String: Any] = [
+            "value": "1920 1800 0",
+            "animation": [
+                "relative": true,
+                "options": ["mode": "single", "fps": 30, "length": 90],
+                "c0": [["frame": 0, "value": 0], ["frame": 90, "value": 0]],
+                "c1": [["frame": 0, "value": 500], ["frame": 90, "value": 0]],
+            ],
+        ]
+        let document = SceneDocument(json: ["objects": [["id": 1, "image": "models/solid.json", "origin": origin]]],
+                                     values: SceneValues(properties: [:]))
+        let object = try XCTUnwrap(document.objects.first)
+        XCTAssertEqual(object.state(at: 0).origin, SIMD3(1920, 2300, 0))
+        XCTAssertEqual(object.state(at: 10).origin, SIMD3(1920, 1800, 0))
+    }
+
     private func track(mode: String, paused: Bool = false, parent: String? = nil) -> [String: Any] {
         var options: [String: Any] = ["mode": mode, "fps": 10, "length": 20, "startpaused": paused]
         if let parent { options["parent"] = ["key": parent] }
