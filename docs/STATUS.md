@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-24 · claude（T36 界面打磨第五轮，分支 `claude/T36-ui-polish`，待用户确认）
+> 最后更新：2026-11-25 · claude（T36 界面打磨第六轮：工具栏重排、窗口重开尺寸、高清封面；0.2.1 发布）
 
 ## 1. 阶段进度
 
@@ -32,7 +32,7 @@
   - Workshop 页扫描 Steam 下载目录、WallpaperMachine 库和自定义文件夹，一键加入资源库。
   - 支持 Steam 下载：通过 SteamCMD 用用户自己的账号登录，支持 Steam Guard 和手机确认；也可以在内置 Workshop 浏览器里点「Download to Lumen」。
 
-**回归基线**（2026-11-24 合并 T31/T33 后，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库，75 个场景；另有 17 个创意工坊热门场景语料 `build/we-corpus-popular`，用 `LUMEN_SCENE_CORPUS` 指定，92/92 加载、206/206 着色器通过）
+**回归基线**（2026-11-25 T37 分支，`Tools/test.sh`，默认 Balanced 预算 6MP、2560×1600 屏，语料为 WallpaperMachine 库 75 个场景；另有 17 个创意工坊热门场景语料 `build/we-corpus-popular`，用 `LUMEN_SCENE_CORPUS` 指定，17/17 加载、无洋红、无脚本异常）
 
 | 项目 | 基线 |
 |---|---|
@@ -40,9 +40,10 @@
 | 加载耗时（着色器缓存命中） | 中位约 0.45s，最大约 1.4s（与构建并行跑时会升到 0.7s / 2.8s） |
 | GPU 帧时间（原生约 4.7MP） | 中位 4.7ms，p90 11.3ms，最大 17.7ms（Elisa 3808922316）；桌面上由 T26 按实测自动降档 |
 | 着色器翻译 + 编译 | 316/316 通过 |
+| 脚本异常（`LUMEN_SCRIPT_ERRORS=1`，75 个场景） | 6 条（都是场景脚本引用了不存在的图层或媒体集成） |
 | 明显洋红色块 | 0 个（3808922316 洋红块、2983846453/3615984066/3397287008 白/灰块均已修复） |
 | SteamCMD 提示解析（假 steamcmd） | 通过 |
-| 单元测试（`Tools/test.sh unit`） | 42/42 通过 |
+| 单元测试（`Tools/test.sh unit`） | 43/43 通过 |
 
 ## 3. 任务板
 
@@ -82,9 +83,12 @@
 | T30 | 界面重设计（第二轮）：氛围背景按壁纸取色并控亮度、首页「舞台」、卡片/列表双视图、详情页信息栏、统一面板组件、播放条与菜单栏面板；同步改写 `docs/DESIGN.md` | UI | 高 | 完成 | claude | 分支 `claude/T30-ui-redesign`。第二轮：降紫色饱和度、自绘按钮、对齐。第三轮：菜单栏面板改成整幅作品铺满；创意工坊改为 app 内的 Steam 创意工坊。第四轮：页码分页、工具栏下载进度、完整排序与筛选、可显隐的预览侧边栏。用户确认后已合并到 `main` |
 | T32 | 场景/网页高清封面帧：很多创意工坊场景只带 160–256px 的预览 GIF，卡片和首页舞台发虚。从实时渲染（详情页预览或桌面渲染器）抓一帧 ≥1920px 存为封面，`ThumbnailCache` 优先用它 | 场景/UI | 中 | 待认领 | — | 视频和着色器已由 T36 解决（`ThumbnailCache.poster`）；剩下场景和网页需要渲染器提供读回帧的接口，属跨模块改动，先在交接日志写明 |
 | T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
-| T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层）。做法建议：按模型路径或 `getInitialLayerConfig` 克隆已有图层，渲染时多画一份 | 场景 | 高 | 待认领 | — | 改动在 `SceneInstance` 的绘制循环，先在交接日志写明 |
+| T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层） | 场景 | 高 | 完成 | claude | 随 T37 完成（分支 `claude/T37-render-fidelity`）：`createLayer` 按模型路径（含创意工坊 `workshop/<id>/` 前缀差异）或 `getInitialLayerConfig` 复制已有图层，共享编译好的材质、贴图和特效缓冲，每根条只多一次绘制；6 个音频可视化场景的 64 根条已出现。文字阴影（`createLayer({text})`）仍不画 |
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
 | T36 | 界面打磨第五、六轮：Steam 密码框不再清空；工具栏搜索框点别处退出输入；创意工坊隐藏底部播放条、侧栏对齐、隐藏滚动条；分段控件外壳贴合；播放列表重新设计；首页等大画面用高清封面；从菜单栏重新打开窗口时尺寸突变；工具栏改为左侧导航、右侧操作 | UI | 高 | 完成 | claude | 已合并 `main` 并推送，随 0.2.1 发布 |
+| T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
+| T38 | 重新设计 app 图标和菜单栏图标：简约、高级、玻璃质感、一眼能看出是壁纸软件 | UI | 中 | 完成 | claude | 已合并 `main`（分支 `claude/T38-app-icon`）。用户选了无框的整幅 app 图标和「波纹太阳」菜单栏图标。Icon Composer 文档 `Lumen/Resources/AppIcon.icon` 取代旧的 PNG 图标集；菜单栏改用模板图 `MenuBarIcon` / `MenuBarIconPlaying`；都由 `Tools/make-icon.py` 生成 |
+| T39 | 0.2.0 发布：App 内更新器（GitHub Releases）、双语 README、MIT 许可证、仓库公开 | 发布 | 高 | 完成 | claude | 分支 `claude/T39-release-0.2`：`AppUpdater` 取代只打开下载页的 `ReleaseUpdate`；`Tools/release.sh` 额外产出 zip 和校验文件；版本 0.2.0（build 2） |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -123,6 +127,57 @@
   - 「添加壁纸」改回工具栏共享的玻璃底：macOS 27 上 `.glass` 按钮样式在工具栏里不显示外形。
   - 每个控件都是独立的玻璃形状，彼此留有间距。1020pt 最小宽度下也放得下。
 - **验证**：build 通过，`unit` 全部通过。真实窗口截图检查了工具栏（1280 和 1020 宽）、返回按钮两种状态、搜索框输入与清除、窗口重开尺寸、首页清晰度。
+### 2026-11-25 · claude · T39 0.2.0 发布（分支 `claude/T39-release-0.2`，已合并 `main`）
+
+- **用户要求**：构建并安装到本机；打包前加入更新器；README 改为中英双语、实事求是地介绍项目、结构、实现和尚未解决的问题；推送并发布到 GitHub；仓库改为公开开源。
+- **更新器**（`Lumen/App/AppUpdater.swift`，替换 `ReleaseUpdate.swift`）：
+  - 来源是 GitHub Releases 的 `releases/latest`（Info.plist 键 `LumenUpdateRepository`），不再需要构建时传 `LUMEN_UPDATE_FEED_URL`。
+  - 校验：zip 的 SHA-256 与发布里的 `.sha256` 一致 → 代码签名有效（`SecStaticCodeCheckValidity`，严格模式、所有架构）→ Bundle ID、版本号一致 → 当前副本若为证书签名，新副本需满足其 designated requirement（临时签名的要求只认这一份构建，所以跳过）。
+  - 安装：Lumen 退出后由 `/bin/sh` 脚本替换并重新打开，失败时放回旧副本；所在文件夹不可写时提示手动下载。
+  - 设置里新增「Check for updates automatically」（UserDefaults 键 `updates.checkAutomatically`，默认开，每天最多一次）；找到新版本时弹 toast。新增 3 个单元测试（46/46）。新字符串已补 zh-Hans。
+- **Intel 构建**：移植的代码海、PRO 光丝用了 Swift 的 `Float16`，它在 x86_64 上不存在，通用构建因此失败。新增 `Engine/Native/HalfFloat.swift`，只在 x86_64 上提供同名的半精度存储类型（与 M4 硬件转换逐位比对 214 万个值，0 差异）。
+- **签名**：本机唯一的签名证书是 Apple Development 证书，用它签发布版会把证书里的邮箱写进签名并公开，所以发布版继续用临时签名。
+- **README / LICENSE**：双语 README（功能、实测数据、安装、结构与实现、已知问题、构建、许可与致谢）；参考项目链接已核实（`MMFoundation/WallpaperMachine`、`laobamac/MirageWallpaper`，均 GPL-3.0）。新增 MIT `LICENSE`（版权人写的是 GitHub 用户名 fancyecho）。
+- **公开前检查**：提交作者均为 GitHub noreply 邮箱；仓库文件和历史里没有邮箱、密钥、本机路径或用户的个人图片（历史里的图片只有旧版 App 图标）。
+- **更新器实测**：仓库公开、v0.2.0 发布后，用版本号改成 0.1.99 的临时副本（`-LumenDebugInstallUpdate YES`）跑完整流程：15 秒内下载、校验、替换并以 0.2.0 重新打开，签名有效、通用二进制，没有残留备份。第一次没触发是调试开关和启动时的自动检查抢跑，已改为等待正在进行的检查。
+- **安装与发布**：`/Applications/Lumen.app` 已装 0.2.0 并运行（替换了此前运行的 Debug 构建）；GitHub Release v0.2.0 附 DMG、zip 和两个校验文件；仓库已公开，许可证 MIT，加了 topics。
+- **没做**：README 还没有截图；Intel Mac 未实测。注意：界面会话在主工作区（`claude/T36-ui-polish`）还有未提交的改动，不在 0.2.0 里；它若再启动 Debug 构建，会和已安装的版本同时运行。
+
+### 2026-11-25 · claude · T38 新 app 图标与菜单栏图标（已合并 `main`）
+
+- 从 `main`（`daad7db`）开的 worktree `build/worktrees/claude-T38`，没碰主目录里 T36 第二批的未提交改动。
+- **app 图标**：改成 Icon Composer 文档 `Lumen/Resources/AppIcon.icon`，删掉旧的 `AppIcon.appiconset`（彩色流体 + 显示器线框）。
+  - 画面：整个图标就是一张壁纸，内容铺满不加框。素净的靛紫天空，只在地平线留一层淡玫瑰色余晖，太阳从三层薰衣草色沙丘后升起。沙丘各是一层 Liquid Glass，所以每道山脊都有系统高光；天空层不加玻璃，让玻璃在它前面显出来。
+  - 用户先看了「玻璃屏幕里放壁纸」的带框版本，选了无框版本；带框版本不再保留。
+  - 天空层盖满画布，深色模式和浅色模式看起来一样；透明、着色模式由系统自动生成，已用 `ictool` 逐一渲染检查。
+  - XcodeGen 2.46 把 `.icon` 识别为 `wrapper.icon` 放进 Resources，`ASSETCATALOG_COMPILER_APPICON_NAME` 仍是 `AppIcon`，`project.yml` 不用改。编译产物里有分层图标（`IconImageStack`）和兜底的 `AppIcon.icns`。
+- **菜单栏图标**：`LumenApp` 里的系统符号 `sparkles.rectangle.stack` 换成模板图「波纹太阳」：把 app 图标浓缩成一个标志，圆形太阳被两道沙丘形的缝切开，没有光芒，不会被看成天气图标。播放时整个圆盘实心（太阳亮着），空闲时只剩圆环和实心的两层沙丘（太阳熄了），仍按 `isAnyPlaying` 切换。18pt SVG，保留矢量，线宽 1.5pt 与系统菜单栏符号一致，补了无障碍标签 "Lumen"。用户觉得第一版（圆角框 + 太阳 + 波浪）太普通；另外试过太阳破框、取景框折角、迷你 app 图标，在菜单栏尺寸下都不如这版。
+- **重新生成**：`python3 Tools/make-icon.py` 会写出上面两部分，并把六种外观的渲染图放到 `build/icon-preview/`。改颜色或几何形状只改这个脚本。
+- **验证**：`Tools/test.sh build` 通过。用 `NSWorkspace` 取了构建产物的图标（和访达、程序坞看到的一致；换图标后系统图标缓存要等 app 包的修改时间变了才会刷新）；从编译后的 `Assets.car` 读出两个菜单栏图标：18×18pt、模板、矢量，浅色和深色菜单栏、Retina 和 1x 下都清楚。用户自己的 Lumen 当时在运行，所以没有再启动一个实例，也就没在真实菜单栏里截图（截屏没有屏幕录制权限）。
+- 代码里没有别处直接引用图标，`Tools/release.sh` 打的 DMG 也没有自定义背景，新图标随 app 包自动生效。
+
+### 2026-11-25 · claude · T37 通用渲染问题、T34 `createLayer`（已合并 `main`）
+
+- **用户要求**：继续修共性的、一眼能看出来的渲染问题，让绝大部分壁纸正常渲染；界面会话已在 `claude/T36-ui-polish` 分支上，本任务另开 worktree（`build/worktrees/claude-T37`）。
+- **方法**：两套语料（WallpaperMachine 75 个 + 创意工坊热门 17 个）逐个把渲染和作者预览拼图对比（`Tools/test.sh visual` 的分数受预览裁切和时刻影响太大，只作参考）。
+- **跨模块改动（先记在这里）**：
+  - `SceneInstance`：`drawables`/`rootDrawables` 改为可变，脚本创建的图层在加载后和每帧插入；`ImageLayer` 新增 `copy(as:keepsEffects:)` 和 `hiddenEffects`；`EffectStep` 新增 `effect`/`pass` 索引。
+  - `SceneDocument.Object` 新增 `copy(id:alignment:keepsEffects:)`；`Effect` 新增 `index`、`hasVisibilityScript`；`shape` 对象归为 `.image`。
+  - `UniformBlock.setConstant(_:to:)`；`SceneBlend.add`（one, one）。
+  - `SceneScriptRuntime`：`takeCreatedLayers()`、`takeEffectValues()`；`__frame` 返回 `[layers, effectValues]`。
+- **修复**（都是共性问题）：
+  1. **折射粒子画成黑方块**（如 2587542891 雨夜玻璃）：`genericparticle` 的 `REFRACT` 要乘 `_rt_FullFrameBuffer`，粒子路径从没拷贝帧缓冲，采样到透明黑。现在先拷贝；连续的折射粒子层共用一次拷贝（该场景 19 层雨滴，每层拷一次 4K 帧要多 5ms，共用后 GPU 5.7ms，旧代码 4.3ms 但画面是错的）。
+  2. **相对关键帧**（`animation.relative: true`）：编辑器录的「从偏移滑到原位」被当成绝对坐标，时钟跑到画布原点（3147346398 左下角的巨大时钟）。现在按属性原值叠加。8/92 个场景用到。
+  3. **形状图层 / 光束**（`"shape": "quad"`，无图片，特效 `lightshafts` 带 `DIRECTDRAW`）：以前整层被跳过。9/92 个场景（约 10%）用到，全是光束。现在按画布大小的四边形（乘对象缩放）直接画到场景上，混合用 one/one（与特效默认的 BLENDMODE 31「相加」一致）。代价：一个全屏光束约 0.3–2.5ms（角落模式最贵）。
+  4. **`createLayer`（T34）**：按模型路径或 `getInitialLayerConfig` 复制已有图层，共享材质、贴图和特效缓冲，每根条只多一次绘制（实测 64 根条的场景 GPU 时间不变）。创意工坊脚本写的是 `models/bar.json`，场景里是 `models/workshop/<id>/bar.json`，两者按去掉 `workshop/<id>/` 后比对。6 个环形/条形音频可视化场景的条已出现（`LUMEN_FAKE_AUDIO=1` 验证）。`sortLayer` 改为真正调整顺序。
+  5. **特效和着色器常量上的脚本**：以前只收集图层属性上的脚本。18/92 个场景在特效 `visible` 或 `constantshadervalues` 上挂脚本（昼夜滤镜透明度、音频条颜色、特效速度、媒体封面开关）。现在都会运行：特效可见性按帧切换（初始隐藏但有脚本的特效也会构建），常量写进对应 pass 的 uniform；`thisObject` 是带 `visible` 的特效对象，向量常量以 `Vec2/3/4` 传给脚本。
+- **验证**：build 通过；`unit` 43/43（新增相对关键帧测试）；`shaders` 316/316；`scenes` 75/75 + 热门 17/17，无洋红；脚本异常 7→6。`Tools/test.sh visual diff` 前后对比，较大变化只出现在上述场景，其余是时钟跨过午夜和视频帧不同。
+- **没做 / 下一步**：
+  - `createLayer({text: …})` 文字阴影（2983846453、3808922316）：没有可复制的模板，仍不画（这些阴影默认也隐藏）。
+  - 脚本修改已有图层的 `alignment`（3397287008 第一根条和其余条对齐方式不同）。
+  - 媒体集成（`mediaThumbnailChanged`/`mediaPlaybackChanged`）事件从未触发，相关小组件按「无媒体」显示。
+  - T35 脚本控制视频贴图仍未做。
+  - 光束只验证了单帧形状和位置，动画速度与 WE 是否一致需在真实桌面看。
 
 ### 2026-11-24 · claude · `claude/T36-ui-polish`（未提交，待用户确认）
 

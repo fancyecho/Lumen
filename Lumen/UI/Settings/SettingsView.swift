@@ -53,13 +53,11 @@ private struct GeneralSettings: View {
 
 private struct ApplicationSection: View {
     @Environment(\.openURL) private var openURL
+    @Environment(AppModel.self) private var model
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginRequiresApproval = LoginItem.requiresApproval
     @State private var loginError: String?
-    @State private var checking = false
-    @State private var update: ReleaseUpdate?
-    @State private var showsUpdate = false
-    @State private var updateStatus: String?
+    @AppStorage(AppUpdater.automaticKey) private var checksAutomatically = true
 
     var body: some View {
         Section("Application") {
@@ -81,25 +79,46 @@ private struct ApplicationSection: View {
             if let loginError {
                 Text(loginError).font(.caption).foregroundStyle(.red)
             }
-            if let feed = ReleaseUpdate.feedURL {
-                Button(checking ? "Checking for Updates…" : "Check for Updates") {
-                    Task { await check(feed) }
-                }
-                .disabled(checking)
-                if let updateStatus {
-                    Text(updateStatus).font(.caption).foregroundStyle(.secondary)
-                }
-            }
+            Toggle("Check for updates automatically", isOn: $checksAutomatically)
+            updateControls
         }
         .onAppear(perform: refreshLoginItem)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshLoginItem()
         }
-        .alert("Lumen Update Available", isPresented: $showsUpdate, presenting: update) { release in
-            Button("Download") { openURL(release.downloadURL) }
-            Button("Later", role: .cancel) {}
-        } message: { release in
-            Text("Lumen \(release.version) is available.\n\n\(release.notes)")
+    }
+
+    @ViewBuilder private var updateControls: some View {
+        let updater = model.updater
+        switch updater.state {
+        case .available(let release):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Lumen \(release.version) is available").font(.headline)
+                if !release.notes.isEmpty {
+                    Text(release.notes).font(.caption).foregroundStyle(.secondary).lineLimit(8)
+                }
+                HStack {
+                    Button("Install and Relaunch") { Task { await updater.install(release) } }
+                    Button("Release Notes") { openURL(release.pageURL) }
+                }
+            }
+        case .installing(let release):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Installing Lumen \(release.version)…").foregroundStyle(.secondary)
+            }
+        default:
+            HStack {
+                Button(updater.state == .checking ? "Checking for Updates…" : "Check for Updates") {
+                    Task { await updater.check() }
+                }
+                .disabled(updater.state == .checking)
+                if updater.state == .upToDate {
+                    Text("Lumen is up to date.").font(.caption).foregroundStyle(.secondary)
+                } else if case .failed(let message) = updater.state {
+                    Text(message).font(.caption).foregroundStyle(.red)
+                }
+            }
         }
     }
 
@@ -108,18 +127,6 @@ private struct ApplicationSection: View {
         loginRequiresApproval = LoginItem.requiresApproval
     }
 
-    private func check(_ feed: URL) async {
-        checking = true
-        updateStatus = nil
-        defer { checking = false }
-        do {
-            update = try await ReleaseUpdate.check(feed)
-            showsUpdate = update != nil
-            if update == nil { updateStatus = String(localized: "Lumen is up to date.") }
-        } catch {
-            updateStatus = error.localizedDescription
-        }
-    }
 }
 
 private struct LanguageSection: View {

@@ -183,7 +183,13 @@ Heights follow `controlSize`: small 24, regular 28, large 34. A row of controls 
 - Content scrolls under the transparent toolbar without an edge effect (`.scrollEdgeEffectHidden(true, for: .top)`): on macOS 27 the system effect draws a solid band with a hairline across the top even at rest, which cut the room's colour off behind the buttons.
 - The Workshop grid shows no scroller while the preview panel is open (it sat in the gutter between the two); the pager is the way through the results.
 
-## 13. Known limits
+## 13. App icon and menu bar glyph
+
+- **App icon** (`Lumen/Resources/AppIcon.icon`, an Icon Composer document): the icon is itself a wallpaper, edge to edge with no frame. A muted indigo sky that warms to a faint rose only at the horizon, and a sun rising behind three lavender dunes. The dunes are separate Liquid Glass layers so each crest catches the system highlight; the sky stays flat so the glass reads against it. The palette is the accent family (`#8E85D6` dunes, warm peach sun), muted like the chrome. Clear and tinted appearances come from the system.
+- **Menu bar** (`MenuBarIcon`, `MenuBarIconPlaying`): the icon reduced to a mark, an 18 pt template glyph. The sun is a disc cut by two dune-shaped gaps; no rays, so it never reads as weather. While anything plays the whole disc is lit; when idle only the dunes stay solid under an open 1.5 pt ring, as if the sun went out.
+- Both are drawn by `Tools/make-icon.py`; edit the script, not the generated files.
+
+## 14. Known limits
 
 - Large surfaces (Home stage, rotation stage, menu bar panel) use `ThumbnailView(resolution: .poster)`: up to 2560 px, taken from the video file (`poster.jpg` beside it) or rendered from the shader at 1920 × 1080, so the still is as sharp as the live preview. Cards keep 960 px thumbnails; a video thumbnail smaller than 640 px (an old Workshop preview) is rebuilt from the video once.
 - Many Workshop scenes ship only a 160–256 px preview GIF, so their cards and the Home stage are soft. Fixing that needs a crisp poster frame rendered from the scene (see the T32 entry on the board in `docs/STATUS.md`); the layouts above avoid full-bleed artwork for this reason.

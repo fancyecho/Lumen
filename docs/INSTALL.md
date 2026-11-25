@@ -37,20 +37,17 @@ Tools/release.sh
 
 脚本读取 `project.yml` 的版本号，在 `build/release/` 生成 DMG 和 SHA-256 校验文件。
 
-## 更新源
+## 更新
 
-托管一个 HTTPS JSON 文件后，将其地址传给构建命令。
+Lumen 从本仓库的 GitHub Releases 获取更新（`project.yml` 的 `LumenUpdateRepository`，默认 `fancyecho/Lumen`）。
 
-```sh
-LUMEN_UPDATE_FEED_URL='https://example.org/lumen/update.json' Tools/release.sh
-```
+- 「设置 › General › Application」可以手动检查；「Check for updates automatically」打开时，启动后最多每天检查一次，有新版本时弹出提示。请求只发往 `api.github.com` 和 GitHub 的下载地址，不带任何个人信息。
+- 点「Install and Relaunch」后，Lumen 下载 `Lumen-<版本>.zip`，依次核对：与同一发布里的 `Lumen-<版本>.zip.sha256` 一致；解压出的 App 代码签名有效、Bundle ID 和版本号正确；若当前副本用证书签名，新副本还要满足当前副本的指定要求（designated requirement）。然后 Lumen 退出，由一个小脚本把新副本换到原位置并重新打开，替换失败时放回旧副本。
+- Lumen 所在文件夹不可写时（例如没有管理员权限），会提示从发布页手动下载。
+- 构建是临时签名，验证依赖 HTTPS、SHA-256 和签名完整性，不如 Developer ID 签名可靠；签名每版都会变，更新后 macOS 可能再次询问系统音频权限。
 
-```json
-{
-  "version": "0.2.0",
-  "downloadURL": "https://example.org/lumen/Lumen-0.2.0.dmg",
-  "notes": "Improved scene playback on external displays."
-}
-```
+### 发布新版本
 
-`version` 使用三段整数，下载链接使用 HTTPS。配置地址后，在 General 的 Application 分区点「Check for Updates」会获取版本信息。用户点「Download」后，Lumen 在浏览器打开下载链接，由用户手动安装。
+1. 改 `project.yml` 的 `MARKETING_VERSION`（三段整数）和 `CURRENT_PROJECT_VERSION`。
+2. 运行 `Tools/release.sh`，在 `build/release/` 得到 `Lumen-<版本>.dmg`、`Lumen-<版本>.zip` 和各自的 `.sha256`。
+3. 用标签 `v<版本>` 创建 GitHub Release，四个文件都上传。更新器只认带 zip 和 zip 校验文件、且不是草稿或预发布的最新 Release。

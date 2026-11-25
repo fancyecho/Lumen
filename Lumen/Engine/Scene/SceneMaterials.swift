@@ -4,6 +4,9 @@ import simd
 
 enum SceneBlend: Hashable {
     case translucent, additive, opaque, multiply, max
+    /// Adds the shader's colour as is (one, one): for direct-draw effects, whose output is already
+    /// weighted by coverage.
+    case add
 
     init(_ name: String?) {
         switch name?.lowercased() {
@@ -34,6 +37,12 @@ enum SceneBlend: Hashable {
             attachment.isBlendingEnabled = true
             attachment.sourceRGBBlendFactor = .destinationColor
             attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            attachment.sourceAlphaBlendFactor = .zero
+            attachment.destinationAlphaBlendFactor = .one
+        case .add:
+            attachment.isBlendingEnabled = true
+            attachment.sourceRGBBlendFactor = .one
+            attachment.destinationRGBBlendFactor = .one
             attachment.sourceAlphaBlendFactor = .zero
             attachment.destinationAlphaBlendFactor = .one
         case .max:
@@ -340,6 +349,8 @@ struct UniformBlock {
     private var dynamic: [(EngineUniform, WEUniform)] = []
     /// Material constants with keyframes.
     private var animated: [(SceneAnimation, WEUniform)] = []
+    /// Material constants by lowercased key, for scripts that set them.
+    private var keyed: [String: WEUniform] = [:]
 
     init(program: WEShaderProgram, constants: [[String: Any]], values: SceneValues, isEffect: Bool = false) {
         slots = Array(repeating: .zero, count: program.slotCount)
@@ -359,6 +370,7 @@ struct UniformBlock {
             }
             var raw: Any?
             if let key = uniform.materialKey {
+                keyed[key.lowercased()] = uniform
                 for table in constants {
                     if let value = table[key] ?? table.first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame })?.value {
                         raw = value
@@ -400,6 +412,13 @@ struct UniformBlock {
     }
 
     var hasDynamicValues: Bool { !dynamic.isEmpty || !animated.isEmpty }
+
+    /// A script's value for a material constant; it replaces the constant's keyframes, if any.
+    mutating func setConstant(_ key: String, to components: [Float]) {
+        guard let uniform = keyed[key.lowercased()] else { return }
+        animated.removeAll { $0.1.slot == uniform.slot }
+        write(components, to: uniform)
+    }
 
     var usesPointLighting: Bool {
         dynamic.contains { engine, _ in

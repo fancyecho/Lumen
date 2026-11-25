@@ -24,7 +24,9 @@ struct LumenApp: App {
             MenuBarPanel()
                 .environment(model)
         } label: {
-            Image(systemName: model.engine.isAnyPlaying ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack")
+            // Template glyphs drawn by Tools/make-icon.py to match the app icon: filled while playing.
+            Image(model.engine.isAnyPlaying ? "MenuBarIconPlaying" : "MenuBarIcon")
+                .accessibilityLabel(Text(verbatim: "Lumen"))
         }
         .menuBarExtraStyle(.window)
 

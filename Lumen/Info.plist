@@ -33,8 +33,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LumenUpdateFeedURL</key>
-	<string>$(LUMEN_UPDATE_FEED_URL)</string>
+	<key>LumenUpdateRepository</key>
+	<string>fancyecho/Lumen</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Audio-reactive wallpapers follow the music your Mac plays. Lumen only measures loudness per frequency and never records or stores audio.</string>
 </dict>

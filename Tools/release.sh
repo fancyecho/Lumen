@@ -16,8 +16,7 @@ trap 'rm -rf "$scratch"' EXIT
 xcodegen generate
 xcodebuild -project Lumen.xcodeproj -scheme Lumen -configuration Release \
   -destination 'generic/platform=macOS' -derivedDataPath "$ROOT/build/DerivedData" \
-  -resultBundlePath "$scratch/Release.xcresult" ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
-  "LUMEN_UPDATE_FEED_URL=${LUMEN_UPDATE_FEED_URL:-}" build
+  -resultBundlePath "$scratch/Release.xcresult" ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
 
 app="$ROOT/build/DerivedData/Build/Products/Release/Lumen.app"
 /usr/bin/codesign --verify --strict "$app"
@@ -28,6 +27,10 @@ name="Lumen-$version.dmg"
 /usr/bin/hdiutil create -srcfolder "$scratch/image" -volname "Lumen $version" -format UDZO "$scratch/$name"
 /usr/bin/hdiutil verify "$scratch/$name"
 (cd "$scratch" && /usr/bin/shasum -a 256 "$name" > "$name.sha256")
-mv -f "$scratch/$name" "$scratch/$name.sha256" "$release/"
-cat "$release/$name.sha256"
-printf '%s\n' "$release/$name"
+# The in-app updater installs the zip; both files go on the GitHub release (see docs/INSTALL.md).
+archive="Lumen-$version.zip"
+/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app" "$scratch/$archive"
+(cd "$scratch" && /usr/bin/shasum -a 256 "$archive" > "$archive.sha256")
+mv -f "$scratch/$name" "$scratch/$name.sha256" "$scratch/$archive" "$scratch/$archive.sha256" "$release/"
+cat "$release/$name.sha256" "$release/$archive.sha256"
+printf '%s\n' "$release/$name" "$release/$archive"

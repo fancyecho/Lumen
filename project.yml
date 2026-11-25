@@ -38,14 +38,14 @@ targets:
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate
             LSItemContentTypes: [public.movie]
-        LumenUpdateFeedURL: "$(LUMEN_UPDATE_FEED_URL)"
+        LumenUpdateRepository: fancyecho/Lumen
         NSAudioCaptureUsageDescription: Audio-reactive wallpapers follow the music your Mac plays. Lumen only measures loudness per frequency and never records or stores audio.
     settings:
       base:
         PRODUCT_NAME: Lumen
         PRODUCT_BUNDLE_IDENTIFIER: app.lumen.Lumen
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Lumen
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
@@ -79,6 +79,7 @@ targets:
       - path: Lumen/Library/Steam/Native
         excludes: [CArchive]
       - path: Lumen/Support/Support.swift
+      - path: Lumen/App/AppUpdater.swift
     dependencies:
       - package: Zstandard
         product: libzstd
