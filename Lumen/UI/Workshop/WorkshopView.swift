@@ -53,6 +53,9 @@ struct WorkshopView: View {
                     .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
                     .frame(maxWidth: .infinity)
                 }
+                // With the preview panel open the scroller would sit in the gutter between grid and
+                // panel; the pager is the way through the results, so it goes.
+                .scrollIndicators(inspectorVisible ? .never : .automatic)
                 // A new page starts at the top, like turning a page.
                 .onChange(of: model.workshopBrowser.page) {
                     // After the grid swaps to placeholders, so an animation can't be cut short mid-way.

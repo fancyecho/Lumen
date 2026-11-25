@@ -263,9 +263,9 @@ private struct PanelArtwork: View {
         ZStack {
             Theme.Surface.canvas
             if let wallpaper {
-                ThumbnailView(wallpaper: wallpaper)
+                ThumbnailView(wallpaper: wallpaper, resolution: .poster)
             } else if let featured = model.library.builtins.first {
-                ThumbnailView(wallpaper: featured).opacity(0.6)
+                ThumbnailView(wallpaper: featured, resolution: .poster).opacity(0.6)
             }
             Color.clear
                 .overlay {

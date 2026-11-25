@@ -86,7 +86,7 @@ private struct HomeStage: View {
     private var artwork: some View {
         ZStack {
             if let wallpaper {
-                ThumbnailView(wallpaper: wallpaper)
+                ThumbnailView(wallpaper: wallpaper, resolution: .poster)
                 if previewing {
                     LiveWallpaperPreview(wallpaper: wallpaper)
                         .transition(.opacity)
@@ -115,7 +115,7 @@ private struct HomeStage: View {
     private var emptyArtwork: some View {
         ZStack {
             if let featured = model.library.builtins.first {
-                ThumbnailView(wallpaper: featured).opacity(0.5)
+                ThumbnailView(wallpaper: featured, resolution: .poster).opacity(0.5)
             } else {
                 Theme.Surface.mediaFill
             }

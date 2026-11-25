@@ -3,9 +3,17 @@ import SwiftUI
 
 /// Static thumbnail for any wallpaper, filling its frame.
 struct ThumbnailView: View {
+    enum Resolution {
+        /// 960 px: gallery cards, rows, strips.
+        case card
+        /// Up to 2560 px from the source: stages and other artwork shown at full width.
+        case poster
+    }
+
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let wallpaper: Wallpaper
+    var resolution: Resolution = .card
     @State private var image: NSImage?
 
     var body: some View {
@@ -21,13 +29,24 @@ struct ThumbnailView: View {
             }
             .clipped()
             .task(id: ThumbnailCache.shared.cacheKey(for: wallpaper)) {
-                let loaded = await ThumbnailCache.shared.thumbnail(for: wallpaper, library: model.library)
-                if reduceMotion {
-                    image = loaded
+                let cache = ThumbnailCache.shared
+                if resolution == .poster {
+                    // The card thumbnail is usually cached already: show it at once, then swap in
+                    // the sharp poster without a fade so the picture doesn't blink.
+                    if image == nil { show(await cache.thumbnail(for: wallpaper, library: model.library)) }
+                    if let poster = await cache.poster(for: wallpaper, library: model.library) { image = poster }
                 } else {
-                    withAnimation(Theme.Motion.smooth) { image = loaded }
+                    show(await cache.thumbnail(for: wallpaper, library: model.library))
                 }
             }
+    }
+
+    private func show(_ loaded: NSImage?) {
+        if reduceMotion {
+            image = loaded
+        } else {
+            withAnimation(Theme.Motion.smooth) { image = loaded }
+        }
     }
 }
 

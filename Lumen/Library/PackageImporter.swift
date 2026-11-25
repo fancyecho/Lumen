@@ -228,6 +228,16 @@ enum PackageImporter {
         return total
     }
 
+    /// Pixel size of an image's longest side without decoding it (0 when unreadable).
+    static func longestSide(of image: URL) -> Int {
+        guard let source = CGImageSourceCreateWithURL(image as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else { return 0 }
+        let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
+        return max(width, height)
+    }
+
     /// First frame of a preview (JPEG, PNG or GIF), scaled for the grid.
     @discardableResult
     static func writeThumbnail(from preview: URL, to destination: URL) -> Bool {

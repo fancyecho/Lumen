@@ -302,7 +302,7 @@ private struct RotationStage: View {
     private func artwork(_ current: Wallpaper?) -> some View {
         ZStack {
             if let current {
-                ThumbnailView(wallpaper: current)
+                ThumbnailView(wallpaper: current, resolution: .poster)
             } else {
                 Theme.Surface.mediaFill
             }
