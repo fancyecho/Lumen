@@ -68,6 +68,9 @@ final class SceneTextureCache: @unchecked Sendable {
     private let lock = NSLock()
     private var uploads: [(MTLBuffer, MTLTexture, Int, Int, Int, Int)] = []
     private var needsMipmaps: [MTLTexture] = []
+    /// Textures to offer other loads of the same scene once their pixels are on the GPU.
+    private var toShare: [(SharedSceneTextures.Key, SceneTexture)] = []
+    private var sourceKey: String { files.projectFolder.standardizedFileURL.path + "|" + (files.assets?.standardizedFileURL.path ?? "") }
 
     /// Every video texture the scene loaded, for pausing them with the scene.
     var videoTextures: [DynamicTexture] {
@@ -133,23 +136,32 @@ final class SceneTextureCache: @unchecked Sendable {
                 let sampler = samplers.state(nearest: false, clamp: decoded.flags.contains(.clampUVs))
                 return SceneTexture(images: [clear.texture], decoded: decoded, sampler: sampler, video: video)
             }
+            let key = SharedSceneTextures.Key(device: ObjectIdentifier(device), source: sourceKey, name: name)
+            if let shared = SharedSceneTextures.texture(for: key, maxDimension: maxDimension, detail: detail) { return shared }
+            // Nearest-filtered textures use samplers without mipmapping, so a generated chain
+            // would never be read (a third more memory for nothing).
+            let generatesMipmaps = !decoded.flags.contains(.noInterpolation)
             var images: [MTLTexture] = []
             for mips in decoded.images {
-                guard let texture = upload(mips, format: decoded.format) else { return nil }
+                guard let texture = upload(mips, format: decoded.format, generatesMipmaps: generatesMipmaps) else { return nil }
                 images.append(texture)
             }
             guard !images.isEmpty else { return nil }
             let sampler = samplers.state(nearest: decoded.flags.contains(.noInterpolation), clamp: decoded.flags.contains(.clampUVs))
-            return SceneTexture(images: images, decoded: decoded, sampler: sampler)
+            let texture = SceneTexture(images: images, decoded: decoded, sampler: sampler)
+            lock.lock()
+            toShare.append((key, texture))
+            lock.unlock()
+            return texture
         } catch {
             Log.engine.error("Scene texture \(name, privacy: .public) unreadable: \(String(describing: error), privacy: .public)")
             return nil
         }
     }
 
-    private func upload(_ mips: [WETexture.Mip], format: WETexture.Format) -> MTLTexture? {
+    private func upload(_ mips: [WETexture.Mip], format: WETexture.Format, generatesMipmaps: Bool) -> MTLTexture? {
         guard let first = mips.first else { return nil }
-        let generate = mips.count == 1 && !format.isBlockCompressed && max(first.width, first.height) > 64
+        let generate = generatesMipmaps && mips.count == 1 && !format.isBlockCompressed && max(first.width, first.height) > 64
         let levelCount = generate ? Int(log2(Double(max(first.width, first.height)))) + 1 : mips.count
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: format.pixelFormat, width: first.width, height: first.height, mipmapped: levelCount > 1
@@ -160,7 +172,9 @@ final class SceneTextureCache: @unchecked Sendable {
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         for (level, mip) in mips.enumerated() where level < levelCount {
             let bytes = format.byteCount(width: mip.width, height: mip.height)
-            guard let buffer = mip.data.withUnsafeBytes({ device.makeBuffer(bytes: $0.baseAddress!, length: bytes, options: .storageModeShared) }) else { continue }
+            // Decode straight into the staging buffer rather than into a temporary copy first.
+            guard let buffer = device.makeBuffer(length: max(bytes, mip.byteCount), options: .storageModeShared),
+                  mip.write(to: buffer.contents(), capacity: buffer.length) >= bytes else { continue }
             lock.lock()
             uploads.append((buffer, texture, level, mip.width, mip.height, format.bytesPerRow(width: mip.width)))
             lock.unlock()
@@ -185,13 +199,22 @@ final class SceneTextureCache: @unchecked Sendable {
 
     /// Copies everything loaded so far to the GPU (and builds mipmaps) in one command buffer.
     func flushUploads(queue: MTLCommandQueue) {
+        // The command buffer is autoreleased and keeps every staging buffer alive until its pool
+        // drains; on a loader thread that can be much later, holding a second copy of each texture.
+        autoreleasepool { encodeUploads(queue: queue) }
+    }
+
+    private func encodeUploads(queue: MTLCommandQueue) {
         lock.lock()
         let pending = uploads
         let mipmaps = needsMipmaps
         uploads.removeAll()
         needsMipmaps.removeAll()
         lock.unlock()
-        guard !pending.isEmpty || !mipmaps.isEmpty, let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder() else { return }
+        // `pending` keeps the staging buffers alive until the copy completes, so the command buffer
+        // needn't retain them; a retaining one can hold them (a full extra copy) well after that.
+        guard !pending.isEmpty || !mipmaps.isEmpty, let buffer = queue.makeCommandBufferWithUnretainedReferences(),
+              let blit = buffer.makeBlitCommandEncoder() else { return }
         for (source, texture, level, width, height, bytesPerRow) in pending {
             let blockRows = texture.pixelFormat == .rgba8Unorm || texture.pixelFormat == .rg8Unorm || texture.pixelFormat == .r8Unorm
                 ? height : max(1, (height + 3) / 4)
@@ -205,6 +228,57 @@ final class SceneTextureCache: @unchecked Sendable {
         blit.endEncoding()
         buffer.commit()
         buffer.waitUntilCompleted()
+        // Metal can keep a released buffer's memory around for reuse; staging copies of big
+        // textures would then stay charged to Lumen. Emptying them returns the pages now.
+        for (source, _, _, _, _, _) in pending { source.setPurgeableState(.empty) }
+        lock.lock()
+        let ready = toShare
+        toShare.removeAll()
+        lock.unlock()
+        for (key, texture) in ready { SharedSceneTextures.publish(texture, for: key, maxDimension: maxDimension, detail: detail) }
+    }
+}
+
+/// Decoded scene textures shared by every load of the same scene in this process: the desktop,
+/// the window's live previews and the Lock Screen recorder would otherwise each upload their own
+/// copy (a 1.3 GB sprite sheet three times over). Entries are weak, so a texture goes away with
+/// the last scene using it, and are only published once uploaded. A load reuses an entry decoded
+/// at the same or greater resolution; video and text textures are never shared.
+enum SharedSceneTextures {
+    struct Key: Hashable {
+        let device: ObjectIdentifier
+        let source: String
+        let name: String
+    }
+
+    private final class Entry {
+        weak var texture: SceneTexture?
+        let maxDimension: Int
+        let detail: Float
+        init(_ texture: SceneTexture, maxDimension: Int, detail: Float) {
+            self.texture = texture
+            self.maxDimension = maxDimension
+            self.detail = detail
+        }
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var entries: [Key: [Entry]] = [:]
+
+    static func texture(for key: Key, maxDimension: Int, detail: Float) -> SceneTexture? {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[key]?.removeAll { $0.texture == nil }
+        return entries[key]?.first { $0.maxDimension >= maxDimension && $0.detail >= detail }?.texture
+    }
+
+    static func publish(_ texture: SceneTexture, for key: Key, maxDimension: Int, detail: Float) {
+        lock.lock()
+        defer { lock.unlock() }
+        var list = entries[key, default: []].filter { $0.texture != nil }
+        list.append(Entry(texture, maxDimension: maxDimension, detail: detail))
+        entries[key] = list
+        if entries.count > 512 { entries = entries.filter { !$0.value.allSatisfy { $0.texture == nil } } }
     }
 }
 

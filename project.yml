@@ -44,8 +44,8 @@ targets:
       base:
         PRODUCT_NAME: Lumen
         PRODUCT_BUNDLE_IDENTIFIER: app.lumen.Lumen
-        MARKETING_VERSION: "0.2.1"
-        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "0.2.2"
+        CURRENT_PROJECT_VERSION: "4"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Lumen
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment

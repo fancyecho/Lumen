@@ -106,7 +106,10 @@ for id in items {
         let request = SceneLoader.Request(folder: folder, entry: project.entry, assets: assets, values: values, displaySize: harnessDisplay, pixelBudget: harnessBudget, device: device, queue: queue)
         let instance = try SceneLoader.load(request)
         let loadTime = Date().timeIntervalSince(start)
-        if environment["LUMEN_MEMORY"] != nil { print(String(format: "  memory %.0f MB", Double(device.currentAllocatedSize) / 1_048_576)) }
+        if environment["LUMEN_MEMORY"] != nil {
+            print(String(format: "  memory %.0f MB GPU, %.0f MB process footprint", Double(device.currentAllocatedSize) / 1_048_576,
+                         Double(processFootprint()) / 1_048_576))
+        }
         if ProcessInfo.processInfo.environment["DUMPLAYERS"] != nil {
             for layer in instance.layers {
                 var tex = ""
@@ -166,6 +169,30 @@ for id in items {
         }
         try savePNG(instance.outputTexture, to: out.appending(path: "\(id).png"))
         renderSaved = true
+        if environment["LUMEN_MEMORY"] != nil {
+            // Metal returns emptied staging buffers to the system a few seconds after upload.
+            Thread.sleep(forTimeInterval: 6)
+            if environment["LUMEN_MEMORY_TWICE"] != nil {
+                // A second load of the same scene, like the window's live preview next to the desktop.
+                let previewRequest = SceneLoader.Request(folder: folder, entry: project.entry, assets: assets, values: values,
+                                                         displaySize: SIMD2(800, 500), pixelBudget: 400_000, device: device, queue: queue)
+                let preview = try SceneLoader.load(previewRequest)
+                Thread.sleep(forTimeInterval: 6)
+                let shared = zip(instance.layers, preview.layers).filter { a, b in
+                    if case .texture(let x)? = a.base.textures[0], case .texture(let y)? = b.base.textures[0] { return x === y }
+                    return false
+                }.count
+                print(String(format: "  second load: %.0f MB process footprint, %d of %d base textures shared",
+                             Double(processFootprint()) / 1_048_576, shared, min(instance.layers.count, preview.layers.count)))
+                withExtendedLifetime(preview) {}
+            }
+            if let pause = environment["LUMEN_MEMORY_PAUSE"].flatMap(Double.init) {
+                print("  paused pid \(ProcessInfo.processInfo.processIdentifier)"); fflush(stdout)
+                Thread.sleep(forTimeInterval: pause)
+            }
+            print(String(format: "  after rendering: %.0f MB GPU, %.0f MB process footprint", Double(device.currentAllocatedSize) / 1_048_576,
+                         Double(processFootprint()) / 1_048_576))
+        }
         let line = String(format: "%@ OK load %.2fs gpu %.2fms particles %d layers %d size %dx%d skipped %@ — %@", id, loadTime, gpu * 1000, instance.particleLayers.reduce(0) { $0 + $1.systems.reduce(0) { $0 + $1.particles.count } }, instance.layers.count, instance.renderSize.x, instance.renderSize.y, instance.unsupported.joined(separator: ","), project.title)
         print(line)
         print(String(format: "  translate %.2fs total(translate+compile) %.2fs compiles %d", SceneShaderLibrary.translateTime, SceneShaderLibrary.compileTime, SceneShaderLibrary.compileCount))
@@ -192,3 +219,14 @@ for id in items {
 }
 let run = SceneVisualRun(id: UUID(), time: time, scenes: visualScenes)
 try JSONEncoder().encode(run).write(to: out.appending(path: SceneVisualRun.filename), options: .atomic)
+
+
+/// Physical footprint as Activity Monitor's Memory column reports it (GPU memory included).
+func processFootprint() -> UInt64 {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+    }
+    return result == KERN_SUCCESS ? info.phys_footprint : 0
+}

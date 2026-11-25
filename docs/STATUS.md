@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-25 · claude（T36 界面打磨第六轮：工具栏重排、窗口重开尺寸、高清封面；0.2.1 发布）
+> 最后更新：2026-11-25 · claude（T40 场景内存，0.2.2 发布）
 
 ## 1. 阶段进度
 
@@ -85,6 +85,7 @@
 | T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
 | T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层） | 场景 | 高 | 完成 | claude | 随 T37 完成（分支 `claude/T37-render-fidelity`）：`createLayer` 按模型路径（含创意工坊 `workshop/<id>/` 前缀差异）或 `getInitialLayerConfig` 复制已有图层，共享编译好的材质、贴图和特效缓冲，每根条只多一次绘制；6 个音频可视化场景的 64 根条已出现。文字阴影（`createLayer({text})`）仍不画 |
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
+| T40 | 场景内存：大精灵图场景（如 1618282820「Kyoto Petals」，5 张 8192² RGBA 共 1.34 GB）让 Lumen 占到 7 GB | 场景 | 高 | 完成 | claude | 0.2.2 发布（分支 `claude/T40-scene-memory`，已合并 `main`）：纹理按需解码进暂存缓冲、上传后清空暂存缓冲；最近邻纹理不再生成用不到的 mipmap；同一场景的桌面、窗口预览、锁屏录制共享已上传的纹理（弱引用）。单份加载 3.07 GB → 1.38 GB，两份同时加载 1.39 GB |
 | T36 | 界面打磨第五、六轮：Steam 密码框不再清空；工具栏搜索框点别处退出输入；创意工坊隐藏底部播放条、侧栏对齐、隐藏滚动条；分段控件外壳贴合；播放列表重新设计；首页等大画面用高清封面；从菜单栏重新打开窗口时尺寸突变；工具栏改为左侧导航、右侧操作 | UI | 高 | 完成 | claude | 已合并 `main` 并推送，随 0.2.1 发布 |
 | T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
 | T38 | 重新设计 app 图标和菜单栏图标：简约、高级、玻璃质感、一眼能看出是壁纸软件 | UI | 中 | 完成 | claude | 已合并 `main`（分支 `claude/T38-app-icon`）。用户选了无框的整幅 app 图标和「波纹太阳」菜单栏图标。Icon Composer 文档 `Lumen/Resources/AppIcon.icon` 取代旧的 PNG 图标集；菜单栏改用模板图 `MenuBarIcon` / `MenuBarIconPlaying`；都由 `Tools/make-icon.py` 生成 |
@@ -102,6 +103,25 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-25 · claude · T40 场景内存（分支 `claude/T40-scene-memory`，已合并 `main`，发布为 0.2.2）
+
+- **用户反馈**：活动监视器里 Lumen 占 7.05 GB。
+- **实测**（`footprint`）：7.2 GB = 5.2 GB GPU（graphics）+ 1.6 GB Malloc Large，数值稳定不增长，不是泄漏。当时桌面是场景「Kyoto Petals」（1618282820）：只有一层，精灵图 128 帧 1920×1080 像素画，打包成 5 张 8192² RGBA（解码后 1.34 GB，LZ4 后磁盘上只有 17 MB）。
+- **原因**（都是通用问题）：
+  1. 每次加载场景都要完整解码、上传一份：桌面、窗口里的实时预览（首页舞台、详情页、取景控件）、锁屏录制各自一份。约三份 × 1.8 GB（含 mipmap）≈ 5.2 GB GPU。
+  2. 整张贴图先 LZ4 解码成 `Data`，再复制进暂存缓冲；释放后的大块内存由系统延迟回收（Deferred Reclaim），在活动监视器里仍算 Lumen 的，就是那 1.6 GB Malloc Large。
+  3. 暂存缓冲释放后，Metal 还会把内存留着备用几秒，仍算在 footprint 里。
+  4. 标了 noInterpolation 的贴图用的是不带 mipmap 的采样器，却照样生成 mipmap（多 33%）。
+- **修复**（`SceneTextures.swift`、`TexDecoder.swift`）：
+  - `WETexture.Mip` 保存原始（可能压缩的）字节，上传时直接解码进暂存缓冲（`write(to:capacity:)`），不再有整张图的临时副本；`data` 仍可按需解码（测试用）。
+  - 上传完成后把暂存缓冲设为 purgeable-empty；上传命令缓冲用不保留引用的版本，并在 autoreleasepool 里提交。
+  - noInterpolation 贴图不生成 mipmap。
+  - `SharedSceneTextures`：按（设备、场景文件夹、贴图名）弱引用共享已上传的静态贴图；只在上传完成后发布；分辨率不低于所需时复用；视频和文字贴图不共享。
+- **结果**（场景测试工具，`LUMEN_MEMORY=1`，等 6 秒后的 footprint）：单份 3,072 MB → 1,378 MB；再加载一份预览（`LUMEN_MEMORY_TWICE=1`）后 1,385 MB，贴图确认为同一对象。按 app 里三份同时存在估算，约 7.2 GB → 1.4 GB 左右。剩下的 1.3 GB 是这张精灵图本身的大小，Windows 上的 Wallpaper Engine 同样要这么多显存。
+- **验证**：build 通过；`unit` 46/46；`scenes` 75/75，无洋红，与上一基线的像素差异只来自时钟和时段。没能在真实 app 里复测：用户已把桌面换成视频壁纸，没有为测试改回去。
+- **测试工具**：`LUMEN_MEMORY` 现在打印 footprint，`LUMEN_MEMORY_PAUSE`、`LUMEN_MEMORY_TWICE` 见 `docs/TESTING.md`。
+- **下一步可选**：超大精灵图可在加载时转成 GPU 压缩格式（ASTC），或按显示需要降采样，再省一半以上；需要评估加载耗时和画质。
 
 ### 2026-11-25 · claude · `claude/T36-ui-polish` 第二、三批，合并到 `main`，发布 0.2.1
 

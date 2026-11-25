@@ -38,7 +38,7 @@ Tools/test.sh scenes
   - 很轻的场景 GPU 不升频，数字会大幅抖动（同一场景 6–18ms）。比较新旧代码时，把一个重场景排在前面一起跑（例如 `2275492265,<目标场景>`），并在旧代码的 worktree 里用同样的参数跑一遍。
   - 默认的单帧 GPU 时间在两次全量运行之间能差 ±5ms，不能用来判断某个改动的代价。
 - 对比渲染和作者预览时，`visual` 的分数受预览裁切、播放时刻和用户设置影响很大，只适合排序。要找肉眼可见的问题，把每个场景的渲染和 `-ref.png` 并排拼图逐个看。
-- `LUMEN_MEMORY=1`：打印每个场景加载后的 GPU 内存。
+- `LUMEN_MEMORY=1`：打印每个场景加载后、以及渲染并等待 6 秒后的 GPU 内存和进程 footprint（即活动监视器「内存」列）。Metal 自己的 `currentAllocatedSize` 会把已清空的暂存缓冲也算进去，判断占用以 footprint 为准。`LUMEN_MEMORY_TWICE=1` 在第一份还在时再按预览尺寸加载一次同一场景，检查贴图是否共享。`LUMEN_MEMORY_PAUSE=120` 让进程在测完后停住，便于用 `footprint <pid>`、`vmmap -summary <pid>` 查看分类。
 
 
 ```bash

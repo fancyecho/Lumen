@@ -49,7 +49,47 @@ struct WETexture {
     struct Mip {
         let width: Int
         let height: Int
-        let data: Data
+        /// The bytes as stored: LZ4-compressed when `decodedSize` is set. Decoding waits until the
+        /// upload so a large sheet (five 8192² images are 1.3 GB) never sits decoded in memory.
+        let stored: Data
+        let decodedSize: Int?
+
+        init(width: Int, height: Int, data: Data) {
+            self.init(width: width, height: height, stored: data, decodedSize: nil)
+        }
+
+        init(width: Int, height: Int, stored: Data, decodedSize: Int?) {
+            self.width = width
+            self.height = height
+            self.stored = stored
+            self.decodedSize = decodedSize
+        }
+
+        /// Size of the pixels once decoded.
+        var byteCount: Int { decodedSize ?? stored.count }
+
+        /// The decoded pixels as a new buffer.
+        var data: Data {
+            guard let decodedSize else { return stored }
+            var output = Data(count: decodedSize)
+            let written = output.withUnsafeMutableBytes { write(to: $0.baseAddress!, capacity: decodedSize) }
+            if written < decodedSize { output.count = written }
+            return output
+        }
+
+        /// Decodes into `destination` and returns the bytes written (0 if decoding failed).
+        func write(to destination: UnsafeMutableRawPointer, capacity: Int) -> Int {
+            stored.withUnsafeBytes { source -> Int in
+                guard let base = source.baseAddress, capacity > 0 else { return 0 }
+                guard decodedSize != nil else {
+                    let count = min(capacity, source.count)
+                    destination.copyMemory(from: base, byteCount: count)
+                    return count
+                }
+                return compression_decode_buffer(destination.assumingMemoryBound(to: UInt8.self), capacity,
+                                                 base.assumingMemoryBound(to: UInt8.self), source.count, nil, COMPRESSION_LZ4_RAW)
+            }
+        }
     }
 
     /// One frame of a sprite-sheet animation, in normalised coordinates of its image.
@@ -188,10 +228,10 @@ struct WETexture {
             }
             var mips: [Mip] = []
             for (index, entry) in raw.enumerated() where index >= startIndex {
-                let bytes = entry.3 ? try lz4(entry.2, size: entry.4) : entry.2
                 let expected = format.byteCount(width: entry.0, height: entry.1)
-                guard bytes.count >= expected, entry.0 > 0, entry.1 > 0 else { break }
-                mips.append(Mip(width: entry.0, height: entry.1, data: bytes))
+                let size = entry.3 ? entry.4 : entry.2.count
+                guard size >= expected, entry.0 > 0, entry.1 > 0 else { break }
+                mips.append(Mip(width: entry.0, height: entry.1, stored: entry.2, decodedSize: entry.3 ? entry.4 : nil))
             }
             guard let first = mips.first else { throw DecodeError.unsupported("empty mip chain") }
             if images.isEmpty, startIndex > 0, raw[0].0 > 0 {
