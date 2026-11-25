@@ -114,6 +114,7 @@
 		BE3FC4814B9F9DF6E0B833AD /* SteamNativeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */; };
 		BF81AAA72F88EFF9D0A5AFDC /* WallpaperRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4318FBE8610E9D2D8C283E /* WallpaperRenderer.swift */; };
 		C086B78155FD8DD67DE526A4 /* LocalContentSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A440091108727012FE21D5 /* LocalContentSchemeHandler.swift */; };
+		C24B1ABF08C3B92A49ACBB1B /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 18A15850E9B7F4468AC68875 /* AppIcon.icon */; };
 		C24BFDA97A4F4C3901D30906 /* MediaInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF816B14AA073CA5F3EC601 /* MediaInspector.swift */; };
 		C2FA0CAE0F960EB81EC8A3CA /* PauseReason.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434FBF47296311D0EB8ADDE0 /* PauseReason.swift */; };
 		C384EEBFF3705571B5385B8D /* WEShaderPreprocessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9505ABE5F366AC111FD86AD /* WEShaderPreprocessor.swift */; };
@@ -172,6 +173,7 @@
 		10CE19AE02B2A55A9A233629 /* TexDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TexDecoderTests.swift; sourceTree = "<group>"; };
 		16C7FAA282E155E1949A6636 /* PROStrands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PROStrands.swift; sourceTree = "<group>"; };
 		1867B46652CB381C804EC68D /* SceneModelCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneModelCamera.swift; sourceTree = "<group>"; };
+		18A15850E9B7F4468AC68875 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		1ADD2132A789BBA75A6A538C /* SteamNativeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamNativeSession.swift; sourceTree = "<group>"; };
 		1B0FDE93074E5ECB186C898A /* CodeSeaRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeSeaRenderer.swift; sourceTree = "<group>"; };
 		1C6360661D5A0519AA9ED8AE /* SteamCM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCM.swift; sourceTree = "<group>"; };
@@ -423,6 +425,7 @@
 		42BAF569E0FECC28CDFBCB3B /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				18A15850E9B7F4468AC68875 /* AppIcon.icon */,
 				A344EC8028FF1FF31AA92DBD /* Assets.xcassets */,
 				EC8C92BB33CB07341BE34F69 /* InfoPlist.xcstrings */,
 				4244B249389139ABF718F32A /* Localizable.xcstrings */,
@@ -796,6 +799,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C24B1ABF08C3B92A49ACBB1B /* AppIcon.icon in Resources */,
 				994F782287920E4097852C07 /* Assets.xcassets in Resources */,
 				3CC66D3274D7DA5B9501BC06 /* CodeSea.msl in Resources */,
 				30B11146B38E425308C53EFE /* CodeSeaVerses.txt in Resources */,

@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-25 · claude（T37 通用渲染问题、T34 `createLayer`，已合并 `main`）
+> 最后更新：2026-11-25 · claude（T38 新 app 图标与菜单栏图标，已合并 `main`）
 
 ## 1. 阶段进度
 
@@ -87,6 +87,7 @@
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
 | T36 | 界面打磨第五轮：Steam 密码框点登录后不再清空；工具栏搜索框点别处会退出输入；创意工坊页隐藏底部播放条，预览侧栏三边等距对齐；顶部分段控件外壳贴合；播放列表页和编辑页重新设计 | UI | 高 | 待验证 | claude | 分支 `claude/T36-ui-polish`，未提交，等用户确认后提交/合并 |
 | T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
+| T38 | 重新设计 app 图标和菜单栏图标：简约、高级、玻璃质感、一眼能看出是壁纸软件 | UI | 中 | 完成 | claude | 已合并 `main`（分支 `claude/T38-app-icon`）。用户选了无框的整幅 app 图标和「波纹太阳」菜单栏图标。Icon Composer 文档 `Lumen/Resources/AppIcon.icon` 取代旧的 PNG 图标集；菜单栏改用模板图 `MenuBarIcon` / `MenuBarIconPlaying`；都由 `Tools/make-icon.py` 生成 |
 
 **2026-11-23 claude 补充（给 T02）**：「[Chisa]Autumn and temple」（库里 EDF506EA…）的 `02眼组` 是木偶模型，贴图是眼白/瞳孔/闭眼的拼图，必须按 `02眼组_puppet.mdl` 里的网格顶点和 UV 去画；**哪怕先只画静止网格、不做骨骼动画，眼睛错位也会消失**，建议 T02 先交付这一步。
 
@@ -100,6 +101,19 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-25 · claude · T38 新 app 图标与菜单栏图标（已合并 `main`）
+
+- 从 `main`（`daad7db`）开的 worktree `build/worktrees/claude-T38`，没碰主目录里 T36 第二批的未提交改动。
+- **app 图标**：改成 Icon Composer 文档 `Lumen/Resources/AppIcon.icon`，删掉旧的 `AppIcon.appiconset`（彩色流体 + 显示器线框）。
+  - 画面：整个图标就是一张壁纸，内容铺满不加框。素净的靛紫天空，只在地平线留一层淡玫瑰色余晖，太阳从三层薰衣草色沙丘后升起。沙丘各是一层 Liquid Glass，所以每道山脊都有系统高光；天空层不加玻璃，让玻璃在它前面显出来。
+  - 用户先看了「玻璃屏幕里放壁纸」的带框版本，选了无框版本；带框版本不再保留。
+  - 天空层盖满画布，深色模式和浅色模式看起来一样；透明、着色模式由系统自动生成，已用 `ictool` 逐一渲染检查。
+  - XcodeGen 2.46 把 `.icon` 识别为 `wrapper.icon` 放进 Resources，`ASSETCATALOG_COMPILER_APPICON_NAME` 仍是 `AppIcon`，`project.yml` 不用改。编译产物里有分层图标（`IconImageStack`）和兜底的 `AppIcon.icns`。
+- **菜单栏图标**：`LumenApp` 里的系统符号 `sparkles.rectangle.stack` 换成模板图「波纹太阳」：把 app 图标浓缩成一个标志，圆形太阳被两道沙丘形的缝切开，没有光芒，不会被看成天气图标。播放时整个圆盘实心（太阳亮着），空闲时只剩圆环和实心的两层沙丘（太阳熄了），仍按 `isAnyPlaying` 切换。18pt SVG，保留矢量，线宽 1.5pt 与系统菜单栏符号一致，补了无障碍标签 "Lumen"。用户觉得第一版（圆角框 + 太阳 + 波浪）太普通；另外试过太阳破框、取景框折角、迷你 app 图标，在菜单栏尺寸下都不如这版。
+- **重新生成**：`python3 Tools/make-icon.py` 会写出上面两部分，并把六种外观的渲染图放到 `build/icon-preview/`。改颜色或几何形状只改这个脚本。
+- **验证**：`Tools/test.sh build` 通过。用 `NSWorkspace` 取了构建产物的图标（和访达、程序坞看到的一致；换图标后系统图标缓存要等 app 包的修改时间变了才会刷新）；从编译后的 `Assets.car` 读出两个菜单栏图标：18×18pt、模板、矢量，浅色和深色菜单栏、Retina 和 1x 下都清楚。用户自己的 Lumen 当时在运行，所以没有再启动一个实例，也就没在真实菜单栏里截图（截屏没有屏幕录制权限）。
+- 代码里没有别处直接引用图标，`Tools/release.sh` 打的 DMG 也没有自定义背景，新图标随 app 包自动生效。
 
 ### 2026-11-25 · claude · T37 通用渲染问题、T34 `createLayer`（已合并 `main`）
 
