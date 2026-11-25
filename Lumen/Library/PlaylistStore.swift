@@ -10,9 +10,12 @@ final class PlaylistStore {
     private(set) var nextChange: Date?
 
     @ObservationIgnored var applyHandler: ((Wallpaper) -> Void)?
+    /// The active rotation's running order (shuffled once per start when shuffle is on) and the
+    /// index showing now. Observed, so the Playlists page can show what's up next.
+    private(set) var order: [UUID] = []
+    private(set) var position = 0
+
     @ObservationIgnored private let library: LibraryStore
-    @ObservationIgnored private var order: [UUID] = []
-    @ObservationIgnored private var position = 0
     @ObservationIgnored private var timer: Timer?
     private static let activeKey = "activePlaylist"
 
@@ -21,6 +24,9 @@ final class PlaylistStore {
     }
 
     var active: Playlist? { playlists.first { $0.id == activeID } }
+
+    /// The wallpaper the active rotation is showing.
+    var currentID: UUID? { order.indices.contains(position) ? order[position] : nil }
 
     func playlist(id: UUID) -> Playlist? { playlists.first { $0.id == id } }
 
@@ -95,6 +101,14 @@ final class PlaylistStore {
     func next() { step(by: 1) }
     func previous() { step(by: -1) }
 
+    /// Jumps the active rotation to one of its wallpapers; the interval starts over from there.
+    func show(_ wallpaperID: UUID) {
+        guard let index = order.firstIndex(of: wallpaperID) else { return }
+        position = index
+        applyCurrent()
+        schedule()
+    }
+
     private func step(by delta: Int) {
         guard !order.isEmpty else { return }
         position = (position + delta + order.count) % order.count
@@ -108,8 +122,15 @@ final class PlaylistStore {
             return
         }
         let valid = playlist.wallpaperIDs.filter { library.wallpaper(id: $0) != nil }
+        let showing = currentID
         order = playlist.shuffle ? valid.shuffled() : valid
-        position = min(position, max(order.count - 1, 0))
+        // Follow the wallpaper on screen, not the index: after a reorder the old index points at
+        // a different wallpaper than the one the desktop is showing.
+        if let showing, let index = order.firstIndex(of: showing) {
+            position = index
+        } else {
+            position = min(position, max(order.count - 1, 0))
+        }
     }
 
     private func applyCurrent() {

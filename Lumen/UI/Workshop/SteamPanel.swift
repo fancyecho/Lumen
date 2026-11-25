@@ -35,6 +35,11 @@ struct SteamPanel: View {
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
         .onDisappear { steam.cancelQRSignIn() }
+        // The password stays in the field after a failed attempt so it can be corrected; once Steam
+        // accepts it, SteamCMD keeps the login and the panel has no reason to hold on to it.
+        .onChange(of: steam.isSignedIn) { _, signedIn in
+            if signedIn { password = "" }
+        }
         .sheet(isPresented: $showsBrowser) {
             SteamWorkshopBrowser { id in
                 model.steam.download(id)
@@ -131,10 +136,15 @@ struct SteamPanel: View {
                     qrSignInButton(steam)
                     DisclosureGroup("Advanced: Sign In with SteamCMD", isExpanded: $showsSteamCMD) {
                         VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                            TextField("Steam account name", text: $username)
-                                .textFieldStyle(.roundedBorder)
-                            SecureField("Password", text: $password)
-                                .textFieldStyle(.roundedBorder)
+                            Group {
+                                TextField("Steam account name", text: $username)
+                                SecureField("Password", text: $password)
+                                    .onSubmit { signIn(steam) }
+                            }
+                            .textFieldStyle(.roundedBorder)
+                            // Locked, not emptied, while SteamCMD works: a field that blanks itself on
+                            // click reads as if the password was rejected.
+                            .disabled(steam.isSigningIn)
                             HStack {
                                 if steam.isSigningIn {
                                     ProgressView().controlSize(.small)
@@ -143,10 +153,7 @@ struct SteamPanel: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Button("Sign In") {
-                                    steam.signIn(username: username, password: password)
-                                    password = ""
-                                }
+                                Button("Sign In") { signIn(steam) }
                                 .buttonStyle(.lumenPrimary)
                                 .disabled(username.isEmpty || password.isEmpty || steam.isBusy)
                             }
@@ -232,6 +239,11 @@ struct SteamPanel: View {
             }
             .frame(maxHeight: 210)
         }
+    }
+
+    private func signIn(_ steam: SteamWorkshop) {
+        guard !username.isEmpty, !password.isEmpty, !steam.isBusy else { return }
+        steam.signIn(username: username, password: password)
     }
 
     private func startDownload() {

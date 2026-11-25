@@ -12,6 +12,124 @@
         }
       }
     },
+    "%lld playlists": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld playlist"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld playlists"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个播放列表"
+          }
+        }
+      }
+    },
+    "Click a wallpaper to add it, and click again to take it out.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击壁纸即可加入，再次点击移出。"
+          }
+        }
+      }
+    },
+    "Drag to reorder. With Shuffle on, the order is mixed each time the rotation starts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动可调整顺序。开启随机后，每次开始轮换都会重新打乱。"
+          }
+        }
+      }
+    },
+    "Edit Playlist": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑播放列表"
+          }
+        }
+      }
+    },
+    "Move Down": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下移"
+          }
+        }
+      }
+    },
+    "Move Up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上移"
+          }
+        }
+      }
+    },
+    "No wallpapers yet. Pick some from your library below.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有壁纸，从下方的资源库里挑几张吧。"
+          }
+        }
+      }
+    },
+    "Only one wallpaper, so there's nothing to rotate yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有一张壁纸，暂时没有可轮换的。"
+          }
+        }
+      }
+    },
+    "Remove from Playlist": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从播放列表移除"
+          }
+        }
+      }
+    },
+    "Show Now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即显示"
+          }
+        }
+      }
+    },
     "“%@” is already compact, so Lumen kept the original": {
       "localizations": {
         "zh-Hans": {

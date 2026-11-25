@@ -47,8 +47,9 @@ struct WorkshopView: View {
                     }
                     .padding(.leading, Theme.Space.page)
                     .padding(.trailing, inspectorVisible ? Theme.Space.xl : Theme.Space.page)
-                    .padding(.top, Theme.Space.lg)
-                    .padding(.bottom, Theme.Space.xxl + Theme.Space.xs)
+                    .padding(.top, Self.contentTop)
+                    // Scrolled to the end, the pager's bottom edge meets the preview panel's.
+                    .padding(.bottom, Self.contentTop)
                     .frame(maxWidth: Theme.Layout.galleryMaxWidth, alignment: .leading)
                     .frame(maxWidth: .infinity)
                 }
@@ -59,11 +60,12 @@ struct WorkshopView: View {
                 }
             }
             if inspectorVisible {
+                // Same inset on three sides, and the top shares the page header's top edge
+                // (`contentTop`), so the panel sits square in the corner of the window.
                 WorkshopInspector()
                     .frame(width: 340)
-                    .padding(.trailing, Theme.Space.md)
-                    .padding(.top, Theme.Space.sm)
-                    .padding(.bottom, Theme.Space.md)
+                    .padding(.top, Self.contentTop)
+                    .padding([.trailing, .bottom], Self.contentTop)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -74,6 +76,8 @@ struct WorkshopView: View {
     }
 
     private static let topAnchor = "workshop-top"
+    /// Gap between the toolbar and the first line of the page; the preview panel uses it on every side.
+    private static let contentTop = Theme.Space.lg
 
     private var header: some View {
         PageHeader(eyebrow: "Wallpaper Engine", title: "Workshop", subtitle: subtitle) {
