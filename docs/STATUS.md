@@ -115,7 +115,9 @@
 - **签名**：本机唯一的签名证书是 Apple Development 证书，用它签发布版会把证书里的邮箱写进签名并公开，所以发布版继续用临时签名。
 - **README / LICENSE**：双语 README（功能、实测数据、安装、结构与实现、已知问题、构建、许可与致谢）；参考项目链接已核实（`MMFoundation/WallpaperMachine`、`laobamac/MirageWallpaper`，均 GPL-3.0）。新增 MIT `LICENSE`（版权人写的是 GitHub 用户名 fancyecho）。
 - **公开前检查**：提交作者均为 GitHub noreply 邮箱；仓库文件和历史里没有邮箱、密钥、本机路径或用户的个人图片（历史里的图片只有旧版 App 图标）。
-- **没做**：README 还没有截图；Intel Mac 未实测；更新器的完整替换流程用一份临时的 0.1.99 构建验证（见下方结果）。
+- **更新器实测**：仓库公开、v0.2.0 发布后，用版本号改成 0.1.99 的临时副本（`-LumenDebugInstallUpdate YES`）跑完整流程：15 秒内下载、校验、替换并以 0.2.0 重新打开，签名有效、通用二进制，没有残留备份。第一次没触发是调试开关和启动时的自动检查抢跑，已改为等待正在进行的检查。
+- **安装与发布**：`/Applications/Lumen.app` 已装 0.2.0 并运行（替换了此前运行的 Debug 构建）；GitHub Release v0.2.0 附 DMG、zip 和两个校验文件；仓库已公开，许可证 MIT，加了 topics。
+- **没做**：README 还没有截图；Intel Mac 未实测。注意：界面会话在主工作区（`claude/T36-ui-polish`）还有未提交的改动，不在 0.2.0 里；它若再启动 Debug 构建，会和已安装的版本同时运行。
 
 ### 2026-11-25 · claude · T38 新 app 图标与菜单栏图标（已合并 `main`）
 

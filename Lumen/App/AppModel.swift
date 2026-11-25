@@ -91,7 +91,9 @@ final class AppModel {
         // to test the whole update path on a throwaway copy built with a lower version.
         if UserDefaults.standard.bool(forKey: "LumenDebugInstallUpdate") {
             Task {
-                await updater.check()
+                // The automatic check may already be running; wait for it instead of skipping.
+                while updater.state == .checking { try? await Task.sleep(for: .milliseconds(200)) }
+                if updater.available == nil { await updater.check() }
                 if let release = updater.available { await updater.install(release) }
             }
         }
