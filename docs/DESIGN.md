@@ -177,10 +177,13 @@ Heights follow `controlSize`: small 24, regular 28, large 34. A row of controls 
 - Filter rows scroll horizontally; titles truncate on one line in cards and rows; the detail title truncates but stays editable in full.
 - Bottom padding on every scroll view clears the Now Playing bar (the bar is a `safeAreaBar`, so pages without it simply get the space back).
 - The toolbar's section picker is `.fixedSize()`: its glass shell hugs the segments, with no empty margin at either end.
+- **Toolbar.** Navigation on the leading edge: Back (a 36 pt glass circle of its own, dimmed rather than removed on top-level pages so the tabs never shift) and the section tabs. Everything else is one group on the trailing edge: Lumen's own 230 pt search field, Add Wallpaper, the downloads ring while it applies, then display and settings in the corner. Each control is its own glass shape with a gap around it, so none melt together. The system search item isn't used because it always claims its own region at the far right, which stranded the action buttons mid-bar. ⌘F focuses the search field and Escape clears it.
 - Clicking anywhere outside the toolbar search field ends editing there (`SearchFieldFocus`), as in Safari and Finder.
 - Captions sit flush with the artwork edge (no extra inset); rows of controls share one height; tiles have fixed heights so wrapping can't break a row.
-- Content scrolling under the toolbar gets the soft scroll-edge effect (`.scrollEdgeEffectStyle(.soft, for: .top)` on the page).
+- Content scrolls under the transparent toolbar without an edge effect (`.scrollEdgeEffectHidden(true, for: .top)`): on macOS 27 the system effect draws a solid band with a hairline across the top even at rest, which cut the room's colour off behind the buttons.
+- The Workshop grid shows no scroller while the preview panel is open (it sat in the gutter between the two); the pager is the way through the results.
 
 ## 13. Known limits
 
+- Large surfaces (Home stage, rotation stage, menu bar panel) use `ThumbnailView(resolution: .poster)`: up to 2560 px, taken from the video file (`poster.jpg` beside it) or rendered from the shader at 1920 × 1080, so the still is as sharp as the live preview. Cards keep 960 px thumbnails; a video thumbnail smaller than 640 px (an old Workshop preview) is rebuilt from the video once.
 - Many Workshop scenes ship only a 160–256 px preview GIF, so their cards and the Home stage are soft. Fixing that needs a crisp poster frame rendered from the scene (see the T32 entry on the board in `docs/STATUS.md`); the layouts above avoid full-bleed artwork for this reason.

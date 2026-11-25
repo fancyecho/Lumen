@@ -7,6 +7,7 @@ struct RootView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDropTargeted = false
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         @Bindable var router = model.router
@@ -17,8 +18,9 @@ struct RootView: View {
             page
                 .id(pageID)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 6)))
-                // Content scrolling under the toolbar fades out softly instead of colliding with its buttons.
-                .scrollEdgeEffectStyle(.soft, for: .top)
+                // The room runs up behind the toolbar; the system edge effect would draw a solid band
+                // across it (at rest too, on macOS 27).
+                .scrollEdgeEffectHidden(true, for: .top)
         }
         .animation(reduceMotion ? nil : Theme.Motion.smooth, value: pageID)
         .safeAreaBar(edge: .bottom) {
@@ -38,7 +40,14 @@ struct RootView: View {
         .animation(reduceMotion ? nil : Theme.Motion.quick, value: isDropTargeted)
         .toolbar { toolbarContent }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .searchable(text: $router.searchText, placement: .toolbar, prompt: "Search wallpapers")
+        // ⌘F, as the system search item had.
+        .background {
+            Button("Search wallpapers") { isSearchFocused = true }
+                .keyboardShortcut("f")
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
         .dropDestination(for: URL.self) { urls, _ in
             model.importFiles(urls)
             return true
@@ -121,18 +130,19 @@ struct RootView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if model.router.route != nil {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    model.router.back()
-                } label: {
-                    Label("Back", systemImage: "chevron.left")
-                }
-                .help("Back")
-            }
+        // Navigation sits on the leading edge and actions on the trailing one, so the bar balances
+        // instead of crowding the centre and right — and the tabs never butt up against the action
+        // buttons, where their glass shapes melted into one. Back keeps its slot (dimmed on top-level
+        // pages) so the tabs don't jump sideways every time a detail page opens or closes.
+        ToolbarItem(placement: .navigation) {
+            ToolbarBackButton(isEnabled: model.router.route != nil) { model.router.back() }
+                // Its own glass circle with a real gap: inside the shared toolbar background it
+                // melted into the tab bar beside it (a fixed spacer doesn't apply on the leading edge).
+                .padding(.trailing, Theme.Space.xs)
         }
+        .sharedBackgroundVisibility(.hidden)
 
-        ToolbarItem(placement: .principal) {
+        ToolbarItem(placement: .navigation) {
             Picker("Section", selection: Binding(
                 get: { model.router.tab },
                 set: { model.router.show($0) }
@@ -148,23 +158,22 @@ struct RootView: View {
             .fixedSize()
         }
 
-        if showsDownloads {
-            ToolbarItem(placement: .primaryAction) {
-                DownloadsToolbarButton()
-            }
+        // macOS lines toolbar items up from the leading edge; this carries the rest to the trailing
+        // edge as one group: search, Add Wallpaper, then display and settings in the corner. (The
+        // system search item always claimed its own region at the far right, stranding these
+        // buttons mid-bar, so search is Lumen's own field.)
+        ToolbarSpacer(.flexible)
+
+        ToolbarItem(placement: .automatic) {
+            ToolbarSearchField(
+                text: Binding(get: { model.router.searchText }, set: { model.router.searchText = $0 }),
+                isFocused: $isSearchFocused
+            )
         }
 
-        ToolbarItemGroup(placement: .primaryAction) {
-            DisplaysMenu()
-            SettingsLink {
-                Label("Settings", systemImage: "gearshape")
-            }
-            .help("Settings")
-        }
+        ToolbarSpacer(.fixed)
 
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(placement: .automatic) {
             Menu {
                 Button("Videos, Projects or Folders…") { model.isImporterPresented = true }
                 Button("Web Page…") { model.isWebPageSheetPresented = true }
@@ -178,11 +187,25 @@ struct RootView: View {
                 model.isImporterPresented = true
             }
             .menuStyle(.button)
-            .buttonStyle(.glass)
             .fixedSize()
             .help("Add videos, Wallpaper Engine projects or web pages (⌘O)")
         }
-        .sharedBackgroundVisibility(.hidden)
+
+        if showsDownloads {
+            ToolbarItem(placement: .automatic) {
+                DownloadsToolbarButton()
+            }
+        }
+
+        ToolbarSpacer(.fixed)
+
+        ToolbarItemGroup(placement: .automatic) {
+            DisplaysMenu()
+            SettingsLink {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .help("Settings")
+        }
     }
 
     /// Workshop downloads in the toolbar: always on the Workshop tab once there are any, elsewhere
@@ -203,6 +226,11 @@ struct RootView: View {
         NSApp.setActivationPolicy(.regular)
         SearchFieldFocus.install()
         #if DEBUG
+        // Launch flags live in the argument domain for the whole process, and this runs every time
+        // the window reappears (menu bar, Dock). Applying them again snapped a window the person had
+        // resized back to the launch size — suddenly narrower — so they apply to the first window only.
+        guard !DebugLaunchFlags.applied else { return finishAppearing() }
+        DebugLaunchFlags.applied = true
         if UserDefaults.standard.bool(forKey: "LumenDebugMenuPreview") {
             openWindow(id: SceneID.menuPreview)
         }
@@ -219,6 +247,10 @@ struct RootView: View {
             Task { @MainActor in await runDebugCapture(to: URL(fileURLWithPath: dir)) }
         }
         #endif
+        finishAppearing()
+    }
+
+    private func finishAppearing() {
         if model.launchedAsLoginItem {
             // Started by launch-at-login: run quietly from the menu bar.
             model.launchedAsLoginItem = false
@@ -303,6 +335,13 @@ struct RootView: View {
     }
 }
 
+#if DEBUG
+@MainActor
+private enum DebugLaunchFlags {
+    static var applied = false
+}
+#endif
+
 /// Ends editing in the toolbar search field when the person clicks anywhere else in the window.
 ///
 /// AppKit only moves keyboard focus when another text field is clicked, so after one search the
@@ -321,9 +360,12 @@ enum SearchFieldFocus {
     }
 
     private static func endSearchIfClickedElsewhere(_ event: NSEvent) {
+        // Only the toolbar's search field: toolbar views live beside the content view, not in it,
+        // so fields on a page (which end editing the usual way) are left alone.
         guard let window = event.window,
               let editor = window.firstResponder as? NSTextView, editor.isFieldEditor,
-              let field = editor.delegate as? NSSearchField
+              let field = editor.delegate as? NSTextField,
+              let content = window.contentView, !field.isDescendant(of: content)
         else { return }
         // The frame view is the window's root, so its hit-testing takes window coordinates and
         // covers the toolbar as well as the content.
@@ -333,6 +375,69 @@ enum SearchFieldFocus {
         // Clicking another field moves focus there by itself.
         if hit is NSTextField || hit is NSTextView { return }
         window.makeFirstResponder(nil)
+    }
+}
+
+/// The toolbar's search field: magnifier, plain text field, clear button; Escape clears it.
+private struct ToolbarSearchField: View {
+    @Binding var text: String
+    var isFocused: FocusState<Bool>.Binding
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Theme.Ink.tertiary)
+                .accessibilityHidden(true)
+            TextField("Search wallpapers", text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.Ink.primary)
+                .focused(isFocused)
+                .onExitCommand {
+                    text = ""
+                    isFocused.wrappedValue = false
+                }
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Ink.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Clear"))
+            }
+        }
+        .padding(.horizontal, Theme.Space.sm)
+        .frame(width: 230)
+    }
+}
+
+/// A 36 pt glass circle like the toolbar's other round buttons; dimmed, not removed, on top-level
+/// pages so the tabs beside it keep their place.
+private struct ToolbarBackButton: View {
+    let isEnabled: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isEnabled ? Theme.Ink.primary : Theme.Ink.quaternary)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Color.white.opacity(hovering && isEnabled ? 0.08 : 0)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular, in: .circle)
+        .disabled(!isEnabled)
+        .onHover { hovering = $0 }
+        .animation(Theme.Motion.quick, value: hovering)
+        .help("Back")
+        .accessibilityLabel(Text("Back"))
     }
 }
 
