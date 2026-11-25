@@ -22,8 +22,13 @@ struct RootView: View {
         }
         .animation(reduceMotion ? nil : Theme.Motion.smooth, value: pageID)
         .safeAreaBar(edge: .bottom) {
-            NowPlayingBar().padding(.bottom, Theme.Space.sm)
+            if showsNowPlaying {
+                NowPlayingBar()
+                    .padding(.bottom, Theme.Space.sm)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
+            }
         }
+        .animation(reduceMotion ? nil : Theme.Motion.smooth, value: showsNowPlaying)
         .overlay(alignment: .top) {
             ToastOverlay().padding(.top, Theme.Space.xs)
         }
@@ -101,6 +106,12 @@ struct RootView: View {
         model.router.route.map { String(describing: $0) } ?? model.router.tab.rawValue
     }
 
+    /// The Workshop is a store front with its own pager and preview sidebar running to the bottom
+    /// edge; a transport bar floating over them only gets in the way, so it steps aside there.
+    private var showsNowPlaying: Bool {
+        !(model.router.route == nil && model.router.tab == .workshop)
+    }
+
     private var focusedWallpaper: Wallpaper? {
         switch model.router.route {
         case .wallpaper(let id), .studio(let id): model.library.wallpaper(id: id)
@@ -132,7 +143,9 @@ struct RootView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(minWidth: 360, idealWidth: 420, maxWidth: 450)
+            // Natural size, so the toolbar's glass shell hugs the segments instead of padding a
+            // fixed-width frame with empty space at both ends.
+            .fixedSize()
         }
 
         if showsDownloads {
@@ -188,6 +201,7 @@ struct RootView: View {
 
     private func windowAppeared() {
         NSApp.setActivationPolicy(.regular)
+        SearchFieldFocus.install()
         #if DEBUG
         if UserDefaults.standard.bool(forKey: "LumenDebugMenuPreview") {
             openWindow(id: SceneID.menuPreview)
@@ -286,6 +300,39 @@ struct RootView: View {
         if model.settings.dockIconMode == .whileWindowOpen {
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+}
+
+/// Ends editing in the toolbar search field when the person clicks anywhere else in the window.
+///
+/// AppKit only moves keyboard focus when another text field is clicked, so after one search the
+/// field kept its focus ring — looking like it still waited for input — until the window closed.
+/// Safari and Finder let a click on the page dismiss the field; this does the same.
+@MainActor
+enum SearchFieldFocus {
+    private static var monitor: Any?
+
+    static func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            MainActor.assumeIsolated { endSearchIfClickedElsewhere(event) }
+            return event
+        }
+    }
+
+    private static func endSearchIfClickedElsewhere(_ event: NSEvent) {
+        guard let window = event.window,
+              let editor = window.firstResponder as? NSTextView, editor.isFieldEditor,
+              let field = editor.delegate as? NSSearchField
+        else { return }
+        // The frame view is the window's root, so its hit-testing takes window coordinates and
+        // covers the toolbar as well as the content.
+        let root = window.contentView?.superview ?? window.contentView
+        guard let hit = root?.hitTest(event.locationInWindow) else { return }
+        if hit === field || hit.isDescendant(of: field) { return }
+        // Clicking another field moves focus there by itself.
+        if hit is NSTextField || hit is NSTextView { return }
+        window.makeFirstResponder(nil)
     }
 }
 
