@@ -45,7 +45,7 @@ Lumen 想解决一件具体的事：在 Mac 上，用一个省电、原生的 Ap
 2. Lumen 目前**没有 Apple 开发者签名和公证**，第一次打开会被 Gatekeeper 拦下：到「系统设置 › 隐私与安全性」点「仍要打开」。详细步骤和校验方法见 [docs/INSTALL.md](docs/INSTALL.md)。
 3. 之后的版本可以在「设置 › 通用」里检查并一键安装（默认每天自动检查一次，可关闭）。
 
-场景壁纸需要 Wallpaper Engine 的共享 `assets` 文件夹（着色器、材质），它属于 Wallpaper Engine 本体，Lumen 不附带。装过 Steam 版 Wallpaper Engine 的话会自动找到，也可以在「设置 › Wallpaper Engine」里指定。下载创意工坊作品需要一个拥有 Wallpaper Engine 的 Steam 账号。
+场景壁纸需要 Wallpaper Engine 的共享 `assets` 文件夹（着色器、材质），它属于 Wallpaper Engine 本体，Lumen 不附带。登录拥有 Wallpaper Engine 的 Steam 账号后，在资源库的提示或「设置 › Wallpaper Engine」里点「从 Steam 下载」，Lumen 会只取出 `assets`（约 85 MB），保存在自己的文件夹 `~/Library/Application Support/Lumen/SceneAssets`，不依赖其他应用；也可以从文件夹导入一份。下载创意工坊作品同样需要这个账号。
 
 ### 项目结构与实现
 
@@ -160,7 +160,7 @@ These numbers come from the regression tools in this repository (`Tools/test.sh`
 2. Lumen is **not signed with an Apple Developer ID or notarized** yet, so Gatekeeper blocks the first launch: open System Settings › Privacy & Security and click Open Anyway. [docs/INSTALL.md](docs/INSTALL.md) has the details and how to verify the download.
 3. Later versions can be checked for and installed from Settings › General (Lumen checks once a day; you can turn that off).
 
-Scene wallpapers need Wallpaper Engine's shared `assets` folder (shaders and materials). It belongs to Wallpaper Engine itself and isn't bundled with Lumen; Lumen finds it automatically if the Steam version of Wallpaper Engine is installed, or you can point to it in Settings › Wallpaper Engine. Downloading Workshop items needs a Steam account that owns Wallpaper Engine.
+Scene wallpapers need Wallpaper Engine's shared `assets` folder (shaders and materials). It belongs to Wallpaper Engine itself and isn't bundled with Lumen. Once you sign in with a Steam account that owns Wallpaper Engine, click Download from Steam in the Library notice or in Settings › Wallpaper Engine: Lumen fetches only `assets` (about 85 MB) and keeps it in its own folder, `~/Library/Application Support/Lumen/SceneAssets`, so it doesn't depend on any other app. You can also import a copy from a folder. Downloading Workshop items needs the same account.
 
 ### Project structure and implementation
 

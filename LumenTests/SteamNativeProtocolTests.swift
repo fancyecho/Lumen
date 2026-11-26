@@ -81,6 +81,24 @@ final class SteamNativeProtocolTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: folder.appending(path: "project.json")), message)
     }
 
+    func testWritesOnlyMappedDepotFilesUnderTheirNewPath() async throws {
+        let parent = try makeFixtureDirectory()
+        let assets = try SteamDepotManifest(container("assets\\shaders\\common.h"), depotID: 431960, manifestID: 51, key: key)
+        let kept = parent.appending(path: "kept")
+        try await SteamNativeDownload.materialize(assets.files, key: key, in: kept, path: SteamSceneAssetsDownload.assetsPath) { _ in
+        } fetch: { _ in self.encrypted }
+        XCTAssertEqual(try Data(contentsOf: kept.appending(path: "shaders/common.h")), message)
+
+        let program = try SteamDepotManifest(container("bin\\wallpaper64.exe"), depotID: 431960, manifestID: 51, key: key)
+        let skipped = parent.appending(path: "skipped")
+        try await SteamNativeDownload.materialize(program.files, key: key, in: skipped, path: SteamSceneAssetsDownload.assetsPath) { _ in
+        } fetch: { _ in
+            XCTFail("Files outside assets must not be fetched")
+            return Data()
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: skipped.path), [])
+    }
+
     func testQRRotatesChallengeAndAcceptsOnlyCredentialFromConfirmation() async throws {
         let credentials = "fixture.eyJzdWIiOiI3NjU2MTE5Nzk2MDI2NTcyOSJ9.signature"
         let fixture = QRResponses([

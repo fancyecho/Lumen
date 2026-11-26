@@ -118,6 +118,8 @@ final class SteamCMDSession: @unchecked Sendable {
         var status: Int32 = -1
         var loggedIn = false
         var downloads: [String: String] = [:]
+        /// Folders reported by `download_depot`, in order.
+        var depotFolders: [String] = []
         var failure: SteamCMD.Failure?
     }
 
@@ -276,6 +278,10 @@ final class SteamCMDSession: @unchecked Sendable {
             onEvent?(.downloaded(id: id, path: path))
         } else if line.firstMatch(of: /ERROR! Download item \d+ failed \((.+)\)/) != nil {
             record(.downloadFailed(String(localized: "SteamCMD reported a Workshop download error.")))
+        } else if let match = line.firstMatch(of: /Depot download complete : "(.+)"/) {
+            result.depotFolders.append(String(match.1))
+        } else if lower.contains("depot download failed") || lower.hasPrefix("error! download depot") {
+            record(.downloadFailed(String(localized: "SteamCMD couldn't download Wallpaper Engine's files.")))
         }
         return false
     }

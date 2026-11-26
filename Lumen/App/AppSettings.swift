@@ -121,7 +121,13 @@ final class AppSettings {
     }
 
     /// Wallpaper Engine's shared assets, from Settings or found automatically.
-    var sceneAssets: URL? { SceneAssetsLocator.resolve(configured: sceneAssetsPath) }
+    /// Bumped when Lumen installs or replaces its own assets copy; reading it in `sceneAssets`
+    /// lets views that show the folder's state redraw.
+    private(set) var sceneAssetsRevision = 0
+    var sceneAssets: URL? {
+        _ = sceneAssetsRevision
+        return SceneAssetsLocator.resolve(configured: sceneAssetsPath)
+    }
 
     var webRenderSettings: WebRenderSettings {
         WebRenderSettings(frameRate: shaderFrameRate, muted: !audioEnabled, volume: volume, audioReactive: audioReactiveWallpapers)
@@ -170,6 +176,13 @@ final class AppSettings {
         sceneAssetsPath = defaults.string(forKey: "sceneAssetsPath") ?? ""
         syncStillFrame = defaults.bool(forKey: "syncStillFrame")
         dockIconMode = DockIconMode(rawValue: defaults.string(forKey: "dockIconMode") ?? "") ?? .whileWindowOpen
+    }
+
+    /// The assets folder's contents changed without the setting changing (Lumen installed its
+    /// own copy); scenes reload so ones showing a preview pick the assets up.
+    func sceneAssetsDidChange() {
+        sceneAssetsRevision += 1
+        observers.forEach { $0(.scene) }
     }
 
     private func store(_ value: Any, _ key: String, _ change: Change?) {

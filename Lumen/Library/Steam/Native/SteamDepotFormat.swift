@@ -36,6 +36,15 @@ enum SteamCompression {
         return output
     }
 
+    /// A whole gzip file; its trailer records the uncompressed size (mod 2³², ample here).
+    static func gunzip(_ data: Data, maxBytes: Int) throws -> Data {
+        guard data.count >= 18 else { throw SteamNativeError.invalidContent }
+        var trailer = SteamBytes(data.suffix(4))
+        let size = Int(try trailer.littleEndian(UInt32.self))
+        guard size > 0, size <= maxBytes else { throw SteamNativeError.invalidContent }
+        return try inflate(data, size: size, gzip: true)
+    }
+
     /// SteamPipe uses single-entry ZIP archives for manifests and some older chunks.
     static func zipEntry(_ data: Data, maxSize: Int) throws -> Data {
         let bytes = Data(data)

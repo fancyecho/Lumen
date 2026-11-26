@@ -1,7 +1,7 @@
 # Lumen · 进度与任务板
 
 > 所有助手共同维护。开工前读，收工时更新（规则见 [`AGENTS.md`](../AGENTS.md)）。
-> 最后更新：2026-11-25 · claude（T40 场景内存，0.2.2 发布）
+> 最后更新：2026-11-26 · claude（T41 场景资源自给，0.2.3 发布）
 
 ## 1. 阶段进度
 
@@ -85,6 +85,7 @@
 | T33 | 引擎可靠性：下载 17 个创意工坊本周热门场景做测试语料，修共性问题 | 场景 | 高 | 完成 | claude | 已合并 `main`。SceneScript 改为先 `init` 再 `applyUserProperties`（与 WE 一致）；脚本返回 NaN 时保留上一帧的值；`import` 改写为绑定模块的变量（支持压缩脚本和别名）；补 `getTransformMatrix`、`getInitialLayerConfig`、`getVideoTexture` 占位。语料 92/92 加载，脚本异常 13→7（剩下的是场景自身引用了不存在的图层） |
 | T34 | 脚本动态图层 `thisScene.createLayer`：现在返回一个不可见的占位层，音频可视化等脚本只能画出一根条。92 个语料场景里 11 个用到（多为复制现有 bar 图层） | 场景 | 高 | 完成 | claude | 随 T37 完成（分支 `claude/T37-render-fidelity`）：`createLayer` 按模型路径（含创意工坊 `workshop/<id>/` 前缀差异）或 `getInitialLayerConfig` 复制已有图层，共享编译好的材质、贴图和特效缓冲，每根条只多一次绘制；6 个音频可视化场景的 64 根条已出现。文字阴影（`createLayer({text})`）仍不画 |
 | T35 | 脚本里的视频贴图和贴图动画：`getVideoTexture()`（播放、停止、`addEndedCallback`）和 `getTextureAnimation()` 现在都是占位，例如 3842760548 的多段视频切换不会发生。共 5 个语料场景 | 场景 | 中 | 待认领 | — | 需要 `SceneVideoTexture` 支持不循环播放和结束回调 |
+| T41 | 场景资源自给：用户删除 WallpaperMachine 后，Lumen 借用的 WE 共享 assets 随之消失，36 个场景壁纸全部退回预览图。改为 Lumen 自己保存 `Application Support/Lumen/SceneAssets`，用已有的 Steam 登录下载（SteamCMD 或原生均可），也可以从文件夹导入 | 场景/Steam | 高 | 完成 | claude | 0.2.3 发布。用户的 SteamCMD 缓存登录实测下载成功：depot 431961 约 5 秒，保留 85 MB 的 assets，其余删除；17/17 场景、206/206 着色器通过 |
 | T40 | 场景内存：大精灵图场景（如 1618282820「Kyoto Petals」，5 张 8192² RGBA 共 1.34 GB）让 Lumen 占到 7 GB | 场景 | 高 | 完成 | claude | 0.2.2 发布（分支 `claude/T40-scene-memory`，已合并 `main`）：纹理按需解码进暂存缓冲、上传后清空暂存缓冲；最近邻纹理不再生成用不到的 mipmap；同一场景的桌面、窗口预览、锁屏录制共享已上传的纹理（弱引用）。单份加载 3.07 GB → 1.38 GB，两份同时加载 1.39 GB |
 | T36 | 界面打磨第五、六轮：Steam 密码框不再清空；工具栏搜索框点别处退出输入；创意工坊隐藏底部播放条、侧栏对齐、隐藏滚动条；分段控件外壳贴合；播放列表重新设计；首页等大画面用高清封面；从菜单栏重新打开窗口时尺寸突变；工具栏改为左侧导航、右侧操作 | UI | 高 | 完成 | claude | 已合并 `main` 并推送，随 0.2.1 发布 |
 | T37 | 一眼可见的通用渲染问题：逐个对比 92 个语料场景的渲染和作者预览，修影响多个场景的共性缺陷 | 场景 | 高 | 完成 | claude | 已合并 `main`（分支 `claude/T37-render-fidelity`）：折射粒子（雨滴、水珠）先拷贝帧缓冲，不再画成黑方块，连续的折射粒子层共用一次拷贝；相对关键帧（`relative: true`，片头滑入）按属性原值叠加；形状图层（`shape: quad`，光束 light shafts 的 `DIRECTDRAW`）按画布大小的四边形叠加绘制；特效 `visible` 和着色器常量上的脚本（昼夜渐变、音频条颜色、特效速度，18/92 个场景）开始运行；`createLayer`（见 T34）。用户确认「基本能用」，剩余问题见交接日志「没做」，以后再改 |
@@ -103,6 +104,21 @@
 - 用户的 macOS 是英文系统；要看中文，在 app 内切换语言，或用 `-AppleLanguages "(zh-Hans)"` 启动。
 
 ## 5. 交接日志（新的写在最上面）
+
+### 2026-11-26 · claude · T41 场景资源自给（分支 `claude/T41-own-scene-assets`，已合并 `main`，发布为 0.2.3）
+
+- **起因**：用户删除了 WallpaperMachine（应用和 `Application Support/WallpaperMachine` 一起删掉）。Lumen 的 36 个场景壁纸本身完好，都在 `Lumen/Items` 里。但场景依赖的 WE 共享 assets 一直借用 `WallpaperMachine/SceneAssets`，这个文件夹没了，场景就全部退回预览图。
+- **资源位置**：只认 Lumen 自己的 `SceneAssets`。设置里直接显示这个路径和状态（已就绪 / 尚未下载），提供「从文件夹导入…」「重新下载」「在访达中显示」。启动时如果在别处找到副本（旧的配置路径、Steam），会克隆到 Lumen 的文件夹。
+- **下载**：
+  - **SteamCMD 登录**（用户现在用的就是这种）：`+@sSteamCmdForcePlatformType windows +login <缓存账号> +download_depot 431960 431961`。不需要密码，也不需要扫码；下载约 360 MB，取出 `assets`（85 MB）后，把 depot 里其余约 730 MB 删掉。实测约 5 秒完成（Steam 已有缓存）。`SteamCMDSession` 会解析 `Depot download complete : "…"`（路径里混有反斜杠）和 depot 下载失败。
+  - **原生登录**：PICS（8903–8906，对照 SteamTracking/Protobufs）读出 depot 列表，跳过 `steamchina` realm 的 depot；在清单里找 `assets/shaders/genericimage2.frag`，只下载 `assets/`，并行写文件。原生路径没有在真实账号上跑过（本机没有原生登录）。
+  - 两种方式都是校验通过后，再原子替换到 Lumen 的文件夹，然后通知 `.scene`，正在显示的场景随即重载。资源库、创意工坊页面和设置页都有入口；只有两种都没登录时，才提示扫码，扫码后自动下载。
+  - SteamCMD 一次只跑一个会话，下载 assets 期间，创意工坊下载会排队等待。
+- **其他**：`AppSettings.sceneAssetsRevision` 让界面能感知资源变化。`Tools/test.sh` 的默认语料改为 `build/we-corpus-popular`，assets 改为 `Lumen/SceneAssets`；原先的 75 场景语料随 WallpaperMachine 一起没了。README 的中英说明同步更新。
+- **验证**：
+  - build 通过；unit 51/51（新增 KeyValues、depot 选择、`assets/` 路径过滤、按映射写文件、SteamCMD depot 输出各项）。
+  - `scenes` 17/17、0 洋红；`shaders` 206/206，都是用下载来的 assets 跑的。
+  - 应用内实测：资源库提示 → 从 Steam 下载 → 提示消失；「土星」场景实时渲染。
 
 ### 2026-11-25 · claude · T40 场景内存（分支 `claude/T40-scene-memory`，已合并 `main`，发布为 0.2.2）
 

@@ -1,13 +1,18 @@
 import Foundation
 
 /// Finds Wallpaper Engine's shared `assets` folder (shaders, materials, effects), which scenes
-/// rely on but which isn't part of any Workshop item. Lumen only reads it.
+/// rely on but which isn't part of any Workshop item.
+///
+/// Lumen keeps its own copy in `Application Support/Lumen/SceneAssets`, either downloaded from
+/// Steam or copied from a folder it found, so removing another app never breaks scenes.
 enum SceneAssetsLocator {
-    /// Places a copy may already exist on this Mac.
+    static var ownFolder: URL { AppPaths.root.appending(path: "SceneAssets", directoryHint: .isDirectory) }
+
+    /// Places a copy may already exist on this Mac, Lumen's own first.
     static var candidates: [URL] {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var urls = [
-            support.appending(path: "Lumen/SceneAssets"),
+            ownFolder,
             support.appending(path: "WallpaperMachine/SceneAssets"),
             support.appending(path: "Steam/steamapps/common/wallpaper_engine/assets"),
         ]
@@ -17,15 +22,18 @@ enum SceneAssetsLocator {
         return urls
     }
 
-    /// The configured folder if valid, otherwise the first copy found.
+    /// Lumen's own copy; until it exists, a configured folder or another copy found on this Mac.
     static func resolve(configured path: String) -> URL? {
-        if !path.isEmpty {
-            let url = URL(fileURLWithPath: path)
-            if isAssetsFolder(url) { return url }
-            let nested = url.appending(path: "assets")
-            if isAssetsFolder(nested) { return nested }
-        }
-        return candidates.first(where: isAssetsFolder)
+        if isAssetsFolder(ownFolder) { return ownFolder }
+        return configuredFolder(path) ?? candidates.first(where: isAssetsFolder)
+    }
+
+    private static func configuredFolder(_ path: String) -> URL? {
+        guard !path.isEmpty else { return nil }
+        let url = URL(fileURLWithPath: path)
+        if isAssetsFolder(url) { return url }
+        let nested = url.appending(path: "assets")
+        return isAssetsFolder(nested) ? nested : nil
     }
 
     /// A real assets folder has the core image shader and the common include.
@@ -33,6 +41,42 @@ enum SceneAssetsLocator {
         let manager = FileManager.default
         return manager.fileExists(atPath: url.appending(path: "shaders/genericimage2.frag").path)
             && manager.fileExists(atPath: url.appending(path: "shaders/common.h").path)
+    }
+
+    /// Copies assets found elsewhere into Lumen's own folder when it has none yet. On the same
+    /// APFS volume the copy is a clone and takes no extra space. Returns true if it copied.
+    /// Runs file I/O; call it off the main thread.
+    @discardableResult
+    static func adoptExternalCopy(configured path: String) -> Bool {
+        guard !isAssetsFolder(ownFolder) else { return false }
+        let others = candidates.dropFirst()
+        guard let source = configuredFolder(path) ?? others.first(where: isAssetsFolder) else { return false }
+        return (try? importCopy(from: source)) != nil
+    }
+
+    /// Copies a chosen assets folder (or a folder containing `assets`) into Lumen's own folder.
+    static func importCopy(from folder: URL) throws {
+        guard let source = configuredFolder(folder.path) else { throw CocoaError(.fileReadCorruptFile) }
+        let staging = AppPaths.root.appending(path: "SceneAssets.copy-\(UUID().uuidString)", directoryHint: .isDirectory)
+        do {
+            try FileManager.default.createDirectory(at: AppPaths.root, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: staging)
+            try install(staging)
+        } catch {
+            try? FileManager.default.removeItem(at: staging)
+            throw error
+        }
+    }
+
+    /// Moves a verified folder into place as Lumen's copy, replacing any older one.
+    static func install(_ folder: URL) throws {
+        guard isAssetsFolder(folder) else { throw CocoaError(.fileReadCorruptFile) }
+        let manager = FileManager.default
+        if manager.fileExists(atPath: ownFolder.path) {
+            _ = try manager.replaceItemAt(ownFolder, withItemAt: folder)
+        } else {
+            try manager.moveItem(at: folder, to: ownFolder)
+        }
     }
 }
 
