@@ -14,8 +14,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/Lumen"
 OUT="$ROOT/build/tools"
-CORPUS="${LUMEN_SCENE_CORPUS:-$HOME/Library/Application Support/WallpaperMachine/Library}"
-ASSETS="${LUMEN_SCENE_ASSETS:-$HOME/Library/Application Support/WallpaperMachine/SceneAssets}"
+# Defaults: the popular-scene corpus in build/ and Lumen's own copy of Wallpaper Engine's assets.
+CORPUS="${LUMEN_SCENE_CORPUS:-$ROOT/build/we-corpus-popular}"
+ASSETS="${LUMEN_SCENE_ASSETS:-$HOME/Library/Application Support/Lumen/SceneAssets}"
 mkdir -p "$OUT"
 
 scene_sources() {

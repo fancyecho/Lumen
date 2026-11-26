@@ -55,6 +55,9 @@ struct LibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.xl) {
                 header
+                if model.settings.sceneAssets == nil && model.library.all.contains(where: { $0.kind == .scene }) {
+                    AssetsNotice()
+                }
                 controls
                 if !model.library.importJobs.isEmpty { importProgress }
                 if wallpapers.isEmpty {

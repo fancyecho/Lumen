@@ -10,31 +10,40 @@ struct WallpaperEngineSettings: View {
         let assets = settings.sceneAssets
         Form {
             Section {
+                let own = SceneAssetsLocator.ownFolder
+                let ready = assets != nil
                 LabeledContent("Assets folder") {
-                    if let assets {
-                        Text(verbatim: abbreviated(assets))
+                    HStack(spacing: Theme.Space.xs) {
+                        Text(verbatim: abbreviated(own))
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .foregroundStyle(.secondary)
-                    } else {
-                        Label("Not found", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Theme.paused)
+                        if ready {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.playing)
+                                .accessibilityLabel(Text("Ready"))
+                        } else {
+                            Label("Not downloaded", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Theme.paused)
+                        }
                     }
                 }
+                if !ready || model.steam.assetsDownload != .idle {
+                    SceneAssetsDownloadControl(inForm: true)
+                }
                 HStack {
-                    Button("Choose Folder…") { chooseAssets() }
-                    if !settings.sceneAssetsPath.isEmpty {
-                        Button("Find Automatically") { settings.sceneAssetsPath = "" }
-                    }
+                    Button("Import from Folder…") { importAssets() }
+                        .disabled(model.steam.assetsDownload != .idle)
                     Spacer()
-                    if let assets {
-                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([assets]) }
+                    if ready {
+                        Button("Download Again") { model.downloadSceneAssets() }
+                            .disabled(!model.steam.canDownloadSceneAssets || model.steam.assetsDownload != .idle)
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([own]) }
                     }
                 }
             } header: {
                 Text("Scene assets")
             } footer: {
-                Text("Scenes use shaders, materials and effects that ship with Wallpaper Engine itself. Choose the “assets” folder of a Wallpaper Engine installation you own (for example copied from a Windows PC), or one another app downloaded. Lumen only reads it.")
+                Text("Scenes use shaders, materials and effects that ship with Wallpaper Engine itself. Lumen downloads them from Steam with the account you signed in with and keeps them in its own folder, so they don't depend on any other app.")
             }
 
             Section {
@@ -83,17 +92,26 @@ struct WallpaperEngineSettings: View {
         (url.path as NSString).abbreviatingWithTildeInPath
     }
 
-    private func chooseAssets() {
+    /// Copies an assets folder (for example from a Windows PC) into Lumen's own folder.
+    private func importAssets() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.message = String(localized: "Choose Wallpaper Engine's “assets” folder.")
         panel.prompt = String(localized: "Use Folder")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        if SceneAssetsLocator.isAssetsFolder(url) || SceneAssetsLocator.isAssetsFolder(url.appending(path: "assets")) {
-            model.settings.sceneAssetsPath = url.path
-        } else {
+        guard SceneAssetsLocator.isAssetsFolder(url) || SceneAssetsLocator.isAssetsFolder(url.appending(path: "assets")) else {
             model.showToast(String(localized: "That folder doesn't look like Wallpaper Engine's assets."), symbol: "exclamationmark.triangle.fill")
+            return
+        }
+        Task {
+            do {
+                try await Task.detached(priority: .userInitiated) { try SceneAssetsLocator.importCopy(from: url) }.value
+                model.settings.sceneAssetsDidChange()
+                model.showToast(String(localized: "Scene assets copied into Lumen."), symbol: "checkmark.circle.fill")
+            } catch {
+                model.showToast(String(localized: "Couldn't copy the assets folder."), symbol: "exclamationmark.triangle.fill")
+            }
         }
     }
 

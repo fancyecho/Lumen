@@ -98,8 +98,8 @@ Tools/test.sh steam
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `LUMEN_SCENE_CORPUS` | `~/Library/Application Support/WallpaperMachine/Library` | 75 个场景，**只读** |
-| `LUMEN_SCENE_ASSETS` | `~/Library/Application Support/WallpaperMachine/SceneAssets` | WE 共享 assets，**只读** |
+| `LUMEN_SCENE_CORPUS` | `build/we-corpus-popular` | 热门场景语料。原先的 75 个场景在 WallpaperMachine 库里，2026-11-26 已随 WallpaperMachine 一起被删除 |
+| `LUMEN_SCENE_ASSETS` | `~/Library/Application Support/Lumen/SceneAssets` | Lumen 自己的 WE 共享 assets（从 Steam 下载，或从找到的副本复制） |
 
 在别的机器上，把这两个变量指向自己的 Steam 创意工坊目录（`steamapps/workshop/content/431960`）和 Wallpaper Engine 的 `assets` 文件夹即可。
 

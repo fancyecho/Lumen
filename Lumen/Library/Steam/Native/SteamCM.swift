@@ -12,6 +12,10 @@ actor SteamCM {
         case depotKey = 5438
         case depotKeyResponse = 5439
         case logon = 5514
+        case picsProductInfoRequest = 8903
+        case picsProductInfoResponse = 8904
+        case picsAccessTokenRequest = 8905
+        case picsAccessTokenResponse = 8906
         case hello = 9805
     }
 
@@ -118,10 +122,14 @@ actor SteamCM {
         return try SteamProto(response.body)
     }
 
+    /// SteamPipe Workshop depots use the consumer app ID as their depot ID.
     func depotKey(appID: UInt64) async throws -> Data {
+        try await depotKey(depotID: appID, appID: appID)
+    }
+
+    func depotKey(depotID: UInt64, appID: UInt64) async throws -> Data {
         var body = SteamProto.Writer()
-        // SteamPipe Workshop depots use the consumer app ID as their depot ID.
-        body.uint(1, appID)
+        body.uint(1, depotID)
         body.uint(2, appID)
         let job = reserveJob()
         try await send(.depotKey, body: body.data, job: job)
@@ -129,10 +137,58 @@ actor SteamCM {
         let fields = try SteamProto(response.body)
         let code = fields.number(1) ?? 2
         guard code == 1 else { throw SteamNativeError.result(code) }
-        guard fields.number(2) == appID, let key = fields.bytes(3), key.count == 32 else {
+        guard fields.number(2) == depotID, let key = fields.bytes(3), key.count == 32 else {
             throw SteamNativeError.protocolError
         }
         return key
+    }
+
+    /// The app's PICS product info: a text KeyValues document listing its depots and their
+    /// public manifests. Owned apps may need an access token for the full document.
+    func appInfo(appID: UInt64) async throws -> Data {
+        var tokenRequest = SteamProto.Writer()
+        tokenRequest.uint(2, appID)
+        let tokenJob = reserveJob()
+        try await send(.picsAccessTokenRequest, body: tokenRequest.data, job: tokenJob)
+        let tokens = try SteamProto(try await reply(.picsAccessTokenResponse, job: tokenJob).body)
+        let token = try tokens.messages(3).first(where: { $0.number(1) == appID })?.number(2) ?? 0
+
+        var app = SteamProto.Writer()
+        app.uint(1, appID)
+        if token != 0 { app.uint(2, token) }
+        var request = SteamProto.Writer()
+        request.bytes(2, app.data)
+        request.uint(7, 1)
+        let job = reserveJob()
+        try await send(.picsProductInfoRequest, body: request.data, job: job)
+        // A large answer can arrive in several messages; `response_pending` marks all but the last.
+        for _ in 0..<8 {
+            let response = try SteamProto(try await reply(.picsProductInfoResponse, job: job).body)
+            if let info = try response.messages(1).first(where: { $0.number(1) == appID }) {
+                if let buffer = info.bytes(5), !buffer.isEmpty { return buffer }
+                if let host = response.string(8), let sha = info.bytes(4), !sha.isEmpty {
+                    return try await Self.appInfoOverHTTP(host: host, appID: appID, sha: sha)
+                }
+                if info.number(3) == 1 { throw SteamNativeError.accessDenied }
+                throw SteamNativeError.protocolError
+            }
+            if try response.messages(2).isEmpty == false || response.number(6) != 1 { break }
+        }
+        throw SteamNativeError.accessDenied
+    }
+
+    private static func appInfoOverHTTP(host: String, appID: UInt64, sha: Data) async throws -> Data {
+        let name = host.lowercased()
+        guard name.hasSuffix(".steamcontent.com") || name.hasSuffix(".steampowered.com"),
+              name.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 46 }) else {
+            throw SteamNativeError.protocolError
+        }
+        let digest = sha.map { String(format: "%02x", $0) }.joined()
+        guard let url = URL(string: "https://\(name)/appinfo/\(appID)/sha/\(digest).txt.gz") else {
+            throw SteamNativeError.protocolError
+        }
+        let compressed = try await SteamNativeHTTP.shared.data(URLRequest(url: url), maxBytes: 16 * 1024 * 1024)
+        return try SteamCompression.gunzip(compressed, maxBytes: 64 * 1024 * 1024)
     }
 
     private func reserveJob() -> UInt64 {

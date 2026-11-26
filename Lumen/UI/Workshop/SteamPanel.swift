@@ -258,7 +258,7 @@ struct SteamPanel: View {
     }
 }
 
-private struct SteamSignInCode: View {
+struct SteamSignInCode: View {
     let url: URL
     private static let context = CIContext()
 

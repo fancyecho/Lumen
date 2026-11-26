@@ -38,7 +38,7 @@ struct SteamNativeDownload {
         guard let code = codeResponse.number(1), code != 0 else { throw SteamNativeError.accessDenied }
 
         let key = try await cm.depotKey(appID: appID)
-        var cdn = try await SteamContentServers(cm: cm, appID: appID)
+        let cdn = try await SteamContentServers(cm: cm, appID: appID)
         let data = try await cdn.fetch("manifest/\(manifestID)/5/\(code)", maxBytes: 64 * 1024 * 1024)
         let manifest = try SteamDepotManifest(data, depotID: appID, manifestID: manifestID, key: key)
         try await Self.materialize(manifest, key: key, in: folder, progress: progress) { chunk in
@@ -46,56 +46,92 @@ struct SteamNativeDownload {
         }
     }
 
+    /// Writes a Workshop item and checks that it really is a Wallpaper Engine project.
     static func materialize(_ manifest: SteamDepotManifest, key: Data, in folder: URL,
                             progress: (Double) async -> Void,
-                            fetch: (SteamDepotManifest.Chunk) async throws -> Data) async throws {
+                            fetch: @escaping @Sendable (SteamDepotManifest.Chunk) async throws -> Data) async throws {
+        try await materialize(manifest.files, key: key, in: folder, progress: progress, fetch: fetch)
+        guard WEProject.isProjectFolder(folder) else { throw SteamNativeError.invalidContent }
+    }
+
+    /// Reassembles `files` under `folder` from verified chunks. `path` maps a depot path to its
+    /// place in the folder, or nil to skip it. Several files download at once; each file's
+    /// chunks stay in order so its SHA-1 can be checked as it is written.
+    static func materialize(_ files: [SteamDepotManifest.File], key: Data, in folder: URL,
+                            path: ([String]) -> [String]? = { $0 }, concurrency: Int = 6,
+                            progress: (Double) async -> Void,
+                            fetch: @escaping @Sendable (SteamDepotManifest.Chunk) async throws -> Data) async throws {
         // The caller gives each download a fresh directory; no preexisting links or files are reused.
         guard !FileManager.default.fileExists(atPath: folder.path) else { throw SteamNativeError.invalidContent }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var delivered: UInt64 = 0
-        for item in manifest.files {
-            try Task.checkCancellation()
-            let target = item.components.reduce(folder) { $0.appending(path: $1) }
+        var jobs: [(target: URL, file: SteamDepotManifest.File)] = []
+        for item in files {
+            guard let components = path(item.components), !components.isEmpty else { continue }
+            let target = components.reduce(folder) { $0.appending(path: $1) }
             if item.isDirectory {
                 try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-                continue
-            }
-            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard !FileManager.default.fileExists(atPath: target.path),
-                  FileManager.default.createFile(atPath: target.path, contents: nil) else {
-                throw SteamNativeError.invalidContent
-            }
-            let file = try FileHandle(forWritingTo: target)
-            defer { try? file.close() }
-            var hash = Insecure.SHA1()
-            for chunk in item.chunks {
-                try Task.checkCancellation()
-                let sealed = try await fetch(chunk)
-                let compressed = try SteamDepotCipher.decrypt(sealed, key: key)
-                let content = try SteamCompression.chunk(compressed, size: chunk.size)
-                try chunk.verify(content)
-                try file.write(contentsOf: content)
-                hash.update(data: content)
-                delivered += UInt64(content.count)
-                await progress(Double(delivered) / Double(max(manifest.size, 1)))
-            }
-            if let expected = item.hash, Data(hash.finalize()) != expected {
-                throw SteamNativeError.invalidContent
+            } else {
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                jobs.append((target, item))
             }
         }
-        guard WEProject.isProjectFolder(folder) else { throw SteamNativeError.invalidContent }
+        let total = max(jobs.reduce(UInt64(0)) { $0 + $1.file.size }, 1)
+        var delivered: UInt64 = 0
+        try await withThrowingTaskGroup(of: UInt64.self) { group in
+            var pending = jobs[...]
+            func startNext() {
+                guard let job = pending.popFirst() else { return }
+                group.addTask { try await write(job.file, to: job.target, key: key, fetch: fetch) }
+            }
+            for _ in 0..<max(concurrency, 1) { startNext() }
+            while let written = try await group.next() {
+                delivered += written
+                await progress(Double(delivered) / Double(total))
+                startNext()
+            }
+        }
+    }
+
+    private static func write(_ item: SteamDepotManifest.File, to target: URL, key: Data,
+                              fetch: @Sendable (SteamDepotManifest.Chunk) async throws -> Data) async throws -> UInt64 {
+        try Task.checkCancellation()
+        guard !FileManager.default.fileExists(atPath: target.path),
+              FileManager.default.createFile(atPath: target.path, contents: nil) else {
+            throw SteamNativeError.invalidContent
+        }
+        let file = try FileHandle(forWritingTo: target)
+        defer { try? file.close() }
+        var hash = Insecure.SHA1()
+        var written: UInt64 = 0
+        for chunk in item.chunks {
+            try Task.checkCancellation()
+            let sealed = try await fetch(chunk)
+            let compressed = try SteamDepotCipher.decrypt(sealed, key: key)
+            let content = try SteamCompression.chunk(compressed, size: chunk.size)
+            try chunk.verify(content)
+            try file.write(contentsOf: content)
+            hash.update(data: content)
+            written += UInt64(content.count)
+        }
+        if let expected = item.hash, Data(hash.finalize()) != expected {
+            throw SteamNativeError.invalidContent
+        }
+        return written
     }
 }
 
-private struct SteamContentServers {
+/// Steam's CDN for one depot. An actor so several files can download through it at once.
+actor SteamContentServers {
     private let cm: SteamCM
     private let appID: UInt64
+    private let depotID: UInt64
     private var hosts: [String]
     private var authorisations: [String: String] = [:]
 
-    init(cm: SteamCM, appID: UInt64) async throws {
+    init(cm: SteamCM, appID: UInt64, depotID: UInt64? = nil) async throws {
         self.cm = cm
         self.appID = appID
+        self.depotID = depotID ?? appID
         var request = SteamProto.Writer()
         request.uint(1, await cm.cellID())
         request.uint(2, 20)
@@ -110,7 +146,7 @@ private struct SteamContentServers {
         guard !hosts.isEmpty else { throw SteamNativeError.connection }
     }
 
-    mutating func fetch(_ path: String, maxBytes: Int) async throws -> Data {
+    func fetch(_ path: String, maxBytes: Int) async throws -> Data {
         var error: Error = SteamNativeError.connection
         for host in Array(hosts.prefix(5)) {
             try Task.checkCancellation()
@@ -131,12 +167,12 @@ private struct SteamContentServers {
         throw error
     }
 
-    private mutating func fetch(_ path: String, host: String, maxBytes: Int) async throws -> Data {
+    private func fetch(_ path: String, host: String, maxBytes: Int) async throws -> Data {
         do {
             return try await fetch(path, host: host, token: authorisations[host], maxBytes: maxBytes)
         } catch SteamNativeError.accessDenied {
             var request = SteamProto.Writer()
-            request.uint(1, appID)
+            request.uint(1, depotID)
             request.string(2, host)
             request.uint(3, appID)
             let reply = try await cm.service("ContentServerDirectory.GetCDNAuthToken", request)
@@ -150,7 +186,7 @@ private struct SteamContentServers {
         var endpoint = URLComponents()
         endpoint.scheme = "https"
         endpoint.host = host
-        endpoint.path = "/depot/\(appID)/\(path)"
+        endpoint.path = "/depot/\(depotID)/\(path)"
         if let token {
             let query = token.hasPrefix("?") ? String(token.dropFirst()) : token
             guard let parameters = URLComponents(string: "?\(query)"), parameters.fragment == nil,

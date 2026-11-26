@@ -126,7 +126,8 @@ struct WorkshopView: View {
     private var localContent: some View {
         let workshop = model.workshop
         let projects = filtered
-        if model.settings.sceneAssets == nil && workshop.projects.contains(where: { $0.kind == .scene }) {
+        if model.settings.sceneAssets == nil
+            && (workshop.projects.contains(where: { $0.kind == .scene }) || model.library.all.contains(where: { $0.kind == .scene })) {
             AssetsNotice()
         }
         controls(projects)
@@ -383,10 +384,12 @@ struct AssetsNotice: View {
                 Text("Scenes need Wallpaper Engine's shared assets")
                     .font(Theme.TypeScale.cardTitle)
                     .foregroundStyle(Theme.Ink.primary)
-                Text("Scenes use shaders and effects that ship with Wallpaper Engine, not with each Workshop item. Point Lumen at an assets folder in Settings › Wallpaper Engine.")
+                Text("Scenes use shaders and effects that ship with Wallpaper Engine, not with each Workshop item. Lumen can download them from Steam into its own folder.")
                     .font(Theme.TypeScale.caption)
                     .foregroundStyle(Theme.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                SceneAssetsDownloadControl()
+                    .padding(.top, Theme.Space.xxs)
             }
             Spacer(minLength: Theme.Space.sm)
             SettingsLink { Text("Open Settings") }

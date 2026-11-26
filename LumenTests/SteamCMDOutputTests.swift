@@ -34,6 +34,25 @@ final class SteamCMDOutputTests: XCTestCase {
         XCTAssertEqual(path, "/fixture/Workshop Content/123456")
     }
 
+    func testReportsDepotFoldersAndDepotFailures() async throws {
+        let done = try await runTranscript(#"""
+        printf 'Logging in using cached credentials.\n'
+        printf 'Waiting for user info...OK\n'
+        printf 'Downloading depot 431961 (6301 files, 359 MB) ... \n'
+        printf 'Depot download complete : "/fixture/SteamCMD\\steamapps\\content\\app_431960\\depot_431961" (manifest 1) \n'
+        """#)
+        XCTAssertTrue(done.result.loggedIn)
+        XCTAssertEqual(done.result.depotFolders, [#"/fixture/SteamCMD\steamapps\content\app_431960\depot_431961"#])
+        XCTAssertNil(done.result.failure)
+
+        let failed = try await runTranscript(#"""
+        printf 'Waiting for user info...OK\n'
+        printf 'Depot download failed : No subscription\n'
+        """#)
+        XCTAssertTrue(failed.result.depotFolders.isEmpty)
+        XCTAssertEqual(failed.result.failure, .accessDenied)
+    }
+
     func testDistinguishesSignInAndWorkshopFailures() async throws {
         let result = try await runTranscript(#"""
         printf 'FAILED (Invalid Password)\n'

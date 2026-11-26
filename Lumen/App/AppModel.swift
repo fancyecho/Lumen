@@ -55,6 +55,7 @@ final class AppModel {
         library.load()
         system.start()
         engine.start()
+        adoptSceneAssets()
         playlists.start()
         lockScreen.start()
         updater.onAutomaticFind = { [weak self] release in
@@ -250,6 +251,24 @@ final class AppModel {
             return engine.displays.count > 1 ? String(localized: "all displays") : String(localized: "your desktop")
         case .display(let id):
             return engine.displays.first { $0.id == id }?.name ?? String(localized: "that display")
+        }
+    }
+
+    /// Copies assets that another app or a chosen folder holds into Lumen's own folder, so
+    /// scenes keep working if that app or folder goes away.
+    func adoptSceneAssets() {
+        let path = settings.sceneAssetsPath
+        Task.detached(priority: .utility) { [weak self] in
+            guard SceneAssetsLocator.adoptExternalCopy(configured: path) else { return }
+            await self?.settings.sceneAssetsDidChange()
+        }
+    }
+
+    /// Downloads Wallpaper Engine's shared assets from Steam into Lumen's own folder.
+    func downloadSceneAssets() {
+        steam.downloadSceneAssets { [weak self] in
+            self?.settings.sceneAssetsDidChange()
+            self?.showToast(String(localized: "Scene assets downloaded. Scenes can render again."), symbol: "checkmark.circle.fill")
         }
     }
 

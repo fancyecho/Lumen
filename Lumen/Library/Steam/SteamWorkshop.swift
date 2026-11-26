@@ -49,6 +49,16 @@ final class SteamWorkshop {
     private(set) var signInError: String?
     private(set) var isInstalling = false
 
+    /// Downloading Wallpaper Engine's shared scene assets into Lumen's own folder.
+    enum AssetsDownload: Equatable {
+        case idle
+        case downloading(Double?)
+        case failed(String)
+    }
+
+    private(set) var assetsDownload: AssetsDownload = .idle
+
+    @ObservationIgnored private var assetsTask: Task<Void, Never>?
     @ObservationIgnored private var session: SteamCMDSession?
     @ObservationIgnored private var qrTask: Task<Void, Never>?
     @ObservationIgnored private var nativeCredential: SteamNativeCredential?
@@ -68,6 +78,83 @@ final class SteamWorkshop {
 
     var isSignedIn: Bool { account != nil }
     var isBusy: Bool { worker != nil || isSigningIn }
+
+    /// Either sign-in can fetch the assets: the native client reads the app depot directly,
+    /// SteamCMD downloads the content depot with its cached login.
+    var canDownloadSceneAssets: Bool { isSignedIn }
+
+    // MARK: Scene assets
+
+    /// Fetches Wallpaper Engine's `assets/` from Steam and installs it as Lumen's own copy.
+    /// `onInstalled` runs once the new folder is in place, so open scenes can reload.
+    func downloadSceneAssets(onInstalled: @escaping @MainActor () -> Void) {
+        // SteamCMD runs one session at a time; Workshop downloads wait for this one.
+        guard assetsTask == nil, worker == nil, !isSigningIn, isSignedIn else { return }
+        assetsDownload = .downloading(nil)
+        assetsTask = Task { [weak self] in
+            guard let self else { return }
+            let staging = AppPaths.root.appending(path: "SceneAssets.download-\(UUID().uuidString)", directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: staging) }
+            do {
+                try FileManager.default.createDirectory(at: AppPaths.root, withIntermediateDirectories: true)
+                if let credential = nativeCredential {
+                    try await SteamSceneAssetsDownload().download(credential: credential, to: staging) { [weak self] progress in
+                        await self?.reportAssetsProgress(progress)
+                    }
+                } else if let steamCMDAccount {
+                    try await downloadSceneAssetsWithSteamCMD(account: steamCMDAccount, to: staging)
+                }
+                try SceneAssetsLocator.install(staging)
+                assetsDownload = .idle
+                onInstalled()
+            } catch is CancellationError {
+                assetsDownload = .idle
+            } catch {
+                if let failure = error as? SteamCMD.Failure, failure == .notSignedIn {
+                    steamCMDAccount = nil
+                    UserDefaults.standard.removeObject(forKey: Self.accountKey)
+                }
+                if let failure = error as? SteamNativeError, failure == .signInRequired || failure == .expired {
+                    try? SteamNativeKeychain.remove()
+                    nativeCredential = nil
+                    nativeAccount = nil
+                }
+                assetsDownload = .failed(error.localizedDescription)
+            }
+            assetsTask = nil
+            startNext()
+        }
+    }
+
+    /// Downloads the content depot (about 360 MB) with SteamCMD's cached login, keeps only its
+    /// `assets` folder (about 85 MB) and deletes the rest.
+    private func downloadSceneAssetsWithSteamCMD(account: String, to staging: URL) async throws {
+        try await ensureInstalled()
+        let depotID = String(SteamSceneAssetsDownload.contentDepot)
+        let result = await runSteamCMD(["+@sSteamCmdForcePlatformType", "windows", "+login", account,
+                                        "+download_depot", Self.appID, depotID, "+quit"])
+        guard result.loggedIn, result.status == 0, let path = result.depotFolders.last else {
+            throw result.failure ?? SteamCMD.Failure.downloadFailed(String(localized: "SteamCMD did not confirm the download."))
+        }
+        let root = SteamCMD.folder.resolvingSymlinksInPath().standardizedFileURL
+        let depot = URL(fileURLWithPath: path.replacingOccurrences(of: "\\", with: "/"))
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard depot.path.hasPrefix(root.path + "/"), depot.lastPathComponent == "depot_\(depotID)" else {
+            throw SteamCMD.Failure.downloadFailed(String(localized: "SteamCMD couldn't download Wallpaper Engine's files."))
+        }
+        defer { try? FileManager.default.removeItem(at: depot) }
+        let assets = depot.appending(path: "assets", directoryHint: .isDirectory)
+        guard SceneAssetsLocator.isAssetsFolder(assets) else {
+            throw SteamCMD.Failure.downloadFailed(String(localized: "SteamCMD couldn't download Wallpaper Engine's files."))
+        }
+        try FileManager.default.moveItem(at: assets, to: staging)
+    }
+
+    private func reportAssetsProgress(_ progress: Double) {
+        // Thousands of small files finish quickly; redraw only in visible steps.
+        if case .downloading(let shown) = assetsDownload, let shown, progress - shown < 0.005, progress < 1 { return }
+        assetsDownload = .downloading(progress)
+    }
 
     // MARK: Account
 
@@ -219,7 +306,7 @@ final class SteamWorkshop {
     }
 
     private func startNext() {
-        guard worker == nil, !isSigningIn, let next = downloads.last(where: { $0.state == .queued }) else { return }
+        guard worker == nil, assetsTask == nil, !isSigningIn, let next = downloads.last(where: { $0.state == .queued }) else { return }
         worker = Task { [weak self] in
             await self?.run(next.id)
             self?.worker = nil
